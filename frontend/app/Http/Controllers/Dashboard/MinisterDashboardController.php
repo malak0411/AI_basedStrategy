@@ -1,5 +1,4 @@
 <?php
-// الملف: app/Http/Controllers/Dashboard/MinisterDashboardController.php
 
 namespace App\Http\Controllers\Dashboard;
 
@@ -15,129 +14,58 @@ class MinisterDashboardController extends Controller
         $this->apiClient = new ApiClient();
     }
 
-    /**
-     * عرض لوحة تحكم الوزير
-     */
     public function index()
     {
+        $token = session('jwt_token');
+        $role = session('user_role');
+
+        if (!$token) {
+            return redirect()->route('login')->with('error', 'يجب تسجيل الدخول أولاً');
+        }
+
+        // السماح للقيادات فقط
+        if (!in_array($role, ['minister', 'deputy', 'general_manager'])) {
+            return redirect()->route('dashboard.employee')
+                ->with('error', 'ليس لديك صلاحية للوصول إلى هذه الصفحة');
+        }
+
         try {
-            $token = session('jwt_token');
-            
-            // جلب جميع البيانات المطلوبة
-            $dashboardData = $this->getDashboardData($token);
-            $pillars = $this->getStrategicPillars($token);
-            $departmentsPerformance = $this->getDepartmentsPerformance($token);
-            $aiRecommendations = $this->getAIRecommendations($token);
-            $budgetOverview = $this->getBudgetOverview($token);
-            $risks = $this->getAllRisks($token);
-            
+            $stats = $this->fetchData('/api/dashboard/minister', $token, [
+                'total_employees' => 0,
+                'total_departments' => 0,
+                'active_projects' => 0,
+                'budget_utilization' => 0,
+                'completion_rate' => 0,
+                'delayed_tasks' => 0,
+            ]);
+
+            $departments = $this->fetchData('/api/dashboard/departments-performance', $token, []);
+            $pillars = $this->fetchData('/api/strategic/pillars', $token, []);
+            $delayedTasks = $this->fetchData('/api/tasks/delayed', $token, []);
+
             return view('dashboard.minister', compact(
-                'dashboardData',
-                'pillars',
-                'departmentsPerformance',
-                'aiRecommendations',
-                'budgetOverview',
-                'risks'
+                'stats', 'departments', 'pillars', 'delayedTasks'
             ));
-            
+
         } catch (\Exception $e) {
             \Log::error('Minister Dashboard Error: ' . $e->getMessage());
-            
             return view('dashboard.minister', [
-                'dashboardData' => [],
+                'stats' => [],
+                'departments' => [],
                 'pillars' => [],
-                'departmentsPerformance' => [],
-                'aiRecommendations' => [],
-                'budgetOverview' => [],
-                'risks' => [],
+                'delayedTasks' => [],
                 'error' => 'عذراً، حدث خطأ في تحميل البيانات'
             ]);
         }
     }
 
-    /**
-     * جلب بيانات لوحة التحكم الرئيسية
-     */
-    private function getDashboardData($token)
+    private function fetchData($endpoint, $token, $default = [])
     {
         try {
-            $response = $this->apiClient->get('/api/dashboard/minister', $token);
-            return $response['data'] ?? [];
+            $response = $this->apiClient->get($endpoint, $token);
+            return $response['data'] ?? $default;
         } catch (\Exception $e) {
-            return [];
-        }
-    }
-
-    /**
-     * جلب الركائز الاستراتيجية
-     */
-    private function getStrategicPillars($token)
-    {
-        try {
-            $response = $this->apiClient->get('/api/strategic/pillars', $token, [
-                'limit' => 5
-            ]);
-            return $response['data'] ?? [];
-        } catch (\Exception $e) {
-            return [];
-        }
-    }
-
-    /**
-     * جلب أداء الإدارات
-     */
-    private function getDepartmentsPerformance($token)
-    {
-        try {
-            $response = $this->apiClient->get('/api/dashboard/departments-performance', $token);
-            return $response['data'] ?? [];
-        } catch (\Exception $e) {
-            return [];
-        }
-    }
-
-    /**
-     * جلب توصيات الذكاء الاصطناعي
-     */
-    private function getAIRecommendations($token)
-    {
-        try {
-            $response = $this->apiClient->get('/api/ai/recommendations', $token, [
-                'limit' => 5
-            ]);
-            return $response['data'] ?? [];
-        } catch (\Exception $e) {
-            return [];
-        }
-    }
-
-    /**
-     * جلب نظرة عامة على الميزانية
-     */
-    private function getBudgetOverview($token)
-    {
-        try {
-            $response = $this->apiClient->get('/api/budget/overview', $token);
-            return $response['data'] ?? [];
-        } catch (\Exception $e) {
-            return [];
-        }
-    }
-
-    /**
-     * جلب جميع المخاطر
-     */
-    private function getAllRisks($token)
-    {
-        try {
-            $response = $this->apiClient->get('/api/risks/all', $token, [
-                'limit' => 5,
-                'order_by' => 'risk_level',
-                'order' => 'desc'
-            ]);
-            return $response['data'] ?? [];
-        } catch (\Exception $e) {
-            return [];
+            return $default;
         }
     }
 }
