@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Strategic;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Services\ApiClient;
 
-class GoalController extends Controller
+class KpiController extends Controller
 {
     protected $apiClient;
 
@@ -17,9 +17,9 @@ class GoalController extends Controller
     public function index()
     {
         $token = session('jwt_token');
-        $response = $this->apiClient->get('/api/strategic/goals', $token);
-        $goals = $response['data'] ?? [];
+        $response = $this->apiClient->get('/api/kpis', $token);
+        $kpis = $response['data'] ?? [];
 
-        return view('strategic.goals', compact('goals'));
+        return view('kpis.index', compact('kpis'));
     }
 }

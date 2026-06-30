@@ -82,7 +82,6 @@
         }
 
         .sidebar .nav { padding: 16px 12px; }
-        .sidebar .nav-item { margin-bottom: 4px; }
 
         .sidebar .nav-link {
             color: rgba(255,255,255,0.7);
@@ -128,6 +127,16 @@
             width: 0;
             overflow: hidden;
             display: none;
+        }
+
+        /* Section Title */
+        .sidebar .nav-section {
+            color: rgba(255,255,255,0.4);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 16px 16px 8px 16px;
+            letter-spacing: 1px;
         }
 
         .sidebar .collapse-btn {
@@ -315,44 +324,100 @@
                 $isSuperAdmin = ($userRole === 'super_admin');
             @endphp
 
-            <!-- Dashboard -->
-            <a class="nav-link {{ request()->routeIs('dashboard.*') ? 'active' : '' }}" href="{{ route('dashboard.employee') }}">
-                <i class="fas fa-chart-pie"></i>
-                <span class="nav-text">لوحة التحكم</span>
+            {{-- ========== الرئيسية ========== --}}
+            <div class="nav-section">الرئيسية</div>
+            
+            <a class="nav-link {{ request()->routeIs('dashboard.employee') ? 'active' : '' }}" href="{{ route('dashboard.employee') }}">
+                <i class="fas fa-user"></i>
+                <span class="nav-text">لوحة الموظف</span>
             </a>
 
-            <!-- Strategic Planning -->
-            @if($isMinister || $isManager || $isSuperAdmin)
-                <a class="nav-link" href="#">
-                    <i class="fas fa-chess-queen"></i>
-                    <span class="nav-text">التخطيط الاستراتيجي</span>
-                </a>
+            @if($isManager || $isMinister || $isSuperAdmin)
+            <a class="nav-link {{ request()->routeIs('dashboard.manager') ? 'active' : '' }}" href="{{ route('dashboard.manager') }}">
+                <i class="fas fa-user-tie"></i>
+                <span class="nav-text">لوحة المدير</span>
+            </a>
             @endif
 
-            <!-- Tasks -->
-            <a class="nav-link" href="#">
+            @if($isMinister || $isSuperAdmin)
+            <a class="nav-link {{ request()->routeIs('dashboard.minister') ? 'active' : '' }}" href="{{ route('dashboard.minister') }}">
+                <i class="fas fa-crown"></i>
+                <span class="nav-text">لوحة الوزير</span>
+            </a>
+            @endif
+
+            {{-- ========== المهام ========== --}}
+            <div class="nav-section">العمليات</div>
+
+            <a class="nav-link {{ request()->routeIs('tasks.*') ? 'active' : '' }}" href="{{ route('tasks.index') }}">
                 <i class="fas fa-tasks"></i>
                 <span class="nav-text">المهام</span>
             </a>
 
-            <!-- تغيير كلمة المرور -->
-            <a class="nav-link" href="{{ route('password.change') }}">
+            {{-- ========== التخطيط الاستراتيجي ========== --}}
+            @if($isMinister || $isManager || $isSuperAdmin)
+            <div class="nav-section">الاستراتيجية</div>
+
+            <a class="nav-link {{ request()->routeIs('strategic.pillars.*') ? 'active' : '' }}" href="{{ route('strategic.pillars.index') }}">
+                <i class="fas fa-chess-queen"></i>
+                <span class="nav-text">الركائز</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('strategic.goals.*') ? 'active' : '' }}" href="{{ route('strategic.goals.index') }}">
+                <i class="fas fa-bullseye"></i>
+                <span class="nav-text">الأهداف</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('strategic.programs.*') ? 'active' : '' }}" href="{{ route('strategic.programs.index') }}">
+                <i class="fas fa-project-diagram"></i>
+                <span class="nav-text">البرامج</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('strategic.initiatives.*') ? 'active' : '' }}" href="{{ route('strategic.initiatives.index') }}">
+                <i class="fas fa-lightbulb"></i>
+                <span class="nav-text">المبادرات</span>
+            </a>
+            @endif
+
+            {{-- ========== الأداء والمتابعة ========== --}}
+            @if($isMinister || $isManager || $isSuperAdmin)
+            <div class="nav-section">المتابعة</div>
+
+            <a class="nav-link {{ request()->routeIs('kpis.*') ? 'active' : '' }}" href="{{ route('kpis.index') }}">
+                <i class="fas fa-chart-line"></i>
+                <span class="nav-text">مؤشرات الأداء</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('budget.*') ? 'active' : '' }}" href="{{ route('budget.index') }}">
+                <i class="fas fa-money-bill-wave"></i>
+                <span class="nav-text">الميزانية</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('risks.*') ? 'active' : '' }}" href="{{ route('risks.index') }}">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span class="nav-text">المخاطر</span>
+            </a>
+            @endif
+
+            {{-- ========== الإعدادات ========== --}}
+            <div class="nav-section">الإعدادات</div>
+
+            <a class="nav-link {{ request()->routeIs('password.change') ? 'active' : '' }}" href="{{ route('password.change') }}">
                 <i class="fas fa-key"></i>
                 <span class="nav-text">تغيير كلمة المرور</span>
             </a>
 
-            <!-- Admin -->
             @if($isSuperAdmin)
-                <a class="nav-link" href="#">
-                    <i class="fas fa-users-cog"></i>
-                    <span class="nav-text">إدارة النظام</span>
-                </a>
+            <div class="nav-section">الإدارة</div>
+            <a class="nav-link {{ request()->routeIs('admin.employees.*') ? 'active' : '' }}" href="{{ route('admin.employees.index') }}">
+                <i class="fas fa-users"></i>
+                <span class="nav-text">الموظفين</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('admin.departments.*') ? 'active' : '' }}" href="{{ route('admin.departments.index') }}">
+                <i class="fas fa-building"></i>
+                <span class="nav-text">الإدارات</span>
+            </a>
             @endif
 
-            <!-- تسجيل الخروج -->
+            {{-- ========== تسجيل الخروج ========== --}}
             <form method="POST" action="{{ route('logout') }}" style="margin-top: 20px;">
                 @csrf
-                <button type="submit" class="nav-link" style="color: var(--danger); border: none; background: none; width: 100%;">
+                <button type="submit" class="nav-link" style="color: var(--danger);">
                     <i class="fas fa-sign-out-alt"></i>
                     <span class="nav-text">تسجيل الخروج</span>
                 </button>
@@ -396,7 +461,6 @@
     ================================================================ -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Sidebar Collapse
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('mainContent');
         const collapseBtn = document.getElementById('collapseBtn');
@@ -419,7 +483,6 @@
             collapseIcon.className = 'fas fa-chevron-right';
         }
 
-        // Mobile Toggle
         document.getElementById('mobileToggle').addEventListener('click', function() {
             sidebar.classList.toggle('mobile-open');
         });
@@ -427,9 +490,7 @@
         document.addEventListener('click', function(e) {
             if (window.innerWidth <= 992) {
                 const isClickInside = sidebar.contains(e.target) || e.target.closest('.toggle-sidebar');
-                if (!isClickInside) {
-                    sidebar.classList.remove('mobile-open');
-                }
+                if (!isClickInside) sidebar.classList.remove('mobile-open');
             }
         });
     </script>
