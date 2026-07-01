@@ -6,16 +6,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'وزارة النفط والمعادن')</title>
 
-    <!-- Google Fonts - Cairo -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Bootstrap 5 RTL -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
-    
-    <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Custom CSS -->
     <style>
         :root {
             --primary-dark: #0a2e5c;
@@ -42,9 +36,6 @@
             overflow-x: hidden;
         }
 
-        /* ================================================================
-        SIDEBAR (Right Side)
-        ================================================================ */
         .sidebar {
             position: fixed;
             top: 0;
@@ -129,12 +120,10 @@
             display: none;
         }
 
-        /* Section Title */
         .sidebar .nav-section {
             color: rgba(255,255,255,0.4);
             font-size: 11px;
             font-weight: 700;
-            text-transform: uppercase;
             padding: 16px 16px 8px 16px;
             letter-spacing: 1px;
         }
@@ -158,9 +147,6 @@
             background: rgba(212, 175, 55, 0.3);
         }
 
-        /* ================================================================
-        MAIN CONTENT
-        ================================================================ */
         .main-content {
             margin-right: 280px;
             padding: 20px 30px;
@@ -170,9 +156,6 @@
 
         .main-content.expanded { margin-right: 80px; }
 
-        /* ================================================================
-        TOP BAR
-        ================================================================ */
         .topbar {
             display: flex;
             justify-content: space-between;
@@ -222,9 +205,6 @@
             cursor: pointer;
         }
 
-        /* ================================================================
-        RESPONSIVE
-        ================================================================ */
         @media (max-width: 992px) {
             .sidebar {
                 width: 280px !important;
@@ -248,9 +228,6 @@
             }
         }
 
-        /* ================================================================
-        UTILITIES
-        ================================================================ */
         .gold-text { color: var(--gold); }
         .bg-gold { background: var(--gold); color: var(--primary-dark); }
         .btn-gold {
@@ -306,9 +283,6 @@
 </head>
 <body>
 
-    <!-- ================================================================
-    SIDEBAR
-    ================================================================ -->
     <aside class="sidebar" id="sidebar">
         <div class="brand">
             <h4>وزارة النفط</h4>
@@ -324,7 +298,7 @@
                 $isSuperAdmin = ($userRole === 'super_admin');
             @endphp
 
-            {{-- ========== الرئيسية ========== --}}
+            {{-- الرئيسية --}}
             <div class="nav-section">الرئيسية</div>
             
             <a class="nav-link {{ request()->routeIs('dashboard.employee') ? 'active' : '' }}" href="{{ route('dashboard.employee') }}">
@@ -346,7 +320,7 @@
             </a>
             @endif
 
-            {{-- ========== المهام ========== --}}
+            {{-- العمليات --}}
             <div class="nav-section">العمليات</div>
 
             <a class="nav-link {{ request()->routeIs('tasks.*') ? 'active' : '' }}" href="{{ route('tasks.index') }}">
@@ -354,7 +328,7 @@
                 <span class="nav-text">المهام</span>
             </a>
 
-            {{-- ========== التخطيط الاستراتيجي ========== --}}
+            {{-- الاستراتيجية --}}
             @if($isMinister || $isManager || $isSuperAdmin)
             <div class="nav-section">الاستراتيجية</div>
 
@@ -374,9 +348,17 @@
                 <i class="fas fa-lightbulb"></i>
                 <span class="nav-text">المبادرات</span>
             </a>
+            <a class="nav-link {{ request()->routeIs('strategic.swot.*') ? 'active' : '' }}" href="{{ route('strategic.swot.index') }}">
+                <i class="fas fa-chess-board"></i>
+                <span class="nav-text">تحليل SWOT</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('strategic.pestel.*') ? 'active' : '' }}" href="{{ route('strategic.pestel.index') }}">
+                <i class="fas fa-globe"></i>
+                <span class="nav-text">تحليل PESTEL</span>
+            </a>
             @endif
 
-            {{-- ========== الأداء والمتابعة ========== --}}
+            {{-- المتابعة --}}
             @if($isMinister || $isManager || $isSuperAdmin)
             <div class="nav-section">المتابعة</div>
 
@@ -394,7 +376,16 @@
             </a>
             @endif
 
-            {{-- ========== الإعدادات ========== --}}
+            {{-- الذكاء الاصطناعي --}}
+            @if($isMinister || $isManager || $isSuperAdmin)
+            <div class="nav-section">ذكاء اصطناعي</div>
+            <a class="nav-link {{ request()->routeIs('ai.*') ? 'active' : '' }}" href="{{ route('ai.recommendations') }}">
+                <i class="fas fa-robot"></i>
+                <span class="nav-text">توصيات AI</span>
+            </a>
+            @endif
+
+            {{-- الإعدادات --}}
             <div class="nav-section">الإعدادات</div>
 
             <a class="nav-link {{ request()->routeIs('password.change') ? 'active' : '' }}" href="{{ route('password.change') }}">
@@ -414,7 +405,7 @@
             </a>
             @endif
 
-            {{-- ========== تسجيل الخروج ========== --}}
+            {{-- تسجيل الخروج --}}
             <form method="POST" action="{{ route('logout') }}" style="margin-top: 20px;">
                 @csrf
                 <button type="submit" class="nav-link" style="color: var(--danger);">
@@ -429,19 +420,12 @@
         </button>
     </aside>
 
-    <!-- ================================================================
-    MAIN CONTENT
-    ================================================================ -->
     <div class="main-content" id="mainContent">
-
-        <!-- Top Bar -->
         <div class="topbar">
             <button class="toggle-sidebar" id="mobileToggle">
                 <i class="fas fa-bars"></i>
             </button>
-
             <h5 class="page-title">@yield('title', 'لوحة التحكم')</h5>
-
             <div class="user-info">
                 <div>
                     <div class="user-name">{{ session('user_name', 'مستخدم') }}</div>
@@ -451,14 +435,9 @@
             </div>
         </div>
 
-        <!-- Page Content -->
         @yield('content')
-
     </div>
 
-    <!-- ================================================================
-    SCRIPTS
-    ================================================================ -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const sidebar = document.getElementById('sidebar');

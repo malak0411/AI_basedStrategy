@@ -21,6 +21,8 @@ use App\Http\Controllers\Strategic\PillarController;
 use App\Http\Controllers\Strategic\GoalController;
 use App\Http\Controllers\Strategic\ProgramController;
 use App\Http\Controllers\Strategic\InitiativeController;
+use App\Http\Controllers\Strategic\SwotController;
+use App\Http\Controllers\Strategic\PestelController;
 
 // Controllers - Admin
 use App\Http\Controllers\Admin\EmployeeController;
@@ -30,6 +32,7 @@ use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\KpiController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\RiskController;
+use App\Http\Controllers\AiController;
 
 // ============================================================
 // تسجيل Middleware مخصص للتحقق من JWT
@@ -73,7 +76,11 @@ Route::middleware('check.jwt')->group(function () {
     
     // ========== المهام ==========
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
+    Route::get('/tasks/create', [TaskController::class, 'create'])->name('tasks.create');
+    Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
     Route::get('/tasks/{id}', [TaskController::class, 'show'])->name('tasks.show');
+    Route::get('/tasks/{id}/edit', [TaskController::class, 'edit'])->name('tasks.edit');
+    Route::put('/tasks/{id}', [TaskController::class, 'update'])->name('tasks.update');
     
     // ========== التخطيط الاستراتيجي ==========
     Route::prefix('strategic')->name('strategic.')->group(function () {
@@ -81,6 +88,8 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/goals', [GoalController::class, 'index'])->name('goals.index');
         Route::get('/programs', [ProgramController::class, 'index'])->name('programs.index');
         Route::get('/initiatives', [InitiativeController::class, 'index'])->name('initiatives.index');
+        Route::get('/swot', [SwotController::class, 'index'])->name('swot.index');
+        Route::get('/pestel', [PestelController::class, 'index'])->name('pestel.index');
     });
     
     // ========== مؤشرات الأداء ==========
@@ -92,10 +101,15 @@ Route::middleware('check.jwt')->group(function () {
     // ========== المخاطر ==========
     Route::get('/risks', [RiskController::class, 'index'])->name('risks.index');
     
+    // ========== توصيات الذكاء الاصطناعي ==========
+    Route::get('/ai/recommendations', [AiController::class, 'recommendations'])->name('ai.recommendations');
+    
     // ========== إدارة النظام (للمشرف العام) ==========
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
+        Route::get('/employees/{id}', [EmployeeController::class, 'show'])->name('employees.show');
         Route::get('/departments', [DepartmentController::class, 'index'])->name('departments.index');
+        Route::get('/departments/{id}', [DepartmentController::class, 'show'])->name('departments.show');
     });
     
     // ========== تسجيل الخروج ==========

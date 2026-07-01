@@ -14,6 +14,9 @@ class EmployeeController extends Controller
         $this->apiClient = new ApiClient();
     }
 
+    /**
+     * عرض قائمة الموظفين
+     */
     public function index()
     {
         $token = session('jwt_token');
@@ -26,5 +29,27 @@ class EmployeeController extends Controller
         $employees = $response['data'] ?? [];
 
         return view('admin.employees.index', compact('employees'));
+    }
+
+    /**
+     * عرض تفاصيل موظف
+     */
+    public function show($id)
+    {
+        $token = session('jwt_token');
+        if (session('user_role') !== 'super_admin') {
+            return redirect()->route('dashboard.employee')
+                ->with('error', 'غير مصرح');
+        }
+
+        $response = $this->apiClient->get("/api/employees/{$id}", $token);
+        $employee = $response['data'] ?? [];
+
+        if (empty($employee)) {
+            return redirect()->route('admin.employees.index')
+                ->with('error', 'الموظف غير موجود');
+        }
+
+        return view('admin.employees.show', compact('employee'));
     }
 }
