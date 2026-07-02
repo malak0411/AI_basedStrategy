@@ -1,55 +1,45 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from datetime import datetime
+from app.database import get_db
+from app.models import Risk, RiskMitigation
 
-from ...database import get_db
-from ...models import (
-    Risk, RiskMitigation, OperationalTask, DictStatus, DictRiskLevel, Employee
-)
-from ...schemas import RiskCreate, RiskUpdate, RiskResponse
-from ...core.dependencies import get_current_user, has_role
+router = APIRouter(prefix="/api/risks", tags=["Risks"])
+RISK_LEVEL_MAP = {1: "منخفض", 2: "متوسط", 3: "عالي", 4: "حرج"}
 
-router = APIRouter(prefix="/api/risks", tags=["المخاطر"])
+@router.get("/")
+async def get_risks(db: Session = Depends(get_db)):
+    try:
+        risks = db.query(Risk).all()
+        result = [{"id": r.risk_id, "name": r.name, "title": r.name, "description": r.description or "", "level": RISK_LEVEL_MAP.get(r.risk_level_id, "غير محدد"), "probability": r.probability or "", "impact": r.impact or "", "status": r.status_id or "نشط"} for r in risks]
+        return {"success": True, "data": result}
+    except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-@router.get("/", response_model=List[RiskResponse])
-async def get_risks(
-    task_id: Optional[int] = None,
-    status_id: Optional[int] = None,
-    db: Session = Depends(get_db),
-    current_user: Employee = Depends(get_current_user)
-):
-    query = db.query(Risk)
-    if task_id:
-        query = query.filter(Risk.task_id == task_id)
-    if status_id:
-        query = query.filter(Risk.status_id == status_id)
-    risks = query.all()
-    result = []
-    for risk in risks:
-        task = db.query(OperationalTask).filter(OperationalTask.task_id == risk.task_id).first()
-        level = db.query(DictRiskLevel).filter(DictRiskLevel.risk_level_id == risk.risk_level_id).first()
-        status = db.query(DictStatus).filter(DictStatus.status_id == risk.status_id).first()
-        identified_by = db.query(Employee).filter(Employee.employee_id == risk.identified_by).first()
-        result.append(RiskResponse(
-            risk_id=risk.risk_id,
-            task_id=risk.task_id,
-            task_title=task.title if task else None,
-            name=risk.name,
-            description=risk.description,
-            risk_level_id=risk.risk_level_id,
-            risk_level_name=level.name_ar if level else None,
-            probability=risk.probability,
-            impact=risk.impact,
-            risk_score=risk.probability * risk.impact // 10 if risk.probability and risk.impact else 0,
-            identified_by=risk.identified_by,
-            identified_by_name=identified_by.full_name if identified_by else None,
-            identified_at=risk.identified_at,
-            target_date=risk.target_date,
-            status_id=risk.status_id,
-            status_name=status.name_ar if status else None,
-            updated_at=risk.updated_at
-        ))
-    return result
+@router.get("/all")
+async def all_risks(db: Session = Depends(get_db)):
+    try:
+        risks = db.query(Risk).order_by(Risk.risk_level_id.desc()).limit(20).all()
+        return {"success": True, "data": [{"id": r.risk_id, "name": r.name, "title": r.name, "level": RISK_LEVEL_MAP.get(r.risk_level_id, "غير محدد"), "status": r.status_id or "نشط"} for r in risks]}
+    except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-# ... باقي الدوال (create, update, delete) بدون تغيير، ولكن تأكد من استيراد Employee فيها
+@router.get("/department")
+async def department_risks(db: Session = Depends(get_db)):
+    try:
+        risks = db.query(Risk).limit(10).all()
+        return {"success": True, "data": [{"id": r.risk_id, "name": r.name, "level": RISK_LEVEL_MAP.get(r.risk_level_id, "غير محدد"), "status": r.status_id or "نشط"} for r in risks]}
+    except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+
+@router.get("/{risk_id}")
+async def risk_detail(risk_id: int, db: Session = Depends(get_db)):
+    try:
+        r = db.query(Risk).filter(Risk.risk_id == risk_id).first()
+        if not r: raise HTTPException(status_code=404, detail="الخطر غير موجود")
+        return {"success": True, "data": {"id": r.risk_id, "name": r.name, "title": r.name, "description": r.description or "", "level": RISK_LEVEL_MAP.get(r.risk_level_id, "غير محدد"), "probability": r.probability or "", "impact": r.impact or "", "status": r.status_id or "نشط"}}
+    except HTTPException: raise
+    except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+
+@router.get("/{risk_id}/mitigations")
+async def risk_mitigations(risk_id: int, db: Session = Depends(get_db)):
+    try:
+        mitigations = db.query(RiskMitigation).filter(RiskMitigation.risk_id == risk_id).all()
+        return {"success": True, "data": [{"id": m.mitigation_id, "name": m.action, "title": m.action, "description": m.action, "status": m.status_id or "نشط"} for m in mitigations]}
+    except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")

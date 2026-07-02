@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
 
+
 # ================================================================
 # جداول الربط (Many-to-Many)
 # ================================================================
@@ -671,3 +672,13 @@ class AuditLog(Base):
     ip_address = Column(String(45))
     user_agent = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+
+class SystemConfig(Base):
+    __tablename__ = "system_config"
+    
+    config_id = Column(Integer, primary_key=True, index=True)
+    config_key = Column(String(100), unique=True, nullable=False)
+    config_value = Column(String(500), nullable=False)
+    description = Column(String(500))
+    updated_at = Column(DateTime, server_default=func.now())
+

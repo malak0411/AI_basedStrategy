@@ -49,7 +49,6 @@
             overflow-y: auto;
             padding: 0;
         }
-
         .sidebar.collapsed { width: 80px; }
 
         .sidebar .brand {
@@ -57,14 +56,12 @@
             text-align: center;
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
-
         .sidebar .brand h4 {
             color: var(--gold);
             font-weight: 800;
             margin: 0;
             font-size: 18px;
         }
-
         .sidebar .brand small {
             color: rgba(255,255,255,0.6);
             font-size: 12px;
@@ -91,28 +88,22 @@
             width: 100%;
             text-align: right;
         }
-
         .sidebar .nav-link:hover {
             background: rgba(212, 175, 55, 0.15);
             color: #fff;
         }
-
         .sidebar .nav-link.active {
             background: rgba(212, 175, 55, 0.2);
             color: var(--gold);
         }
-
         .sidebar .nav-link i {
             width: 24px;
             text-align: center;
             font-size: 18px;
             color: rgba(255,255,255,0.6);
         }
-
         .sidebar .nav-link.active i { color: var(--gold); }
-
         .sidebar .nav-text { transition: opacity 0.2s ease; }
-
         .sidebar.collapsed .nav-text {
             opacity: 0;
             width: 0;
@@ -142,7 +133,6 @@
             cursor: pointer;
             transition: all 0.3s ease;
         }
-
         .sidebar .collapse-btn:hover {
             background: rgba(212, 175, 55, 0.3);
         }
@@ -153,7 +143,6 @@
             min-height: 100vh;
             transition: margin-right 0.3s ease;
         }
-
         .main-content.expanded { margin-right: 80px; }
 
         .topbar {
@@ -166,20 +155,17 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.04);
             margin-bottom: 24px;
         }
-
         .topbar .page-title {
             font-weight: 700;
             font-size: 22px;
             color: var(--primary-dark);
             margin: 0;
         }
-
         .topbar .user-info {
             display: flex;
             align-items: center;
             gap: 16px;
         }
-
         .topbar .user-info .avatar {
             width: 40px;
             height: 40px;
@@ -192,10 +178,8 @@
             font-weight: 700;
             font-size: 18px;
         }
-
         .topbar .user-info .user-name { font-weight: 600; color: var(--text-dark); }
         .topbar .user-info .user-role { font-size: 12px; color: var(--text-gray); }
-
         .topbar .toggle-sidebar {
             display: none;
             background: none;
@@ -215,7 +199,6 @@
             .main-content { margin-right: 0; }
             .topbar .toggle-sidebar { display: block; }
         }
-
         @media (max-width: 768px) {
             .topbar {
                 flex-direction: column;
@@ -292,7 +275,6 @@
         <nav class="nav flex-column">
             @php
                 $userRole = session('user_role', 'employee');
-                $userName = session('user_name', 'مستخدم');
                 $isMinister = in_array($userRole, ['minister', 'deputy', 'general_manager']);
                 $isManager = ($userRole === 'manager');
                 $isSuperAdmin = ($userRole === 'super_admin');
@@ -300,108 +282,129 @@
 
             {{-- الرئيسية --}}
             <div class="nav-section">الرئيسية</div>
-            
             <a class="nav-link {{ request()->routeIs('dashboard.employee') ? 'active' : '' }}" href="{{ route('dashboard.employee') }}">
-                <i class="fas fa-user"></i>
-                <span class="nav-text">لوحة الموظف</span>
+                <i class="fas fa-user"></i><span class="nav-text">لوحة الموظف</span>
             </a>
-
             @if($isManager || $isMinister || $isSuperAdmin)
             <a class="nav-link {{ request()->routeIs('dashboard.manager') ? 'active' : '' }}" href="{{ route('dashboard.manager') }}">
-                <i class="fas fa-user-tie"></i>
-                <span class="nav-text">لوحة المدير</span>
+                <i class="fas fa-user-tie"></i><span class="nav-text">لوحة المدير</span>
             </a>
             @endif
-
             @if($isMinister || $isSuperAdmin)
             <a class="nav-link {{ request()->routeIs('dashboard.minister') ? 'active' : '' }}" href="{{ route('dashboard.minister') }}">
-                <i class="fas fa-crown"></i>
-                <span class="nav-text">لوحة الوزير</span>
+                <i class="fas fa-crown"></i><span class="nav-text">لوحة الوزير</span>
             </a>
             @endif
 
             {{-- العمليات --}}
             <div class="nav-section">العمليات</div>
-
             <a class="nav-link {{ request()->routeIs('tasks.*') ? 'active' : '' }}" href="{{ route('tasks.index') }}">
-                <i class="fas fa-tasks"></i>
-                <span class="nav-text">المهام</span>
+                <i class="fas fa-tasks"></i><span class="nav-text">المهام</span>
             </a>
 
             {{-- الاستراتيجية --}}
             @if($isMinister || $isManager || $isSuperAdmin)
             <div class="nav-section">الاستراتيجية</div>
-
             <a class="nav-link {{ request()->routeIs('strategic.pillars.*') ? 'active' : '' }}" href="{{ route('strategic.pillars.index') }}">
-                <i class="fas fa-chess-queen"></i>
-                <span class="nav-text">الركائز</span>
+                <i class="fas fa-chess-queen"></i><span class="nav-text">الركائز</span>
             </a>
             <a class="nav-link {{ request()->routeIs('strategic.goals.*') ? 'active' : '' }}" href="{{ route('strategic.goals.index') }}">
-                <i class="fas fa-bullseye"></i>
-                <span class="nav-text">الأهداف</span>
+                <i class="fas fa-bullseye"></i><span class="nav-text">الأهداف</span>
             </a>
             <a class="nav-link {{ request()->routeIs('strategic.programs.*') ? 'active' : '' }}" href="{{ route('strategic.programs.index') }}">
-                <i class="fas fa-project-diagram"></i>
-                <span class="nav-text">البرامج</span>
+                <i class="fas fa-project-diagram"></i><span class="nav-text">البرامج</span>
             </a>
             <a class="nav-link {{ request()->routeIs('strategic.initiatives.*') ? 'active' : '' }}" href="{{ route('strategic.initiatives.index') }}">
-                <i class="fas fa-lightbulb"></i>
-                <span class="nav-text">المبادرات</span>
+                <i class="fas fa-lightbulb"></i><span class="nav-text">المبادرات</span>
             </a>
             <a class="nav-link {{ request()->routeIs('strategic.swot.*') ? 'active' : '' }}" href="{{ route('strategic.swot.index') }}">
-                <i class="fas fa-chess-board"></i>
-                <span class="nav-text">تحليل SWOT</span>
+                <i class="fas fa-chess-board"></i><span class="nav-text">تحليل SWOT</span>
             </a>
             <a class="nav-link {{ request()->routeIs('strategic.pestel.*') ? 'active' : '' }}" href="{{ route('strategic.pestel.index') }}">
-                <i class="fas fa-globe"></i>
-                <span class="nav-text">تحليل PESTEL</span>
+                <i class="fas fa-globe"></i><span class="nav-text">تحليل PESTEL</span>
             </a>
             @endif
 
             {{-- المتابعة --}}
             @if($isMinister || $isManager || $isSuperAdmin)
             <div class="nav-section">المتابعة</div>
-
             <a class="nav-link {{ request()->routeIs('kpis.*') ? 'active' : '' }}" href="{{ route('kpis.index') }}">
-                <i class="fas fa-chart-line"></i>
-                <span class="nav-text">مؤشرات الأداء</span>
+                <i class="fas fa-chart-line"></i><span class="nav-text">مؤشرات الأداء</span>
             </a>
             <a class="nav-link {{ request()->routeIs('budget.*') ? 'active' : '' }}" href="{{ route('budget.index') }}">
-                <i class="fas fa-money-bill-wave"></i>
-                <span class="nav-text">الميزانية</span>
+                <i class="fas fa-money-bill-wave"></i><span class="nav-text">الميزانية</span>
             </a>
             <a class="nav-link {{ request()->routeIs('risks.*') ? 'active' : '' }}" href="{{ route('risks.index') }}">
-                <i class="fas fa-exclamation-triangle"></i>
-                <span class="nav-text">المخاطر</span>
+                <i class="fas fa-exclamation-triangle"></i><span class="nav-text">المخاطر</span>
             </a>
             @endif
 
             {{-- الذكاء الاصطناعي --}}
             @if($isMinister || $isManager || $isSuperAdmin)
             <div class="nav-section">ذكاء اصطناعي</div>
-            <a class="nav-link {{ request()->routeIs('ai.*') ? 'active' : '' }}" href="{{ route('ai.recommendations') }}">
-                <i class="fas fa-robot"></i>
-                <span class="nav-text">توصيات AI</span>
+            <a class="nav-link {{ request()->routeIs('ai.dashboard') ? 'active' : '' }}" href="{{ route('ai.dashboard') }}">
+                <i class="fas fa-brain"></i><span class="nav-text">لوحة AI</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('ai.models.*') ? 'active' : '' }}" href="{{ route('ai.models') }}">
+                <i class="fas fa-microchip"></i><span class="nav-text">النماذج</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('ai.predictions.*') ? 'active' : '' }}" href="{{ route('ai.predictions') }}">
+                <i class="fas fa-chart-line"></i><span class="nav-text">التنبؤات</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('ai.recommendations.*') ? 'active' : '' }}" href="{{ route('ai.recommendations') }}">
+                <i class="fas fa-lightbulb"></i><span class="nav-text">التوصيات</span>
             </a>
             @endif
 
-            {{-- الإعدادات --}}
-            <div class="nav-section">الإعدادات</div>
-
-            <a class="nav-link {{ request()->routeIs('password.change') ? 'active' : '' }}" href="{{ route('password.change') }}">
-                <i class="fas fa-key"></i>
-                <span class="nav-text">تغيير كلمة المرور</span>
+            {{-- التقارير --}}
+            <div class="nav-section">تقارير</div>
+            <a class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}">
+                <i class="fas fa-file-alt"></i><span class="nav-text">التقارير</span>
             </a>
 
+            {{-- الملف الشخصي --}}
+            <div class="nav-section">حسابي</div>
+            <a class="nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}" href="{{ route('profile.index') }}">
+                <i class="fas fa-user-circle"></i><span class="nav-text">الملف الشخصي</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('password.change') ? 'active' : '' }}" href="{{ route('password.change') }}">
+                <i class="fas fa-key"></i><span class="nav-text">تغيير كلمة المرور</span>
+            </a>
+
+            {{-- تتبع المواقع --}}
+            @if($isManager || $isMinister || $isSuperAdmin)
+            <div class="nav-section">متابعة</div>
+            <a class="nav-link {{ request()->routeIs('location.*') ? 'active' : '' }}" href="{{ route('location.index') }}">
+                <i class="fas fa-map-marker-alt"></i><span class="nav-text">تتبع المواقع</span>
+            </a>
+            @endif
+
+            {{-- الإدارة --}}
             @if($isSuperAdmin)
-            <div class="nav-section">الإدارة</div>
+            <div class="nav-section">إدارة النظام</div>
             <a class="nav-link {{ request()->routeIs('admin.employees.*') ? 'active' : '' }}" href="{{ route('admin.employees.index') }}">
-                <i class="fas fa-users"></i>
-                <span class="nav-text">الموظفين</span>
+                <i class="fas fa-users"></i><span class="nav-text">الموظفين</span>
             </a>
             <a class="nav-link {{ request()->routeIs('admin.departments.*') ? 'active' : '' }}" href="{{ route('admin.departments.index') }}">
-                <i class="fas fa-building"></i>
-                <span class="nav-text">الإدارات</span>
+                <i class="fas fa-building"></i><span class="nav-text">الإدارات</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('admin.roles.*') ? 'active' : '' }}" href="{{ route('admin.roles.index') }}">
+                <i class="fas fa-user-tag"></i><span class="nav-text">الأدوار</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('admin.permissions.*') ? 'active' : '' }}" href="{{ route('admin.permissions.index') }}">
+                <i class="fas fa-shield-alt"></i><span class="nav-text">الصلاحيات</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('admin.employee-roles.*') ? 'active' : '' }}" href="{{ route('admin.employee-roles.index') }}">
+                <i class="fas fa-user-check"></i><span class="nav-text">ربط الموظفين</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('admin.role-permissions.*') ? 'active' : '' }}" href="{{ route('admin.role-permissions.index') }}">
+                <i class="fas fa-link"></i><span class="nav-text">ربط الصلاحيات</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('admin.audit-logs.*') ? 'active' : '' }}" href="{{ route('admin.audit-logs.index') }}">
+                <i class="fas fa-history"></i><span class="nav-text">سجل التدقيق</span>
+            </a>
+            <a class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}" href="{{ route('admin.settings.index') }}">
+                <i class="fas fa-cogs"></i><span class="nav-text">تهيئة النظام</span>
             </a>
             @endif
 
@@ -409,8 +412,7 @@
             <form method="POST" action="{{ route('logout') }}" style="margin-top: 20px;">
                 @csrf
                 <button type="submit" class="nav-link" style="color: var(--danger);">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span class="nav-text">تسجيل الخروج</span>
+                    <i class="fas fa-sign-out-alt"></i><span class="nav-text">تسجيل الخروج</span>
                 </button>
             </form>
         </nav>
@@ -455,7 +457,6 @@
         }
 
         collapseBtn.addEventListener('click', toggleSidebar);
-
         if (collapsed) {
             sidebar.classList.add('collapsed');
             mainContent.classList.add('expanded');

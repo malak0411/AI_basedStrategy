@@ -1,0 +1,46 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Services\ApiClient;
+
+class PermissionController extends Controller
+{
+    protected $apiClient;
+
+    public function __construct()
+    {
+        $this->apiClient = new ApiClient();
+    }
+
+    public function index()
+    {
+        $token = session('jwt_token');
+        if (session('user_role') !== 'super_admin') {
+            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+        }
+
+        $response = $this->apiClient->get('/api/permissions', $token);
+        $permissions = $response['data'] ?? [];
+
+        return view('admin.permissions.index', compact('permissions'));
+    }
+
+    public function show($id)
+    {
+        $token = session('jwt_token');
+        if (session('user_role') !== 'super_admin') {
+            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+        }
+
+        $response = $this->apiClient->get("/api/permissions/{$id}", $token);
+        $permission = $response['data'] ?? [];
+
+        if (empty($permission)) {
+            return redirect()->route('admin.permissions.index')->with('error', 'الصلاحية غير موجودة');
+        }
+
+        return view('admin.permissions.show', compact('permission'));
+    }
+}

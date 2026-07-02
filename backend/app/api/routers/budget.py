@@ -1,135 +1,49 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from datetime import datetime
+from sqlalchemy import func
+from app.database import get_db
+from app.models import BudgetLine, BudgetTransaction
 
-from ...database import get_db
-from ...models import BudgetLine, BudgetTransaction, OperationalTask, Department, DictTransactionType
-from ...schemas import (
-    BudgetLineCreate, BudgetLineUpdate, BudgetLineResponse,
-    BudgetTransactionCreate, BudgetTransactionResponse
-)
-from ...core.dependencies import get_current_user, has_role
+router = APIRouter(prefix="/api/budget", tags=["Budget"])
 
-router = APIRouter(prefix="/api/budget", tags=["الميزانية"])
+@router.get("/overview")
+async def budget_overview(db: Session = Depends(get_db)):
+    try:
+        total_allocated = db.query(func.sum(BudgetLine.allocated_amount)).scalar() or 0
+        total_spent = db.query(func.sum(BudgetLine.spent_amount)).scalar() or 0
+        return {"success": True, "data": {"total": float(total_allocated), "used": float(total_spent), "remaining": float(total_allocated - total_spent)}}
+    except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-@router.get("/lines", response_model=List[BudgetLineResponse])
-async def get_budget_lines(
-    budgetable_type: Optional[str] = None,
-    budgetable_id: Optional[int] = None,
-    fiscal_year: Optional[int] = None,
-    db: Session = Depends(get_db),
-    current_user: Employee = Depends(get_current_user)
-):
-    query = db.query(BudgetLine)
-    if budgetable_type:
-        query = query.filter(BudgetLine.budgetable_type == budgetable_type)
-    if budgetable_id:
-        query = query.filter(BudgetLine.budgetable_id == budgetable_id)
-    if fiscal_year:
-        query = query.filter(BudgetLine.fiscal_year == fiscal_year)
-    lines = query.all()
-    result = []
-    for line in lines:
-        dept = db.query(Department).filter(Department.department_id == line.department_id).first()
-        # Get budgetable name (simplified)
-        budgetable_name = None
-        if line.budgetable_type == 'operational_task':
-            task = db.query(OperationalTask).filter(OperationalTask.task_id == line.budgetable_id).first()
-            budgetable_name = task.title if task else None
-        result.append(BudgetLineResponse(
-            budget_id=line.budget_id,
-            budgetable_type=line.budgetable_type,
-            budgetable_id=line.budgetable_id,
-            budgetable_name=budgetable_name,
-            department_id=line.department_id,
-            department_name=dept.name if dept else None,
-            allocated_amount=line.allocated_amount,
-            spent_amount=line.spent_amount,
-            remaining_amount=line.allocated_amount - line.spent_amount,
-            fiscal_year=line.fiscal_year,
-            parent_budget_id=line.parent_budget_id,
-            created_at=line.created_at,
-            updated_at=line.updated_at
-        ))
-    return result
+@router.get("/")
+async def budget_lines(db: Session = Depends(get_db)):
+    try:
+        lines = db.query(BudgetLine).all()
+        result = [{"id": b.budget_id, "name": f"بند {b.budget_id}", "allocated_amount": float(b.allocated_amount or 0), "used_amount": float(b.spent_amount or 0), "description": f"ميزانية {b.fiscal_year or ''}"} for b in lines]
+        return {"success": True, "data": result}
+    except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-@router.post("/lines", response_model=BudgetLineResponse, status_code=status.HTTP_201_CREATED)
-async def create_budget_line(
-    line_data: BudgetLineCreate,
-    db: Session = Depends(get_db),
-    current_user: Employee = Depends(has_role(["Super Admin", "وزير / قيادة العليا"]))
-):
-    # التحقق من صحة النوع
-    valid_types = ['program', 'initiative', 'major_task', 'operational_task']
-    if line_data.budgetable_type not in valid_types:
-        raise HTTPException(status_code=400, detail=f"نوع غير صحيح. الأنواع المسموحة: {valid_types}")
-    new_line = BudgetLine(
-        budgetable_type=line_data.budgetable_type,
-        budgetable_id=line_data.budgetable_id,
-        department_id=line_data.department_id,
-        allocated_amount=line_data.allocated_amount,
-        fiscal_year=line_data.fiscal_year,
-        parent_budget_id=line_data.parent_budget_id
-    )
-    db.add(new_line)
-    db.commit()
-    db.refresh(new_line)
-    return BudgetLineResponse(
-        budget_id=new_line.budget_id,
-        budgetable_type=new_line.budgetable_type,
-        budgetable_id=new_line.budgetable_id,
-        department_id=new_line.department_id,
-        allocated_amount=new_line.allocated_amount,
-        spent_amount=new_line.spent_amount,
-        remaining_amount=new_line.allocated_amount - new_line.spent_amount,
-        fiscal_year=new_line.fiscal_year,
-        parent_budget_id=new_line.parent_budget_id,
-        created_at=new_line.created_at,
-        updated_at=new_line.updated_at
-    )
+@router.get("/{budget_id}")
+async def budget_detail(budget_id: int, db: Session = Depends(get_db)):
+    try:
+        b = db.query(BudgetLine).filter(BudgetLine.budget_id == budget_id).first()
+        if not b: raise HTTPException(status_code=404, detail="البند غير موجود")
+        return {"success": True, "data": {"id": b.budget_id, "name": f"بند {b.budget_id}", "allocated_amount": float(b.allocated_amount or 0), "used_amount": float(b.spent_amount or 0), "description": f"ميزانية {b.fiscal_year or ''}"}}
+    except HTTPException: raise
+    except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-@router.post("/transactions", response_model=BudgetTransactionResponse, status_code=status.HTTP_201_CREATED)
-async def create_transaction(
-    trans_data: BudgetTransactionCreate,
-    db: Session = Depends(get_db),
-    current_user: Employee = Depends(has_role(["Super Admin", "وزير / قيادة العليا"]))
-):
-    budget_line = db.query(BudgetLine).filter(BudgetLine.budget_id == trans_data.budget_id).first()
-    if not budget_line:
-        raise HTTPException(status_code=404, detail="بند الميزانية غير موجود")
-    trans_type = db.query(DictTransactionType).filter(DictTransactionType.trans_type_id == trans_data.transaction_type_id).first()
-    if not trans_type:
-        raise HTTPException(status_code=404, detail="نوع المعاملة غير موجود")
-    # تحديث المصروفات
-    if trans_type.code == 'spent':
-        budget_line.spent_amount += trans_data.amount
-    elif trans_type.code == 'allocated':
-        budget_line.allocated_amount += trans_data.amount
-    elif trans_type.code == 'refunded':
-        budget_line.spent_amount -= trans_data.amount
-    new_trans = BudgetTransaction(
-        budget_id=trans_data.budget_id,
-        amount=trans_data.amount,
-        transaction_type_id=trans_data.transaction_type_id,
-        description=trans_data.description,
-        created_by=current_user.employee_id
-    )
-    db.add(new_trans)
-    db.commit()
-    db.refresh(new_trans)
-    return BudgetTransactionResponse(
-        transaction_id=new_trans.transaction_id,
-        budget_id=new_trans.budget_id,
-        amount=new_trans.amount,
-        transaction_type_id=new_trans.transaction_type_id,
-        transaction_type_name=trans_type.name_ar if trans_type else None,
-        description=new_trans.description,
-        transaction_date=new_trans.transaction_date,
-        created_by=new_trans.created_by,
-        created_by_name=current_user.full_name,
-        approved_by=new_trans.approved_by,
-        approved_at=new_trans.approved_at
-    )
+@router.get("/transactions")
+async def budget_transactions(db: Session = Depends(get_db)):
+    try:
+        transactions = db.query(BudgetTransaction).order_by(BudgetTransaction.transaction_date.desc()).limit(50).all()
+        result = [{"id": t.transaction_id, "budget_line_name": f"بند {t.budget_id}", "amount": float(t.amount or 0), "type": "expense" if (t.transaction_type_id or 1) == 1 else "deposit", "transaction_date": t.transaction_date.isoformat() if t.transaction_date else None, "description": t.description or ""} for t in transactions]
+        return {"success": True, "data": result}
+    except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
- 
+@router.get("/transactions/{transaction_id}")
+async def transaction_detail(transaction_id: int, db: Session = Depends(get_db)):
+    try:
+        t = db.query(BudgetTransaction).filter(BudgetTransaction.transaction_id == transaction_id).first()
+        if not t: raise HTTPException(status_code=404, detail="المعاملة غير موجودة")
+        return {"success": True, "data": {"id": t.transaction_id, "amount": float(t.amount or 0), "type": "expense" if (t.transaction_type_id or 1) == 1 else "deposit", "transaction_date": t.transaction_date.isoformat() if t.transaction_date else None, "description": t.description or ""}}
+    except HTTPException: raise
+    except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")

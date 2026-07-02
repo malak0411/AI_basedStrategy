@@ -75,28 +75,34 @@ class ApiClient
             $statusCode = $response->getStatusCode();
             $body = json_decode($response->getBody()->getContents(), true);
 
-            return [
-                'success' => $statusCode >= 200 && $statusCode < 300,
-                'status' => $statusCode,
-                'data' => $body
-            ];
+            // تأكد من أن النتيجة دائماً مصفوفة
+            if (!is_array($body)) {
+                $body = ['success' => true, 'data' => []];
+            }
+
+            return $body;
 
         } catch (RequestException $e) {
             \Log::error('API Error: ' . $e->getMessage());
             
             if ($e->hasResponse()) {
                 $body = json_decode($e->getResponse()->getBody(), true);
+                if (!is_array($body)) {
+                    $body = ['detail' => 'خطأ غير معروف'];
+                }
                 return [
                     'success' => false,
                     'status' => $e->getResponse()->getStatusCode(),
-                    'detail' => $body['detail'] ?? 'خطأ في الطلب'
+                    'detail' => $body['detail'] ?? 'خطأ في الطلب',
+                    'data' => []
                 ];
             }
 
             return [
                 'success' => false,
                 'status' => 500,
-                'detail' => 'خطأ في الاتصال بالخادم'
+                'detail' => 'خطأ في الاتصال بالخادم',
+                'data' => []
             ];
         }
     }
