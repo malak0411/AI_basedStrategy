@@ -3,14 +3,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
 from app.models import Employee, Department, OperationalTask, TaskAssignment
+from app.core.dependencies import get_current_employee
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
 @router.get("/employee")
-async def employee_dashboard(db: Session = Depends(get_db)):
+async def employee_dashboard(
+    db: Session = Depends(get_db),
+    employee_id: int = Depends(get_current_employee)
+):
+    """لوحة تحكم الموظف"""
     try:
-        employee_id = 6  # مؤقتاً
-        
         employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
         if not employee:
             raise HTTPException(status_code=404, detail="الموظف غير موجود")
@@ -23,21 +26,21 @@ async def employee_dashboard(db: Session = Depends(get_db)):
             TaskAssignment, OperationalTask.task_id == TaskAssignment.task_id
         ).filter(
             TaskAssignment.employee_id == employee_id,
-            OperationalTask.status_id == 4  # completed
+            OperationalTask.status_id == 4
         ).scalar() or 0
 
         in_progress = db.query(func.count(OperationalTask.task_id)).join(
             TaskAssignment, OperationalTask.task_id == TaskAssignment.task_id
         ).filter(
             TaskAssignment.employee_id == employee_id,
-            OperationalTask.status_id == 2  # in_progress
+            OperationalTask.status_id == 2
         ).scalar() or 0
 
         delayed = db.query(func.count(OperationalTask.task_id)).join(
             TaskAssignment, OperationalTask.task_id == TaskAssignment.task_id
         ).filter(
             TaskAssignment.employee_id == employee_id,
-            OperationalTask.status_id == 3  # delayed
+            OperationalTask.status_id == 3
         ).scalar() or 0
 
         completion_rate = round((completed_tasks / total_tasks * 100) if total_tasks > 0 else 0, 1)
@@ -61,10 +64,18 @@ async def employee_dashboard(db: Session = Depends(get_db)):
 
 
 @router.get("/manager")
-async def manager_dashboard(db: Session = Depends(get_db)):
+async def manager_dashboard(
+    db: Session = Depends(get_db),
+    employee_id: int = Depends(get_current_employee)
+):
+    """لوحة تحكم المدير"""
     try:
-        department_id = 6
-
+        # جلب department_id من الموظف
+        employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+        if not employee:
+            raise HTTPException(status_code=404, detail="الموظف غير موجود")
+        
+        department_id = employee.department_id
         department = db.query(Department).filter(Department.department_id == department_id).first()
 
         total_employees = db.query(func.count(Employee.employee_id)).filter(
@@ -96,12 +107,15 @@ async def manager_dashboard(db: Session = Depends(get_db)):
                 "average_performance": completion_rate
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
 
 @router.get("/minister")
 async def minister_dashboard(db: Session = Depends(get_db)):
+    """لوحة تحكم الوزير - لا يحتاج employee_id محدد"""
     try:
         total_employees = db.query(func.count(Employee.employee_id)).scalar() or 0
         total_departments = db.query(func.count(Department.department_id)).scalar() or 0
@@ -132,6 +146,7 @@ async def minister_dashboard(db: Session = Depends(get_db)):
 
 @router.get("/departments-performance")
 async def departments_performance(db: Session = Depends(get_db)):
+    """أداء الإدارات"""
     try:
         departments = db.query(Department).all()
         result = []

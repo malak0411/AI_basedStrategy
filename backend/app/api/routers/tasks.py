@@ -1,32 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from app.database import get_db
 from app.models import OperationalTask, TaskAssignment, Employee
+from app.core.dependencies import get_current_employee
 
 router = APIRouter(prefix="/api/tasks", tags=["Tasks"])
 
-# قاموس الحالات (بدلاً من الاعتماد على العلاقة في الـ Model)
-STATUS_MAP = {
-    1: "معلق",
-    2: "قيد التنفيذ",
-    3: "متأخر",
-    4: "مكتمل",
-    5: "ملغي"
-}
-
-PRIORITY_MAP = {
-    1: "منخفضة",
-    2: "متوسطة",
-    3: "عالية",
-    4: "حرجة"
-}
+STATUS_MAP = {1: "معلق", 2: "قيد التنفيذ", 3: "متأخر", 4: "مكتمل", 5: "ملغي"}
+PRIORITY_MAP = {1: "منخفضة", 2: "متوسطة", 3: "عالية", 4: "حرجة"}
 
 def format_task(task, assigned_name=None, department_name=None):
-    """تنسيق بيانات المهمة"""
     return {
         "id": task.task_id,
         "task_name": task.title,
+        "title": task.title,
         "description": task.description or "",
         "status": task.status_id,
         "status_name": STATUS_MAP.get(task.status_id, "غير معروف"),
@@ -34,6 +21,7 @@ def format_task(task, assigned_name=None, department_name=None):
         "priority_name": PRIORITY_MAP.get(task.priority_id, "غير معروف"),
         "progress": getattr(task, 'progress', 0) or 0,
         "due_date": task.end_date.isoformat() if task.end_date else None,
+        "end_date": task.end_date.isoformat() if task.end_date else None,
         "start_date": task.start_date.isoformat() if task.start_date else None,
         "assigned_to_name": assigned_name,
         "department_name": department_name
@@ -44,12 +32,11 @@ def format_task(task, assigned_name=None, department_name=None):
 async def my_tasks(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    employee_id: int = Depends(get_current_employee)
 ):
     """مهام المستخدم الحالي"""
     try:
-        employee_id = 6  # مؤقتاً
-
         tasks = db.query(OperationalTask).join(
             TaskAssignment, OperationalTask.task_id == TaskAssignment.task_id
         ).filter(
@@ -57,7 +44,6 @@ async def my_tasks(
         ).order_by(OperationalTask.end_date.asc()).offset(offset).limit(limit).all()
 
         result = [format_task(task) for task in tasks]
-
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
@@ -66,11 +52,13 @@ async def my_tasks(
 @router.get("/department")
 async def department_tasks(
     limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    employee_id: int = Depends(get_current_employee)
 ):
     """مهام الإدارة"""
     try:
-        department_id = 6
+        employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+        department_id = employee.department_id if employee else 6
 
         tasks = db.query(OperationalTask).filter(
             OperationalTask.department_id == department_id
@@ -85,7 +73,6 @@ async def department_tasks(
             if assignment:
                 emp = db.query(Employee).filter(Employee.employee_id == assignment.employee_id).first()
                 employee_name = emp.full_name if emp else None
-
             result.append(format_task(task, assigned_name=employee_name))
 
         return {"success": True, "data": result}
@@ -100,15 +87,11 @@ async def all_tasks(
 ):
     """جميع المهام"""
     try:
-        tasks = db.query(OperationalTask).order_by(
-            OperationalTask.end_date.asc()
-        ).limit(limit).all()
-
+        tasks = db.query(OperationalTask).order_by(OperationalTask.end_date.asc()).limit(limit).all()
         result = []
         for task in tasks:
             dept_name = task.department.name if task.department else None
             result.append(format_task(task, department_name=dept_name))
-
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
@@ -118,17 +101,12 @@ async def all_tasks(
 async def delayed_tasks(db: Session = Depends(get_db)):
     """المهام المتأخرة"""
     try:
-        tasks = db.query(OperationalTask).filter(
-            OperationalTask.status_id == 3  # delayed
-        ).limit(20).all()
-
+        tasks = db.query(OperationalTask).filter(OperationalTask.status_id == 3).limit(20).all()
         result = [{
-            "id": t.task_id,
-            "task_name": t.title,
+            "id": t.task_id, "task_name": t.title,
             "due_date": t.end_date.isoformat() if t.end_date else None,
             "department_name": t.department.name if t.department else None
         } for t in tasks]
-
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
@@ -142,19 +120,15 @@ async def task_detail(task_id: int, db: Session = Depends(get_db)):
         if not task:
             raise HTTPException(status_code=404, detail="المهمة غير موجودة")
 
-        assignment = db.query(TaskAssignment).filter(
-            TaskAssignment.task_id == task_id
-        ).first()
+        assignment = db.query(TaskAssignment).filter(TaskAssignment.task_id == task_id).first()
         assigned_name = None
         if assignment:
             emp = db.query(Employee).filter(Employee.employee_id == assignment.employee_id).first()
             assigned_name = emp.full_name if emp else None
 
         dept_name = task.department.name if task.department else None
-
         result = format_task(task, assigned_name=assigned_name, department_name=dept_name)
-        result["comments"] = []  # يمكن إضافة التعليقات لاحقاً
-
+        result["comments"] = []
         return {"success": True, "data": result}
     except HTTPException:
         raise

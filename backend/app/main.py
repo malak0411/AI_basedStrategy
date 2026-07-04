@@ -1,32 +1,25 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .config import settings
-from .api.routers import auth, strategic, tasks, dashboard, employees, budget, risks, kpis, ai
-from app.api.routers import system_config
-from app.api.routers import dashboard, tasks, strategic, employees, departments
-from app.api.routers import dashboard, tasks, strategic, employees, departments
-from app.api.routers import kpis, budget, risks, ai, system_config, admin, location
 
-
+from app.api.routers import auth, strategic, tasks, dashboard, employees, budget, risks, kpis, ai
+from app.api.routers import system_config, admin, location
 
 app = FastAPI(
-    title="AI-Based Strategy Management System",
+    title="AI Strategy Management System",
     description="نظام إدارة الاستراتيجية الحكومي المعتمد على الذكاء الاصطناعي",
-    version="1.0.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    version="1.0.0"
 )
 
-# CORS - السماح لـ Laravel بالاتصال
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# تسجيل الرواترز
+# تسجيل الـ Routers
 app.include_router(auth.router)
 app.include_router(strategic.router)
 app.include_router(tasks.router)
@@ -37,31 +30,9 @@ app.include_router(risks.router)
 app.include_router(kpis.router)
 app.include_router(ai.router)
 app.include_router(system_config.router)
-app.include_router(dashboard.router)
-app.include_router(tasks.router)
-app.include_router(strategic.router)
-app.include_router(employees.router)
-app.include_router(departments.router)
-app.include_router(dashboard.router)
-app.include_router(tasks.router)
-app.include_router(strategic.router)
-app.include_router(employees.router)
-app.include_router(departments.router)
-app.include_router(kpis.router)
-app.include_router(budget.router)
-app.include_router(risks.router)
-app.include_router(ai.router)
-app.include_router(system_config.router)
 app.include_router(admin.router)
 app.include_router(location.router)
 
-
-
-
 @app.get("/")
 async def root():
-    return {"message": "AI-Based Strategy Management System", "status": "running"}
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy", "version": "1.0.0"}
+    return {"message": "AI Strategy Management System API", "version": "1.0.0", "status": "running"}
