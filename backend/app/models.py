@@ -682,3 +682,14 @@ class SystemConfig(Base):
     description = Column(String(500))
     updated_at = Column(DateTime, server_default=func.now())
 
+class AiJob(Base):
+    __tablename__ = "ai_jobs"
+    
+    job_id = Column(Integer, primary_key=True, autoincrement=True)
+    job_type = Column(String(50), nullable=False)
+    status = Column(String(20), default="pending")
+    input_data = Column(Text)  # JSON
+    result_json = Column(Text)  # JSON
+    created_by = Column(Integer, ForeignKey("employees.employee_id"))
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())

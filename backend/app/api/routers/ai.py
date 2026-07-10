@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import AIModel, AIPrediction, AIRecommendation, OperationalTask
+from app.ai.models.delay_predictor import delay_predictor
+from app.ai.models.recommender import recommender
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
 
@@ -65,3 +67,142 @@ async def recommendation_detail(recommendation_id: int, db: Session = Depends(ge
         return {"success": True, "data": {"id": r.recommendation_id, "title": r.reasoning or "توصية", "description": r.reasoning or "", "priority": "medium", "category": "عام", "status": "جديد", "created_at": r.created_at.isoformat() if r.created_at else None, "actions": []}}
     except HTTPException: raise
     except Exception as e: raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+
+
+@router.get("/predict-delay/{task_id}")
+async def predict_task_delay(task_id: int, db: Session = Depends(get_db)):
+    """التنبؤ بتأخر مهمة محددة"""
+    try:
+        task = db.query(OperationalTask).filter(OperationalTask.task_id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+        
+        task_data = {
+            'progress': 0,
+            'end_date': task.end_date,
+            'start_date': task.start_date,
+            'priority_id': task.priority_id or 2,
+            'estimated_hours': float(task.estimated_hours or 0),
+            'actual_hours': float(task.actual_hours or 0),
+            'is_cross_functional': task.is_cross_functional or False,
+        }
+        
+        result = delay_predictor.predict(task_data)
+        
+        return {"success": True, "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+
+
+@router.get("/predict-all-delays")
+async def predict_all_delays(db: Session = Depends(get_db)):
+    """التنبؤ بتأخر جميع المهام النشطة"""
+    try:
+        tasks = db.query(OperationalTask).filter(
+            OperationalTask.status_id.in_([1, 2])  # معلق وقيد التنفيذ
+        ).all()
+        
+        results = []
+        for task in tasks:
+            task_data = {
+                'progress': 0,
+                'end_date': task.end_date,
+                'start_date': task.start_date,
+                'priority_id': task.priority_id or 2,
+                'estimated_hours': float(task.estimated_hours or 0),
+                'actual_hours': float(task.actual_hours or 0),
+                'is_cross_functional': task.is_cross_functional or False,
+            }
+            
+            prediction = delay_predictor.predict(task_data)
+            
+            results.append({
+                "task_id": task.task_id,
+                "task_name": task.title,
+                "delay_probability": prediction['delay_probability'],
+                "risk_level": prediction['risk_level'],
+                "risk_label": prediction['risk_label']
+            })
+        
+        # ترتيب حسب نسبة الخطر
+        results.sort(key=lambda x: x['delay_probability'], reverse=True)
+        
+        return {"success": True, "data": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+
+
+@router.get("/recommendations/task/{task_id}")
+async def task_recommendations(task_id: int, db: Session = Depends(get_db)):
+    """توصيات لمهمة محددة"""
+    try:
+        task = db.query(OperationalTask).filter(OperationalTask.task_id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+        
+        from datetime import date
+        days_remaining = (task.end_date - date.today()).days if task.end_date else 30
+        
+        task_data = {
+            'task_name': task.title,
+            'task_id': task.task_id,
+            'status_id': task.status_id,
+            'progress': 0,
+            'priority_id': task.priority_id or 2,
+            'days_remaining': days_remaining,
+            'estimated_hours': float(task.estimated_hours or 0),
+            'actual_hours': float(task.actual_hours or 0),
+            'employee_task_count': 3,
+            'budget_spent_percent': 0,
+            'has_dependencies': False,
+        }
+        
+        result = recommender.get_task_recommendations(task_data)
+        return {"success": True, "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+
+
+@router.get("/recommendations/dashboard")
+async def dashboard_recommendations(db: Session = Depends(get_db)):
+    """توصيات لوحة التحكم"""
+    try:
+        from datetime import date
+        
+        tasks = db.query(OperationalTask).filter(
+            OperationalTask.status_id.in_([1, 2, 3])
+        ).all()
+        
+        tasks_data = []
+        for task in tasks:
+            days_remaining = (task.end_date - date.today()).days if task.end_date else 30
+            tasks_data.append({
+                'task_name': task.title,
+                'task_id': task.task_id,
+                'status_id': task.status_id,
+                'progress': 0,
+                'priority_id': task.priority_id or 2,
+                'days_remaining': days_remaining,
+                'estimated_hours': float(task.estimated_hours or 0),
+                'actual_hours': float(task.actual_hours or 0),
+                'employee_task_count': 3,
+                'budget_spent_percent': 0,
+                'has_dependencies': False,
+            })
+        
+        result = recommender.get_dashboard_recommendations(tasks_data, limit=10)
+        stats = recommender.get_summary_stats(tasks_data)
+        
+        return {
+            "success": True,
+            "data": {
+                "recommendations": result,
+                "stats": stats
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
