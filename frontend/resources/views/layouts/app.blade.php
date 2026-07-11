@@ -133,9 +133,7 @@
             cursor: pointer;
             transition: all 0.3s ease;
         }
-        .sidebar .collapse-btn:hover {
-            background: rgba(212, 175, 55, 0.3);
-        }
+        .sidebar .collapse-btn:hover { background: rgba(212, 175, 55, 0.3); }
 
         .main-content {
             margin-right: 280px;
@@ -161,101 +159,55 @@
             color: var(--primary-dark);
             margin: 0;
         }
-        .topbar .user-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
+        .topbar .user-info { display: flex; align-items: center; gap: 16px; }
         .topbar .user-info .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--gold);
-            color: var(--primary-dark);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 18px;
+            width: 40px; height: 40px; border-radius: 50%;
+            background: var(--gold); color: var(--primary-dark);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 18px;
         }
         .topbar .user-info .user-name { font-weight: 600; color: var(--text-dark); }
         .topbar .user-info .user-role { font-size: 12px; color: var(--text-gray); }
         .topbar .toggle-sidebar {
-            display: none;
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: var(--primary-dark);
-            cursor: pointer;
+            display: none; background: none; border: none;
+            font-size: 24px; color: var(--primary-dark); cursor: pointer;
         }
 
         @media (max-width: 992px) {
-            .sidebar {
-                width: 280px !important;
-                right: -100%;
-                transition: right 0.3s ease;
-            }
+            .sidebar { width: 280px !important; right: -100%; transition: right 0.3s ease; }
             .sidebar.mobile-open { right: 0; }
             .main-content { margin-right: 0; }
             .topbar .toggle-sidebar { display: block; }
         }
         @media (max-width: 768px) {
-            .topbar {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 12px;
-            }
-            .topbar .user-info {
-                width: 100%;
-                justify-content: flex-start;
-            }
+            .topbar { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .topbar .user-info { width: 100%; justify-content: flex-start; }
         }
 
         .gold-text { color: var(--gold); }
         .bg-gold { background: var(--gold); color: var(--primary-dark); }
         .btn-gold {
-            background: var(--gold);
-            color: var(--primary-dark);
-            font-weight: 600;
-            border: none;
-            padding: 10px 24px;
-            border-radius: 10px;
-            transition: all 0.3s ease;
+            background: var(--gold); color: var(--primary-dark);
+            font-weight: 600; border: none; padding: 10px 24px;
+            border-radius: 10px; transition: all 0.3s ease;
         }
         .btn-gold:hover { background: var(--gold-dark); color: #fff; }
 
         .card-custom {
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-            padding: 20px;
-            border: 1px solid var(--gray-border);
-            transition: all 0.3s ease;
+            background: #fff; border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06); padding: 20px;
+            border: 1px solid var(--gray-border); transition: all 0.3s ease;
         }
         .card-custom:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
 
         .stat-card {
-            padding: 20px;
-            border-radius: 16px;
-            background: #fff;
+            padding: 20px; border-radius: 16px; background: #fff;
             border-right: 4px solid var(--gold);
             box-shadow: 0 2px 10px rgba(0,0,0,0.04);
         }
-        .stat-card .number {
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--primary-dark);
-        }
-        .stat-card .label {
-            font-size: 14px;
-            color: var(--text-gray);
-            margin-top: 4px;
-        }
-        .stat-card .icon {
-            font-size: 32px;
-            color: var(--gold);
-            opacity: 0.6;
-        }
+        .stat-card .number { font-size: 28px; font-weight: 800; color: var(--primary-dark); }
+        .stat-card .label { font-size: 14px; color: var(--text-gray); margin-top: 4px; }
+        .stat-card .icon { font-size: 32px; color: var(--gold); opacity: 0.6; }
 
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: var(--gray-light); }
@@ -305,6 +257,9 @@
             {{-- الاستراتيجية --}}
             @if($isMinister || $isManager || $isSuperAdmin)
             <div class="nav-section">الاستراتيجية</div>
+            <a class="nav-link {{ request()->routeIs('strategic.vision.*') ? 'active' : '' }}" href="{{ route('strategic.vision.index') }}">
+                <i class="fas fa-eye"></i><span class="nav-text">الرؤية</span>
+            </a>
             <a class="nav-link {{ request()->routeIs('strategic.pillars.*') ? 'active' : '' }}" href="{{ route('strategic.pillars.index') }}">
                 <i class="fas fa-chess-queen"></i><span class="nav-text">الركائز</span>
             </a>
@@ -348,9 +303,6 @@
             <a class="nav-link {{ request()->routeIs('ai.models.*') ? 'active' : '' }}" href="{{ route('ai.models') }}">
                 <i class="fas fa-microchip"></i><span class="nav-text">النماذج</span>
             </a>
-            <a class="nav-link {{ request()->routeIs('ai.predictions.*') ? 'active' : '' }}" href="{{ route('ai.predictions') }}">
-                <i class="fas fa-chart-line"></i><span class="nav-text">التنبؤات</span>
-            </a>
             <a class="nav-link {{ request()->routeIs('ai.recommendations.*') ? 'active' : '' }}" href="{{ route('ai.recommendations') }}">
                 <i class="fas fa-lightbulb"></i><span class="nav-text">التوصيات</span>
             </a>
@@ -362,7 +314,7 @@
                 <i class="fas fa-file-alt"></i><span class="nav-text">التقارير</span>
             </a>
 
-            {{-- الملف الشخصي --}}
+            {{-- حسابي --}}
             <div class="nav-section">حسابي</div>
             <a class="nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}" href="{{ route('profile.index') }}">
                 <i class="fas fa-user-circle"></i><span class="nav-text">الملف الشخصي</span>
@@ -379,7 +331,7 @@
             </a>
             @endif
 
-            {{-- الإدارة --}}
+            {{-- إدارة النظام --}}
             @if($isSuperAdmin)
             <div class="nav-section">إدارة النظام</div>
             <a class="nav-link {{ request()->routeIs('admin.employees.*') ? 'active' : '' }}" href="{{ route('admin.employees.index') }}">
@@ -436,7 +388,6 @@
                 <div class="avatar">{{ mb_substr(session('user_name', 'م'), 0, 1) }}</div>
             </div>
         </div>
-
         @yield('content')
     </div>
 
@@ -469,8 +420,8 @@
 
         document.addEventListener('click', function(e) {
             if (window.innerWidth <= 992) {
-                const isClickInside = sidebar.contains(e.target) || e.target.closest('.toggle-sidebar');
-                if (!isClickInside) sidebar.classList.remove('mobile-open');
+                const inside = sidebar.contains(e.target) || e.target.closest('.toggle-sidebar');
+                if (!inside) sidebar.classList.remove('mobile-open');
             }
         });
     </script>

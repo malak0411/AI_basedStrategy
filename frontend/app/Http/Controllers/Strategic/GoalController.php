@@ -19,15 +19,7 @@ class GoalController extends Controller
     {
         $token = session('jwt_token');
         $response = $this->apiClient->get('/api/strategic/goals', $token);
-        
-        // استخراج البيانات بأمان
-        $goals = [];
-        if (isset($response['data'])) {
-            $goals = is_array($response['data']) ? $response['data'] : [];
-        } elseif (isset($response['success']) && is_array($response)) {
-            $goals = $response;
-        }
-
+        $goals = $response['data'] ?? [];
         return view('strategic.goals.index', compact('goals'));
     }
 
@@ -35,19 +27,22 @@ class GoalController extends Controller
     {
         $token = session('jwt_token');
         $pillarsResponse = $this->apiClient->get('/api/strategic/pillars', $token);
-        $pillars = [];
-        if (isset($pillarsResponse['data'])) {
-            $pillars = is_array($pillarsResponse['data']) ? $pillarsResponse['data'] : [];
-        }
-
+        $pillars = $pillarsResponse['data'] ?? [];
         return view('strategic.goals.create', compact('pillars'));
     }
 
     public function store(Request $request)
     {
         $token = session('jwt_token');
-        $response = $this->apiClient->post('/api/strategic/goals', $request->all(), $token);
-
+        $data = [
+            'pillar_id' => (int) $request->pillar_id,
+            'title' => $request->title,
+            'description' => $request->description ?? '',
+            'target_date' => $request->target_date,
+            'valid_from' => $request->valid_from,
+            'valid_until' => $request->valid_until,
+        ];
+        $response = $this->apiClient->post('/api/strategic/goals', $data, $token);
         if ($response['success'] ?? false) {
             return redirect()->route('strategic.goals.index')->with('success', 'تم إنشاء الهدف بنجاح');
         }
@@ -58,12 +53,8 @@ class GoalController extends Controller
     {
         $token = session('jwt_token');
         $response = $this->apiClient->get("/api/strategic/goals/{$id}", $token);
-        $goal = $response['data'] ?? $response ?? [];
-
-        if (empty($goal)) {
-            return redirect()->route('strategic.goals.index')->with('error', 'الهدف غير موجود');
-        }
-
+        $goal = $response['data'] ?? [];
+        if (empty($goal)) return redirect()->route('strategic.goals.index')->with('error', 'الهدف غير موجود');
         return view('strategic.goals.show', compact('goal'));
     }
 
@@ -71,26 +62,38 @@ class GoalController extends Controller
     {
         $token = session('jwt_token');
         $response = $this->apiClient->get("/api/strategic/goals/{$id}", $token);
-        $goal = $response['data'] ?? $response ?? [];
-
+        $goal = $response['data'] ?? [];
         $pillarsResponse = $this->apiClient->get('/api/strategic/pillars', $token);
         $pillars = $pillarsResponse['data'] ?? [];
-
-        if (empty($goal)) {
-            return redirect()->route('strategic.goals.index')->with('error', 'الهدف غير موجود');
-        }
-
+        if (empty($goal)) return redirect()->route('strategic.goals.index')->with('error', 'الهدف غير موجود');
         return view('strategic.goals.edit', compact('goal', 'pillars'));
     }
 
     public function update(Request $request, $id)
     {
         $token = session('jwt_token');
-        $response = $this->apiClient->put("/api/strategic/goals/{$id}", $request->all(), $token);
-
+        $data = [
+            'pillar_id' => (int) $request->pillar_id,
+            'title' => $request->title,
+            'description' => $request->description ?? '',
+            'target_date' => $request->target_date,
+            'valid_from' => $request->valid_from,
+            'valid_until' => $request->valid_until,
+        ];
+        $response = $this->apiClient->put("/api/strategic/goals/{$id}", $data, $token);
         if ($response['success'] ?? false) {
-            return redirect()->route('strategic.goals.show', $id)->with('success', 'تم تحديث الهدف بنجاح');
+            return redirect()->route('strategic.goals.show', $id)->with('success', 'تم تحديث الهدف');
         }
         return back()->with('error', $response['detail'] ?? 'فشل تحديث الهدف');
+    }
+
+    public function destroy($id)
+    {
+        $token = session('jwt_token');
+        $response = $this->apiClient->delete("/api/strategic/goals/{$id}", $token);
+        if ($response['success'] ?? false) {
+            return redirect()->route('strategic.goals.index')->with('success', 'تم حذف الهدف');
+        }
+        return back()->with('error', $response['detail'] ?? 'فشل حذف الهدف');
     }
 }

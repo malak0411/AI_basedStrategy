@@ -23,6 +23,7 @@ use App\Http\Controllers\Strategic\ProgramController;
 use App\Http\Controllers\Strategic\InitiativeController;
 use App\Http\Controllers\Strategic\SwotController;
 use App\Http\Controllers\Strategic\PestelController;
+use App\Http\Controllers\Strategic\VisionController;
 
 // Controllers - KPIs, Budget, Risks
 use App\Http\Controllers\KpiController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\RiskController;
 
 // Controllers - AI
 use App\Http\Controllers\AiController;
+use App\Http\Controllers\AiDashboardController;
 
 // Controllers - Admin
 use App\Http\Controllers\Admin\EmployeeController;
@@ -95,9 +97,13 @@ Route::middleware('check.jwt')->group(function () {
 
     // ========== التخطيط الاستراتيجي ==========
     Route::prefix('strategic')->name('strategic.')->group(function () {
+        // الرؤية
+        Route::get('/vision', [VisionController::class, 'index'])->name('vision.index');
+        Route::put('/vision', [VisionController::class, 'update'])->name('vision.update');
+
         // الركائز
         Route::get('/pillars', [PillarController::class, 'index'])->name('pillars.index');
-        
+
         // الأهداف
         Route::get('/goals', [GoalController::class, 'index'])->name('goals.index');
         Route::get('/goals/create', [GoalController::class, 'create'])->name('goals.create');
@@ -105,7 +111,8 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/goals/{id}', [GoalController::class, 'show'])->name('goals.show');
         Route::get('/goals/{id}/edit', [GoalController::class, 'edit'])->name('goals.edit');
         Route::put('/goals/{id}', [GoalController::class, 'update'])->name('goals.update');
-        
+        Route::delete('/goals/{id}', [GoalController::class, 'destroy'])->name('goals.destroy');
+
         // البرامج
         Route::get('/programs', [ProgramController::class, 'index'])->name('programs.index');
         Route::get('/programs/create', [ProgramController::class, 'create'])->name('programs.create');
@@ -113,7 +120,8 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/programs/{id}', [ProgramController::class, 'show'])->name('programs.show');
         Route::get('/programs/{id}/edit', [ProgramController::class, 'edit'])->name('programs.edit');
         Route::put('/programs/{id}', [ProgramController::class, 'update'])->name('programs.update');
-        
+        Route::delete('/programs/{id}', [ProgramController::class, 'destroy'])->name('programs.destroy');
+
         // المبادرات
         Route::get('/initiatives', [InitiativeController::class, 'index'])->name('initiatives.index');
         Route::get('/initiatives/create', [InitiativeController::class, 'create'])->name('initiatives.create');
@@ -121,10 +129,17 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/initiatives/{id}', [InitiativeController::class, 'show'])->name('initiatives.show');
         Route::get('/initiatives/{id}/edit', [InitiativeController::class, 'edit'])->name('initiatives.edit');
         Route::put('/initiatives/{id}', [InitiativeController::class, 'update'])->name('initiatives.update');
-        
-        // التحليل
+        Route::delete('/initiatives/{id}', [InitiativeController::class, 'destroy'])->name('initiatives.destroy');
+
+        // SWOT
         Route::get('/swot', [SwotController::class, 'index'])->name('swot.index');
+        Route::get('/swot/edit', [SwotController::class, 'edit'])->name('swot.edit');
+        Route::put('/swot', [SwotController::class, 'update'])->name('swot.update');
+
+        // PESTEL
         Route::get('/pestel', [PestelController::class, 'index'])->name('pestel.index');
+        Route::get('/pestel/edit', [PestelController::class, 'edit'])->name('pestel.edit');
+        Route::put('/pestel', [PestelController::class, 'update'])->name('pestel.update');
     });
 
     // ========== مؤشرات الأداء ==========
@@ -148,7 +163,6 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/{id}', [BudgetController::class, 'show'])->name('show');
         Route::get('/{id}/edit', [BudgetController::class, 'edit'])->name('edit');
         Route::put('/{id}', [BudgetController::class, 'update'])->name('update');
-        // المعاملات
         Route::get('/transactions', [BudgetController::class, 'transactions'])->name('transactions');
         Route::get('/transactions/create', [BudgetController::class, 'createTransaction'])->name('transactions.create');
         Route::post('/transactions', [BudgetController::class, 'storeTransaction'])->name('transactions.store');
@@ -163,7 +177,6 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/{id}', [RiskController::class, 'show'])->name('show');
         Route::get('/{id}/edit', [RiskController::class, 'edit'])->name('edit');
         Route::put('/{id}', [RiskController::class, 'update'])->name('update');
-        // خطط التخفيف
         Route::get('/{id}/mitigations', [RiskController::class, 'mitigations'])->name('mitigations');
         Route::get('/{id}/mitigations/create', [RiskController::class, 'createMitigation'])->name('mitigations.create');
         Route::post('/{id}/mitigations', [RiskController::class, 'storeMitigation'])->name('mitigations.store');
@@ -171,7 +184,8 @@ Route::middleware('check.jwt')->group(function () {
 
     // ========== الذكاء الاصطناعي ==========
     Route::prefix('ai')->name('ai.')->group(function () {
-        Route::get('/dashboard', [AiController::class, 'dashboard'])->name('dashboard');
+        Route::get('/dashboard', [AiDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/predict-all', [AiDashboardController::class, 'predictAll'])->name('predict-all');
         Route::get('/models', [AiController::class, 'models'])->name('models');
         Route::get('/models/{id}', [AiController::class, 'showModel'])->name('models.show');
         Route::get('/predictions', [AiController::class, 'predictions'])->name('predictions');
@@ -197,38 +211,24 @@ Route::middleware('check.jwt')->group(function () {
 
     // ========== إدارة النظام (مشرف عام) ==========
     Route::prefix('admin')->name('admin.')->group(function () {
-        // الموظفين
         Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
         Route::get('/employees/{id}', [EmployeeController::class, 'show'])->name('employees.show');
-        
-        // الإدارات
         Route::get('/departments', [DepartmentController::class, 'index'])->name('departments.index');
         Route::get('/departments/{id}', [DepartmentController::class, 'show'])->name('departments.show');
-        
-        // تهيئة النظام
         Route::get('/settings', [SystemConfigController::class, 'index'])->name('settings.index');
         Route::post('/settings/update', [SystemConfigController::class, 'update'])->name('settings.update');
-        
-        // سجل التدقيق
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
         Route::get('/audit-logs/{id}', [AuditLogController::class, 'show'])->name('audit-logs.show');
-        
-        // الأدوار
         Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
         Route::get('/roles/create', [RoleController::class, 'create'])->name('roles.create');
         Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
         Route::get('/roles/{id}', [RoleController::class, 'show'])->name('roles.show');
         Route::get('/roles/{id}/edit', [RoleController::class, 'edit'])->name('roles.edit');
         Route::put('/roles/{id}', [RoleController::class, 'update'])->name('roles.update');
-        
-        // الصلاحيات
+        Route::delete('/roles/{id}', [RoleController::class, 'destroy'])->name('roles.destroy');
         Route::get('/permissions', [PermissionController::class, 'index'])->name('permissions.index');
         Route::get('/permissions/{id}', [PermissionController::class, 'show'])->name('permissions.show');
-        
-        // ربط الموظفين بالأدوار
         Route::get('/employee-roles', [EmployeeRoleController::class, 'index'])->name('employee-roles.index');
-        
-        // ربط الأدوار بالصلاحيات
         Route::get('/role-permissions', [RolePermissionController::class, 'index'])->name('role-permissions.index');
     });
 

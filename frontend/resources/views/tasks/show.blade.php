@@ -4,76 +4,79 @@
 
 @section('content')
 <div class="container-fluid px-4">
-    <a href="{{ route('tasks.index') }}" class="btn btn-outline-secondary mb-3">
-        <i class="fas fa-arrow-right"></i> العودة للقائمة
-    </a>
-
-    @if(session('error'))
-        <div class="alert alert-danger">{{ session('error') }}</div>
-    @endif
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="{{ route('tasks.index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-right"></i> العودة للقائمة
+        </a>
+        <a href="{{ route('tasks.edit', $task['id'] ?? 0) }}" class="btn btn-outline-primary">
+            <i class="fas fa-edit"></i> تعديل
+        </a>
+    </div>
 
     @if(empty($task))
-        <div class="alert alert-info">المهمة غير متوفرة.</div>
+        <div class="alert alert-info">المهمة غير موجودة</div>
     @else
-        <div class="card-custom">
-            <div class="d-flex justify-content-between align-items-start mb-4">
-                <h4>{{ $task['task_name'] ?? $task['title'] ?? 'اسم المهمة' }}</h4>
-                @php
-                    $status = $task['status'] ?? 'pending';
-                    $labels = [
-                        'completed' => 'مكتمل',
-                        'in_progress' => 'قيد التنفيذ',
-                        'pending' => 'معلق',
-                        'delayed' => 'متأخر',
-                    ];
-                    $colors = [
-                        'completed' => 'success',
-                        'in_progress' => 'info',
-                        'pending' => 'warning',
-                        'delayed' => 'danger',
-                    ];
-                @endphp
-                <span class="badge bg-{{ $colors[$status] ?? 'secondary' }} fs-6">
-                    {{ $labels[$status] ?? $status }}
-                </span>
-            </div>
-
-            <p class="text-muted">{{ $task['description'] ?? 'لا يوجد وصف' }}</p>
-
-            <div class="row mt-4">
-                <div class="col-md-4">
-                    <strong>تاريخ البداية:</strong> {{ $task['start_date'] ?? 'غير محدد' }}
-                </div>
-                <div class="col-md-4">
-                    <strong>تاريخ التسليم:</strong> {{ $task['due_date'] ?? 'غير محدد' }}
-                </div>
-                <div class="col-md-4">
-                    <strong>المسؤول:</strong> {{ $task['assigned_to_name'] ?? session('user_name') }}
-                </div>
-            </div>
-
-            <div class="mt-4">
-                <strong>التقدم:</strong>
-                <div class="progress mt-2" style="height: 12px;">
-                    <div class="progress-bar bg-{{ ($task['progress'] ?? 0) >= 80 ? 'success' : 'info' }}" 
-                         style="width: {{ $task['progress'] ?? 0 }}%">
+        <div class="row">
+            <div class="col-lg-8">
+                {{-- تفاصيل المهمة --}}
+                <div class="card-custom mb-4">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h4>{{ $task['task_name'] ?? $task['title'] ?? '' }}</h4>
+                        @php $status = $task['status'] ?? 5; @endphp
+                        <span class="badge bg-{{ $status == 8 ? 'success' : ($status == 7 ? 'danger' : ($status == 6 ? 'info' : 'warning')) }} fs-6">
+                            {{ ['5'=>'معلق','6'=>'جاري العمل','7'=>'متأخر','8'=>'مكتمل'][$status] ?? 'غير معروف' }}
+                        </span>
+                    </div>
+                    <p class="text-muted mb-4">{{ $task['description'] ?? 'لا يوجد وصف' }}</p>
+                    <div class="row mb-4">
+                        <div class="col-md-3"><small class="text-muted">تاريخ البداية</small><div class="fw-bold">{{ $task['start_date'] ?? 'غير محدد' }}</div></div>
+                        <div class="col-md-3"><small class="text-muted">تاريخ التسليم</small><div class="fw-bold">{{ $task['due_date'] ?? $task['end_date'] ?? 'غير محدد' }}</div></div>
+                        <div class="col-md-3"><small class="text-muted">المسؤول</small><div class="fw-bold">{{ $task['assigned_to_name'] ?? 'غير معين' }}</div></div>
+                        <div class="col-md-3"><small class="text-muted">الإدارة</small><div class="fw-bold">{{ $task['department_name'] ?? '' }}</div></div>
                     </div>
                 </div>
-                <small class="text-muted">{{ $task['progress'] ?? 0 }}% مكتمل</small>
             </div>
 
-            {{-- ملاحظات أو تعليقات (إن وجدت) --}}
-            @if(!empty($task['comments']))
-                <hr>
-                <h5>التعليقات</h5>
-                @foreach($task['comments'] as $comment)
-                    <div class="border p-2 mb-2 rounded">
-                        <strong>{{ $comment['user'] ?? 'مستخدم' }}</strong>
-                        <small class="text-muted">- {{ $comment['created_at'] ?? '' }}</small>
-                        <p class="mb-0">{{ $comment['content'] ?? '' }}</p>
+            <div class="col-lg-4">
+                {{-- تنبؤ AI --}}
+                @if(!empty($prediction))
+                <div class="card-custom mb-4 border-{{ $prediction['risk_level'] == 'High' ? 'danger' : 'warning' }}">
+                    <h6><i class="fas fa-brain text-warning ml-2"></i>توقع الذكاء الاصطناعي</h6>
+                    <div class="text-center mt-3">
+                        <div class="display-4 fw-bold text-{{ $prediction['risk_level'] == 'High' ? 'danger' : 'warning' }}">
+                            {{ round(($prediction['delay_probability'] ?? 0) * 100) }}%
+                        </div>
+                        <p>احتمالية التأخير</p>
+                        <span class="badge bg-{{ $prediction['risk_level'] == 'High' ? 'danger' : 'warning' }}">
+                            {{ $prediction['risk_level'] ?? 'غير معروف' }}
+                        </span>
                     </div>
-                @endforeach
-            @endif
+                    @if(!empty($prediction['top_factors']))
+                        <hr>
+                        <small class="text-muted">العوامل المؤثرة:</small>
+                        @foreach($prediction['top_factors'] as $factor)
+                            <li><small>{{ $factor['feature'] ?? '' }}</small></li>
+                        @endforeach
+                    @endif
+                </div>
+                @endif
+
+                {{-- توصيات AI --}}
+                @if(!empty($aiRecommendations))
+                <div class="card-custom mb-4">
+                    <h6><i class="fas fa-robot text-info ml-2"></i>توصيات ذكية</h6>
+                    @foreach($aiRecommendations as $rec)
+                    <div class="border rounded p-3 mb-2">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ $rec['action_ar'] ?? $rec['action'] ?? '' }}</strong>
+                            <span class="badge bg-info">{{ round(($rec['confidence'] ?? 0) * 100) }}%</span>
+                        </div>
+                        <p class="text-muted small mt-2 mb-0">{{ $rec['reason'] ?? '' }}</p>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+            </div>
         </div>
     @endif
 </div>
