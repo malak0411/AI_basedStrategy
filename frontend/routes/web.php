@@ -131,6 +131,14 @@ Route::middleware('check.jwt')->group(function () {
         Route::put('/initiatives/{id}', [InitiativeController::class, 'update'])->name('initiatives.update');
         Route::delete('/initiatives/{id}', [InitiativeController::class, 'destroy'])->name('initiatives.destroy');
 
+        // إعدادات النظام
+        Route::get('/admin/settings', [SystemConfigController::class, 'index'])->name('admin.settings.index');
+        Route::post('/admin/settings', [SystemConfigController::class, 'store'])->name('admin.settings.store');
+        Route::post('/admin/settings/update', [SystemConfigController::class, 'update'])->name('admin.settings.update');
+        Route::delete('/admin/settings/{config_key}', [SystemConfigController::class, 'destroy'])->name('admin.settings.destroy');
+
+
+        
         // SWOT
         Route::get('/swot', [SwotController::class, 'index'])->name('swot.index');
         Route::get('/swot/edit', [SwotController::class, 'edit'])->name('swot.edit');

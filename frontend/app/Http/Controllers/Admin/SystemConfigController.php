@@ -15,62 +15,63 @@ class SystemConfigController extends Controller
         $this->apiClient = new ApiClient();
     }
 
-    /**
-     * عرض صفحة إعدادات النظام
-     */
     public function index()
     {
         $token = session('jwt_token');
-        
-        // التحقق من الصلاحية
         if (session('user_role') !== 'super_admin') {
-            return redirect()->route('dashboard.employee')
-                ->with('error', 'غير مصرح بالوصول');
+            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
         }
 
-        try {
-            // جلب الإعدادات المجمعة
-            $response = $this->apiClient->get('/api/system-config/grouped/all', $token);
-            $configs = $response['data'] ?? [];
+        $response = $this->apiClient->get('/api/system-config', $token);
+        $configs = $response['data'] ?? [];
 
-            return view('admin.settings.index', compact('configs'));
-
-        } catch (\Exception $e) {
-            \Log::error('System Config Error: ' . $e->getMessage());
-            return view('admin.settings.index', [
-                'configs' => [],
-                'error' => 'تعذر تحميل إعدادات النظام'
-            ]);
-        }
+        return view('admin.settings.index', compact('configs'));
     }
 
-    /**
-     * تحديث إعداد
-     */
-    public function update(Request $request)
+    public function store(Request $request)
     {
         $token = session('jwt_token');
-        
-        if (session('user_role') !== 'super_admin') {
-            return response()->json(['error' => 'غير مصرح'], 403);
-        }
-
         $request->validate([
             'config_key' => 'required|string',
             'config_value' => 'required|string',
         ]);
 
-        try {
-            $response = $this->apiClient->put(
-                "/api/system-config/{$request->config_key}",
-                ['config_value' => $request->config_value],
-                $token
-            );
+        $response = $this->apiClient->post('/api/system-config', [
+            'config_key' => $request->config_key,
+            'config_value' => $request->config_value,
+            'description' => $request->description ?? '',
+        ], $token);
 
-            return response()->json($response);
-
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+        if ($response['success'] ?? false) {
+            return redirect()->route('admin.settings.index')->with('success', 'تم إضافة الإعداد');
         }
+        return back()->with('error', $response['detail'] ?? 'فشل إضافة الإعداد')->withInput();
+    }
+
+    public function update(Request $request)
+    {
+        $token = session('jwt_token');
+        if (session('user_role') !== 'super_admin') {
+            return response()->json(['error' => 'غير مصرح'], 403);
+        }
+
+        $response = $this->apiClient->put(
+            "/api/system-config/{$request->config_key}",
+            ['config_value' => $request->config_value],
+            $token
+        );
+
+        return response()->json($response);
+    }
+
+    public function destroy($config_key)
+    {
+        $token = session('jwt_token');
+        $response = $this->apiClient->delete("/api/system-config/{$config_key}", $token);
+
+        if ($response['success'] ?? false) {
+            return redirect()->route('admin.settings.index')->with('success', 'تم حذف الإعداد');
+        }
+        return back()->with('error', $response['detail'] ?? 'فشل حذف الإعداد');
     }
 }

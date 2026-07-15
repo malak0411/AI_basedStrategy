@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from datetime import date as date_type
 from typing import Optional
 from app.models import StrategicVision
+from app.core.audit import log_audit
 
 router = APIRouter(prefix="/api/strategic", tags=["Strategic"])
 
@@ -244,12 +245,44 @@ async def get_initiative(initiative_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
 @router.get("/swot")
-async def get_swot():
-    return {"success": True, "data": {"strengths": [], "weaknesses": [], "opportunities": [], "threats": []}}
+async def get_swot(db: Session = Depends(get_db)):
+    """تحليل SWOT"""
+    try:
+        swot = db.query(SWOTAnalysis).first()
+        if swot:
+            return {
+                "success": True,
+                "data": {
+                    "strengths": swot.strengths or "",
+                    "weaknesses": swot.weaknesses or "",
+                    "opportunities": swot.opportunities or "",
+                    "threats": swot.threats or ""
+                }
+            }
+        return {"success": True, "data": {"strengths": "", "weaknesses": "", "opportunities": "", "threats": ""}}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/pestel")
-async def get_pestel():
-    return {"success": True, "data": {"political": [], "economic": [], "social": [], "technological": [], "environmental": [], "legal": []}}
+async def get_pestel(db: Session = Depends(get_db)):
+    """تحليل PESTEL"""
+    try:
+        pestel = db.query(PESTELAnalysis).first()
+        if pestel:
+            return {
+                "success": True,
+                "data": {
+                    "political": pestel.political or "",
+                    "economic": pestel.economic or "",
+                    "social": pestel.social or "",
+                    "technological": pestel.technological or "",
+                    "environmental": pestel.environmental or "",
+                    "legal": pestel.legal or ""
+                }
+            }
+        return {"success": True, "data": {"political": "", "economic": "", "social": "", "technological": "", "environmental": "", "legal": ""}}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
 # POST/PUT/DELETE - PILLARS

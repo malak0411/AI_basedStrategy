@@ -19,7 +19,7 @@ class PestelController extends Controller
     {
         $token = session('jwt_token');
         $pestel = $this->apiClient->safeGet('/api/strategic/pestel', $token, []);
-        return view('strategic.pestel', compact('pestel'));
+        return view('strategic.pestel.index', compact('pestel'));
     }
 
     public function edit()

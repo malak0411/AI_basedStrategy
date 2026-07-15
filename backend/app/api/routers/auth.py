@@ -10,6 +10,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import bcrypt
+from app.core.audit import log_audit
 
 from app.database import get_db
 from app.models import Employee
@@ -91,6 +92,15 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         employee.last_login = datetime.now()
         db.commit()
         
+        # تسجيل تدقيق - تسجيل دخول
+        log_audit(
+            employee_id=employee.employee_id,
+            action="LOGIN",
+            table_name="employees",
+            record_id=employee.employee_id,
+            new_data={"email": employee.email, "full_name": employee.full_name}
+        )
+
         return {
             "success": True,
             "data": {

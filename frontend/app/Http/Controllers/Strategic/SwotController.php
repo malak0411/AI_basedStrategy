@@ -19,7 +19,7 @@ class SwotController extends Controller
     {
         $token = session('jwt_token');
         $swot = $this->apiClient->safeGet('/api/strategic/swot', $token, []);
-        return view('strategic.swot', compact('swot'));
+        return view('strategic.swot.index', compact('swot'));
     }
 
     public function edit()
