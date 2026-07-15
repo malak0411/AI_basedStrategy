@@ -42,17 +42,19 @@ class LoginController extends Controller
         if ($token) {
             // البيانات قد تكون ضمن 'user' أو مباشرة
             $user = $data['user'] ?? $data;
-            
+           
             // استخراج الصلاحيات من المصفوفة
             $roles = $user['roles'] ?? [];
             $primaryRole = is_array($roles) ? ($roles[0] ?? 'employee') : 'employee';
-            
+           
             // تحويل المسمى إلى role_type موحد
             $roleType = match(true) {
                 in_array('وزير / قيادة العليا', $roles) => 'minister',
                 in_array('وكيل وزارة', $roles) => 'deputy',
                 in_array('مدير عام', $roles) => 'general_manager',
                 in_array('مدير إدارة', $roles) => 'manager',
+                in_array('مشرف النظام', $roles) => 'super_admin',
+                in_array('Super Admin', $roles) => 'super_admin',
                 default => 'employee'
             };
 

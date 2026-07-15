@@ -197,6 +197,17 @@ Route::middleware('check.jwt')->group(function () {
     // ========== التقارير ==========
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
+    // تعديل الموظفين
+    Route::get('/admin/employees/{id}/edit', [EmployeeController::class, 'edit'])->name('admin.employees.edit');
+    Route::put('/admin/employees/{id}', [EmployeeController::class, 'update'])->name('admin.employees.update');
+
+    // الإدارات - CRUD كامل
+    Route::get('/admin/departments/create', [DepartmentController::class, 'create'])->name('admin.departments.create');
+    Route::post('/admin/departments', [DepartmentController::class, 'store'])->name('admin.departments.store');
+    Route::get('/admin/departments/{id}/edit', [DepartmentController::class, 'edit'])->name('admin.departments.edit');
+    Route::put('/admin/departments/{id}', [DepartmentController::class, 'update'])->name('admin.departments.update');
+    Route::delete('/admin/departments/{id}', [DepartmentController::class, 'destroy'])->name('admin.departments.destroy');
+
     // ========== الملف الشخصي ==========
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -208,6 +219,19 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/employee/{employeeId}', [LocationController::class, 'employee'])->name('employee');
         Route::get('/history', [LocationController::class, 'history'])->name('history');
     });
+
+    // الأدوار
+    Route::get('/admin/roles/create', [RoleController::class, 'create'])->name('admin.roles.create');
+    Route::post('/admin/roles', [RoleController::class, 'store'])->name('admin.roles.store');
+    Route::delete('/admin/roles/{id}', [RoleController::class, 'destroy'])->name('admin.roles.destroy');
+
+// ربط الموظفين بالأدوار
+    Route::post('/admin/employee-roles', [EmployeeRoleController::class, 'store'])->name('admin.employee-roles.store');
+    Route::delete('/admin/employee-roles', [EmployeeRoleController::class, 'destroy'])->name('admin.employee-roles.destroy');
+
+// ربط الأدوار بالصلاحيات
+    Route::post('/admin/role-permissions', [RolePermissionController::class, 'store'])->name('admin.role-permissions.store');
+    Route::delete('/admin/role-permissions', [RolePermissionController::class, 'destroy'])->name('admin.role-permissions.destroy');
 
     // ========== إدارة النظام (مشرف عام) ==========
     Route::prefix('admin')->name('admin.')->group(function () {
