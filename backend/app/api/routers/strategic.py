@@ -1,17 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import StrategicPillar, StrategicGoal, Program, Initiative
+from app.models import StrategicPillar, StrategicGoal, Program, Initiative, StrategicVision, SWOTAnalysis, PESTELAnalysis
 from pydantic import BaseModel
 from datetime import date as date_type
 from typing import Optional
-from app.models import StrategicVision
-from app.core.audit import log_audit
 
 router = APIRouter(prefix="/api/strategic", tags=["Strategic"])
 
 # ============================================================
-# Schemas للإنشاء والتحديث
+# Schemas
 # ============================================================
 class PillarCreate(BaseModel):
     name: str
@@ -46,247 +44,25 @@ class InitiativeCreate(BaseModel):
     budget_estimate: Optional[float] = 0
 
 # ============================================================
-# GET - جلب البيانات
+# PILLARS - GET/POST/PUT/DELETE
 # ============================================================
 
 @router.get("/pillars")
 async def get_pillars(db: Session = Depends(get_db)):
-    """الركائز الاستراتيجية"""
+    """جميع الركائز الاستراتيجية"""
     try:
         pillars = db.query(StrategicPillar).all()
         result = [{
             "id": p.pillar_id,
             "name": p.name,
             "title": p.name,
-            "description": p.description or ""
+            "description": p.description or "",
+            "order_index": p.order_index or 0,
+            "is_active": p.is_active if p.is_active is not None else True
         } for p in pillars]
         return {"success": True, "data": result}
     except Exception as e:
-        print(f"Error in pillars: {str(e)}")
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
-
-@router.get("/goals")
-async def get_goals(db: Session = Depends(get_db)):
-    """الأهداف الاستراتيجية"""
-    try:
-        goals = db.query(StrategicGoal).all()
-        result = []
-        for g in goals:
-            try:
-                pillar_name = g.pillar.name if g.pillar else None
-            except:
-                pillar_name = None
-            result.append({
-                "id": g.goal_id,
-                "name": g.title,
-                "title": g.title,
-                "description": g.description or "",
-                "pillar_name": pillar_name,
-                "pillar_id": g.pillar_id,
-                "progress": 0,
-                "status": "active" if g.is_active else "inactive",
-                "start_date": g.valid_from.isoformat() if g.valid_from else None,
-                "end_date": g.valid_until.isoformat() if g.valid_until else None
-            })
-        return {"success": True, "data": result}
-    except Exception as e:
-        print(f"Error in goals: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
-
-@router.get("/goals/{goal_id}")
-async def get_goal(goal_id: int, db: Session = Depends(get_db)):
-    """تفاصيل هدف"""
-    try:
-        g = db.query(StrategicGoal).filter(StrategicGoal.goal_id == goal_id).first()
-        if not g:
-            raise HTTPException(status_code=404, detail="الهدف غير موجود")
-        try:
-            pillar_name = g.pillar.name if g.pillar else None
-        except:
-            pillar_name = None
-        return {
-            "success": True,
-            "data": {
-                "id": g.goal_id,
-                "name": g.title,
-                "title": g.title,
-                "description": g.description or "",
-                "pillar_name": pillar_name,
-                "pillar_id": g.pillar_id,
-                "progress": 0,
-                "status": "active" if g.is_active else "inactive",
-                "start_date": g.valid_from.isoformat() if g.valid_from else None,
-                "end_date": g.valid_until.isoformat() if g.valid_until else None
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
-
-@router.get("/programs")
-async def get_programs(db: Session = Depends(get_db)):
-    """البرامج"""
-    try:
-        programs = db.query(Program).all()
-        result = []
-        for p in programs:
-            try:
-                goal_name = p.goal.title if p.goal else None
-            except:
-                goal_name = None
-            result.append({
-                "id": p.program_id,
-                "name": p.name,
-                "title": p.name,
-                "description": p.description or "",
-                "goal_name": goal_name,
-                "goal_id": p.goal_id,
-                "budget": float(p.budget_estimate) if p.budget_estimate else 0,
-                "progress": 0,
-                "start_date": p.start_date.isoformat() if p.start_date else None,
-                "end_date": p.end_date.isoformat() if p.end_date else None
-            })
-        return {"success": True, "data": result}
-    except Exception as e:
-        print(f"Error in programs: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
-
-@router.get("/programs/{program_id}")
-async def get_program(program_id: int, db: Session = Depends(get_db)):
-    """تفاصيل برنامج"""
-    try:
-        p = db.query(Program).filter(Program.program_id == program_id).first()
-        if not p:
-            raise HTTPException(status_code=404, detail="البرنامج غير موجود")
-        try:
-            goal_name = p.goal.title if p.goal else None
-        except:
-            goal_name = None
-        return {
-            "success": True,
-            "data": {
-                "id": p.program_id,
-                "name": p.name,
-                "title": p.name,
-                "description": p.description or "",
-                "goal_name": goal_name,
-                "goal_id": p.goal_id,
-                "budget": float(p.budget_estimate) if p.budget_estimate else 0,
-                "progress": 0,
-                "start_date": p.start_date.isoformat() if p.start_date else None,
-                "end_date": p.end_date.isoformat() if p.end_date else None
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
-
-@router.get("/initiatives")
-async def get_initiatives(db: Session = Depends(get_db)):
-    """المبادرات"""
-    try:
-        initiatives = db.query(Initiative).all()
-        result = []
-        for i in initiatives:
-            try:
-                program_name = i.program.name if i.program else None
-            except:
-                program_name = None
-            result.append({
-                "id": i.initiative_id,
-                "name": i.name,
-                "title": i.name,
-                "description": i.description or "",
-                "program_name": program_name,
-                "program_id": i.program_id,
-                "status": i.status_id,
-                "priority": i.priority_id,
-                "progress": 0,
-                "start_date": i.start_date.isoformat() if i.start_date else None,
-                "end_date": i.end_date.isoformat() if i.end_date else None
-            })
-        return {"success": True, "data": result}
-    except Exception as e:
-        print(f"Error in initiatives: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
-
-@router.get("/initiatives/{initiative_id}")
-async def get_initiative(initiative_id: int, db: Session = Depends(get_db)):
-    """تفاصيل مبادرة"""
-    try:
-        i = db.query(Initiative).filter(Initiative.initiative_id == initiative_id).first()
-        if not i:
-            raise HTTPException(status_code=404, detail="المبادرة غير موجودة")
-        try:
-            program_name = i.program.name if i.program else None
-        except:
-            program_name = None
-        return {
-            "success": True,
-            "data": {
-                "id": i.initiative_id,
-                "name": i.name,
-                "title": i.name,
-                "description": i.description or "",
-                "program_name": program_name,
-                "program_id": i.program_id,
-                "status": i.status_id,
-                "priority": i.priority_id,
-                "progress": 0,
-                "start_date": i.start_date.isoformat() if i.start_date else None,
-                "end_date": i.end_date.isoformat() if i.end_date else None
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
-
-@router.get("/swot")
-async def get_swot(db: Session = Depends(get_db)):
-    """تحليل SWOT"""
-    try:
-        swot = db.query(SWOTAnalysis).first()
-        if swot:
-            return {
-                "success": True,
-                "data": {
-                    "strengths": swot.strengths or "",
-                    "weaknesses": swot.weaknesses or "",
-                    "opportunities": swot.opportunities or "",
-                    "threats": swot.threats or ""
-                }
-            }
-        return {"success": True, "data": {"strengths": "", "weaknesses": "", "opportunities": "", "threats": ""}}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/pestel")
-async def get_pestel(db: Session = Depends(get_db)):
-    """تحليل PESTEL"""
-    try:
-        pestel = db.query(PESTELAnalysis).first()
-        if pestel:
-            return {
-                "success": True,
-                "data": {
-                    "political": pestel.political or "",
-                    "economic": pestel.economic or "",
-                    "social": pestel.social or "",
-                    "technological": pestel.technological or "",
-                    "environmental": pestel.environmental or "",
-                    "legal": pestel.legal or ""
-                }
-            }
-        return {"success": True, "data": {"political": "", "economic": "", "social": "", "technological": "", "environmental": "", "legal": ""}}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ============================================================
-# POST/PUT/DELETE - PILLARS
-# ============================================================
 
 @router.post("/pillars")
 async def create_pillar(data: PillarCreate, db: Session = Depends(get_db)):
@@ -342,21 +118,73 @@ async def delete_pillar(pillar_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
-# POST/PUT/DELETE - GOALS
+# GOALS - GET/POST/PUT/DELETE
 # ============================================================
+
+@router.get("/goals")
+async def get_goals(db: Session = Depends(get_db)):
+    """جميع الأهداف الاستراتيجية"""
+    try:
+        goals = db.query(StrategicGoal).all()
+        result = []
+        for g in goals:
+            pillar_name = None
+            try:
+                pillar_name = g.pillar.name if g.pillar else None
+            except:
+                pass
+            result.append({
+                "id": g.goal_id,
+                "name": g.title,
+                "title": g.title,
+                "description": g.description or "",
+                "pillar_name": pillar_name,
+                "pillar_id": g.pillar_id,
+                "progress": 0,
+                "status": "active" if g.is_active else "inactive",
+                "start_date": g.valid_from.isoformat() if g.valid_from else None,
+                "end_date": g.valid_until.isoformat() if g.valid_until else None
+            })
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+
+@router.get("/goals/{goal_id}")
+async def get_goal(goal_id: int, db: Session = Depends(get_db)):
+    """تفاصيل هدف"""
+    try:
+        g = db.query(StrategicGoal).filter(StrategicGoal.goal_id == goal_id).first()
+        if not g:
+            raise HTTPException(status_code=404, detail="الهدف غير موجود")
+        pillar_name = None
+        try:
+            pillar_name = g.pillar.name if g.pillar else None
+        except:
+            pass
+        return {
+            "success": True,
+            "data": {
+                "id": g.goal_id, "name": g.title, "title": g.title,
+                "description": g.description or "", "pillar_name": pillar_name,
+                "pillar_id": g.pillar_id, "progress": 0,
+                "status": "active" if g.is_active else "inactive",
+                "start_date": g.valid_from.isoformat() if g.valid_from else None,
+                "end_date": g.valid_until.isoformat() if g.valid_until else None
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
 @router.post("/goals")
 async def create_goal(data: GoalCreate, db: Session = Depends(get_db)):
     """إنشاء هدف جديد"""
     try:
         goal = StrategicGoal(
-            pillar_id=data.pillar_id,
-            title=data.title,
-            description=data.description,
-            target_date=data.target_date,
-            valid_from=data.valid_from,
-            valid_until=data.valid_until,
-            is_active=True
+            pillar_id=data.pillar_id, title=data.title,
+            description=data.description, target_date=data.target_date,
+            valid_from=data.valid_from, valid_until=data.valid_until, is_active=True
         )
         db.add(goal)
         db.commit()
@@ -404,22 +232,71 @@ async def delete_goal(goal_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
-# POST/PUT/DELETE - PROGRAMS
+# PROGRAMS - GET/POST/PUT/DELETE
 # ============================================================
+
+@router.get("/programs")
+async def get_programs(db: Session = Depends(get_db)):
+    """جميع البرامج"""
+    try:
+        programs = db.query(Program).all()
+        result = []
+        for p in programs:
+            goal_name = None
+            try:
+                goal_name = p.goal.title if p.goal else None
+            except:
+                pass
+            result.append({
+                "id": p.program_id, "name": p.name, "title": p.name,
+                "description": p.description or "", "goal_name": goal_name,
+                "goal_id": p.goal_id,
+                "budget": float(p.budget_estimate) if p.budget_estimate else 0,
+                "progress": 0,
+                "start_date": p.start_date.isoformat() if p.start_date else None,
+                "end_date": p.end_date.isoformat() if p.end_date else None
+            })
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+
+@router.get("/programs/{program_id}")
+async def get_program(program_id: int, db: Session = Depends(get_db)):
+    """تفاصيل برنامج"""
+    try:
+        p = db.query(Program).filter(Program.program_id == program_id).first()
+        if not p:
+            raise HTTPException(status_code=404, detail="غير موجود")
+        goal_name = None
+        try:
+            goal_name = p.goal.title if p.goal else None
+        except:
+            pass
+        return {
+            "success": True,
+            "data": {
+                "id": p.program_id, "name": p.name, "title": p.name,
+                "description": p.description or "", "goal_name": goal_name,
+                "goal_id": p.goal_id,
+                "budget": float(p.budget_estimate) if p.budget_estimate else 0,
+                "progress": 0,
+                "start_date": p.start_date.isoformat() if p.start_date else None,
+                "end_date": p.end_date.isoformat() if p.end_date else None
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
 @router.post("/programs")
 async def create_program(data: ProgramCreate, db: Session = Depends(get_db)):
-    """إنشاء برنامج جديد"""
+    """إنشاء برنامج"""
     try:
         program = Program(
-            goal_id=data.goal_id,
-            name=data.name,
-            description=data.description,
-            budget_estimate=data.budget_estimate,
-            start_date=data.start_date,
-            end_date=data.end_date,
-            status_id=data.status_id,
-            is_active=True
+            goal_id=data.goal_id, name=data.name, description=data.description,
+            budget_estimate=data.budget_estimate, start_date=data.start_date,
+            end_date=data.end_date, status_id=data.status_id, is_active=True
         )
         db.add(program)
         db.commit()
@@ -468,23 +345,70 @@ async def delete_program(program_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
-# POST/PUT/DELETE - INITIATIVES
+# INITIATIVES - GET/POST/PUT/DELETE
 # ============================================================
+
+@router.get("/initiatives")
+async def get_initiatives(db: Session = Depends(get_db)):
+    """جميع المبادرات"""
+    try:
+        initiatives = db.query(Initiative).all()
+        result = []
+        for i in initiatives:
+            program_name = None
+            try:
+                program_name = i.program.name if i.program else None
+            except:
+                pass
+            result.append({
+                "id": i.initiative_id, "name": i.name, "title": i.name,
+                "description": i.description or "", "program_name": program_name,
+                "program_id": i.program_id, "status": i.status_id,
+                "priority": i.priority_id, "progress": 0,
+                "start_date": i.start_date.isoformat() if i.start_date else None,
+                "end_date": i.end_date.isoformat() if i.end_date else None
+            })
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+
+@router.get("/initiatives/{initiative_id}")
+async def get_initiative(initiative_id: int, db: Session = Depends(get_db)):
+    """تفاصيل مبادرة"""
+    try:
+        i = db.query(Initiative).filter(Initiative.initiative_id == initiative_id).first()
+        if not i:
+            raise HTTPException(status_code=404, detail="غير موجودة")
+        program_name = None
+        try:
+            program_name = i.program.name if i.program else None
+        except:
+            pass
+        return {
+            "success": True,
+            "data": {
+                "id": i.initiative_id, "name": i.name, "title": i.name,
+                "description": i.description or "", "program_name": program_name,
+                "program_id": i.program_id, "status": i.status_id,
+                "priority": i.priority_id, "progress": 0,
+                "start_date": i.start_date.isoformat() if i.start_date else None,
+                "end_date": i.end_date.isoformat() if i.end_date else None
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
 @router.post("/initiatives")
 async def create_initiative(data: InitiativeCreate, db: Session = Depends(get_db)):
-    """إنشاء مبادرة جديدة"""
+    """إنشاء مبادرة"""
     try:
         initiative = Initiative(
-            program_id=data.program_id,
-            name=data.name,
-            description=data.description,
-            priority_id=data.priority_id,
-            start_date=data.start_date,
-            end_date=data.end_date,
-            budget_estimate=data.budget_estimate,
-            status_id=5,
-            is_active=True
+            program_id=data.program_id, name=data.name, description=data.description,
+            priority_id=data.priority_id, start_date=data.start_date,
+            end_date=data.end_date, budget_estimate=data.budget_estimate,
+            status_id=5, is_active=True
         )
         db.add(initiative)
         db.commit()
@@ -533,27 +457,30 @@ async def delete_initiative(initiative_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
-# الرؤية - Vision
+# VISION - GET/PUT
 # ============================================================
+
 @router.get("/vision")
 async def get_vision(db: Session = Depends(get_db)):
+    """الرؤية الحالية"""
     try:
         vision = db.query(StrategicVision).filter(StrategicVision.is_current == True).first()
         if not vision:
-            return {"success": True, "data": {"text": "", "description": ""}}
+            return {"success": True, "data": {"text": "", "description": "", "version": 1}}
         return {"success": True, "data": {"text": vision.text, "description": vision.description or "", "version": vision.version}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/vision")
 async def update_vision(data: dict, db: Session = Depends(get_db)):
+    """تحديث الرؤية"""
     try:
         vision = db.query(StrategicVision).filter(StrategicVision.is_current == True).first()
         if vision:
             vision.text = data.get('text', vision.text)
             vision.description = data.get('description', vision.description)
         else:
-            vision = StrategicVision(text=data.get('text', ''), description=data.get('description', ''), is_current=True, effective_date=date.today())
+            vision = StrategicVision(text=data.get('text', ''), description=data.get('description', ''), is_current=True, effective_date=date_type.today())
             db.add(vision)
         db.commit()
         return {"success": True, "message": "تم تحديث الرؤية"}
@@ -562,12 +489,23 @@ async def update_vision(data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
-# SWOT - تحديث
+# SWOT - GET/PUT
 # ============================================================
-from app.models import SWOTAnalysis
+
+@router.get("/swot")
+async def get_swot(db: Session = Depends(get_db)):
+    """تحليل SWOT"""
+    try:
+        swot = db.query(SWOTAnalysis).first()
+        if swot:
+            return {"success": True, "data": {"strengths": swot.strengths or "", "weaknesses": swot.weaknesses or "", "opportunities": swot.opportunities or "", "threats": swot.threats or ""}}
+        return {"success": True, "data": {"strengths": "", "weaknesses": "", "opportunities": "", "threats": ""}}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/swot")
 async def update_swot(data: dict, db: Session = Depends(get_db)):
+    """تحديث SWOT"""
     try:
         swot = db.query(SWOTAnalysis).first()
         if swot:
@@ -576,7 +514,7 @@ async def update_swot(data: dict, db: Session = Depends(get_db)):
             swot.opportunities = data.get('opportunities', swot.opportunities)
             swot.threats = data.get('threats', swot.threats)
         else:
-            swot = SWOTAnalysis(strengths=data.get('strengths',''), weaknesses=data.get('weaknesses',''), opportunities=data.get('opportunities',''), threats=data.get('threats',''), analysis_date=date.today())
+            swot = SWOTAnalysis(strengths=data.get('strengths',''), weaknesses=data.get('weaknesses',''), opportunities=data.get('opportunities',''), threats=data.get('threats',''), analysis_date=date_type.today())
             db.add(swot)
         db.commit()
         return {"success": True, "message": "تم تحديث SWOT"}
@@ -585,12 +523,23 @@ async def update_swot(data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
-# PESTEL - تحديث
+# PESTEL - GET/PUT
 # ============================================================
-from app.models import PESTELAnalysis
+
+@router.get("/pestel")
+async def get_pestel(db: Session = Depends(get_db)):
+    """تحليل PESTEL"""
+    try:
+        pestel = db.query(PESTELAnalysis).first()
+        if pestel:
+            return {"success": True, "data": {"political": pestel.political or "", "economic": pestel.economic or "", "social": pestel.social or "", "technological": pestel.technological or "", "environmental": pestel.environmental or "", "legal": pestel.legal or ""}}
+        return {"success": True, "data": {"political": "", "economic": "", "social": "", "technological": "", "environmental": "", "legal": ""}}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/pestel")
 async def update_pestel(data: dict, db: Session = Depends(get_db)):
+    """تحديث PESTEL"""
     try:
         pestel = db.query(PESTELAnalysis).first()
         if pestel:
@@ -601,7 +550,7 @@ async def update_pestel(data: dict, db: Session = Depends(get_db)):
             pestel.environmental = data.get('environmental', pestel.environmental)
             pestel.legal = data.get('legal', pestel.legal)
         else:
-            pestel = PESTELAnalysis(political=data.get('political',''), economic=data.get('economic',''), social=data.get('social',''), technological=data.get('technological',''), environmental=data.get('environmental',''), legal=data.get('legal',''), analysis_date=date.today())
+            pestel = PESTELAnalysis(political=data.get('political',''), economic=data.get('economic',''), social=data.get('social',''), technological=data.get('technological',''), environmental=data.get('environmental',''), legal=data.get('legal',''), analysis_date=date_type.today())
             db.add(pestel)
         db.commit()
         return {"success": True, "message": "تم تحديث PESTEL"}

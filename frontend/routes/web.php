@@ -50,19 +50,13 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\LocationController;
 
 // ============================================================
-// تسجيل Middleware
-// ============================================================
 Route::aliasMiddleware('check.jwt', CheckJwtToken::class);
 
-// ============================================================
-// الصفحة الرئيسية
 // ============================================================
 Route::get('/', function () {
     return redirect()->route('login');
 });
 
-// ============================================================
-// المصادقة (زائر)
 // ============================================================
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
@@ -72,15 +66,11 @@ Route::middleware('guest')->group(function () {
 });
 
 // ============================================================
-// محمي بـ JWT
-// ============================================================
 Route::middleware('check.jwt')->group(function () {
 
-    // ========== تغيير كلمة المرور ==========
     Route::get('/change-password', [ChangePasswordController::class, 'showChangeForm'])->name('password.change');
     Route::post('/change-password', [ChangePasswordController::class, 'changePassword'])->name('password.update');
 
-    // ========== لوحات التحكم ==========
     Route::get('/dashboard/employee', [EmployeeDashboardController::class, 'index'])->name('dashboard.employee');
     Route::get('/dashboard/manager', [ManagerDashboardController::class, 'index'])->name('dashboard.manager');
     Route::get('/dashboard/minister', [MinisterDashboardController::class, 'index'])->name('dashboard.minister');
@@ -103,6 +93,9 @@ Route::middleware('check.jwt')->group(function () {
 
         // الركائز
         Route::get('/pillars', [PillarController::class, 'index'])->name('pillars.index');
+        Route::post('/pillars', [PillarController::class, 'store'])->name('pillars.store');
+        Route::put('/pillars/{id}', [PillarController::class, 'update'])->name('pillars.update');
+        Route::delete('/pillars/{id}', [PillarController::class, 'destroy'])->name('pillars.destroy');
 
         // الأهداف
         Route::get('/goals', [GoalController::class, 'index'])->name('goals.index');
@@ -131,14 +124,6 @@ Route::middleware('check.jwt')->group(function () {
         Route::put('/initiatives/{id}', [InitiativeController::class, 'update'])->name('initiatives.update');
         Route::delete('/initiatives/{id}', [InitiativeController::class, 'destroy'])->name('initiatives.destroy');
 
-        // إعدادات النظام
-        Route::get('/admin/settings', [SystemConfigController::class, 'index'])->name('admin.settings.index');
-        Route::post('/admin/settings', [SystemConfigController::class, 'store'])->name('admin.settings.store');
-        Route::post('/admin/settings/update', [SystemConfigController::class, 'update'])->name('admin.settings.update');
-        Route::delete('/admin/settings/{config_key}', [SystemConfigController::class, 'destroy'])->name('admin.settings.destroy');
-
-
-        
         // SWOT
         Route::get('/swot', [SwotController::class, 'index'])->name('swot.index');
         Route::get('/swot/edit', [SwotController::class, 'edit'])->name('swot.edit');
@@ -205,17 +190,6 @@ Route::middleware('check.jwt')->group(function () {
     // ========== التقارير ==========
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
-    // تعديل الموظفين
-    Route::get('/admin/employees/{id}/edit', [EmployeeController::class, 'edit'])->name('admin.employees.edit');
-    Route::put('/admin/employees/{id}', [EmployeeController::class, 'update'])->name('admin.employees.update');
-
-    // الإدارات - CRUD كامل
-    Route::get('/admin/departments/create', [DepartmentController::class, 'create'])->name('admin.departments.create');
-    Route::post('/admin/departments', [DepartmentController::class, 'store'])->name('admin.departments.store');
-    Route::get('/admin/departments/{id}/edit', [DepartmentController::class, 'edit'])->name('admin.departments.edit');
-    Route::put('/admin/departments/{id}', [DepartmentController::class, 'update'])->name('admin.departments.update');
-    Route::delete('/admin/departments/{id}', [DepartmentController::class, 'destroy'])->name('admin.departments.destroy');
-
     // ========== الملف الشخصي ==========
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -228,29 +202,34 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/history', [LocationController::class, 'history'])->name('history');
     });
 
-    // الأدوار
-    Route::get('/admin/roles/create', [RoleController::class, 'create'])->name('admin.roles.create');
-    Route::post('/admin/roles', [RoleController::class, 'store'])->name('admin.roles.store');
-    Route::delete('/admin/roles/{id}', [RoleController::class, 'destroy'])->name('admin.roles.destroy');
-
-// ربط الموظفين بالأدوار
-    Route::post('/admin/employee-roles', [EmployeeRoleController::class, 'store'])->name('admin.employee-roles.store');
-    Route::delete('/admin/employee-roles', [EmployeeRoleController::class, 'destroy'])->name('admin.employee-roles.destroy');
-
-// ربط الأدوار بالصلاحيات
-    Route::post('/admin/role-permissions', [RolePermissionController::class, 'store'])->name('admin.role-permissions.store');
-    Route::delete('/admin/role-permissions', [RolePermissionController::class, 'destroy'])->name('admin.role-permissions.destroy');
-
-    // ========== إدارة النظام (مشرف عام) ==========
+    // ========== إدارة النظام ==========
     Route::prefix('admin')->name('admin.')->group(function () {
+        // الموظفين
         Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
         Route::get('/employees/{id}', [EmployeeController::class, 'show'])->name('employees.show');
+        Route::get('/employees/{id}/edit', [EmployeeController::class, 'edit'])->name('employees.edit');
+        Route::put('/employees/{id}', [EmployeeController::class, 'update'])->name('employees.update');
+
+        // الإدارات
         Route::get('/departments', [DepartmentController::class, 'index'])->name('departments.index');
+        Route::get('/departments/create', [DepartmentController::class, 'create'])->name('departments.create');
+        Route::post('/departments', [DepartmentController::class, 'store'])->name('departments.store');
         Route::get('/departments/{id}', [DepartmentController::class, 'show'])->name('departments.show');
+        Route::get('/departments/{id}/edit', [DepartmentController::class, 'edit'])->name('departments.edit');
+        Route::put('/departments/{id}', [DepartmentController::class, 'update'])->name('departments.update');
+        Route::delete('/departments/{id}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
+
+        // إعدادات النظام
         Route::get('/settings', [SystemConfigController::class, 'index'])->name('settings.index');
+        Route::post('/settings', [SystemConfigController::class, 'store'])->name('settings.store');
         Route::post('/settings/update', [SystemConfigController::class, 'update'])->name('settings.update');
+        Route::delete('/settings/{config_key}', [SystemConfigController::class, 'destroy'])->name('settings.destroy');
+
+        // سجل التدقيق
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
         Route::get('/audit-logs/{id}', [AuditLogController::class, 'show'])->name('audit-logs.show');
+
+        // الأدوار
         Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
         Route::get('/roles/create', [RoleController::class, 'create'])->name('roles.create');
         Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
@@ -258,10 +237,20 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/roles/{id}/edit', [RoleController::class, 'edit'])->name('roles.edit');
         Route::put('/roles/{id}', [RoleController::class, 'update'])->name('roles.update');
         Route::delete('/roles/{id}', [RoleController::class, 'destroy'])->name('roles.destroy');
+
+        // الصلاحيات
         Route::get('/permissions', [PermissionController::class, 'index'])->name('permissions.index');
         Route::get('/permissions/{id}', [PermissionController::class, 'show'])->name('permissions.show');
+
+        // ربط الموظفين بالأدوار
         Route::get('/employee-roles', [EmployeeRoleController::class, 'index'])->name('employee-roles.index');
+        Route::post('/employee-roles', [EmployeeRoleController::class, 'store'])->name('employee-roles.store');
+        Route::delete('/employee-roles', [EmployeeRoleController::class, 'destroy'])->name('employee-roles.destroy');
+
+        // ربط الأدوار بالصلاحيات
         Route::get('/role-permissions', [RolePermissionController::class, 'index'])->name('role-permissions.index');
+        Route::post('/role-permissions', [RolePermissionController::class, 'store'])->name('role-permissions.store');
+        Route::delete('/role-permissions', [RolePermissionController::class, 'destroy'])->name('role-permissions.destroy');
     });
 
     // ========== تسجيل الخروج ==========
