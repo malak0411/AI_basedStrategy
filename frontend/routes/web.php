@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\CheckJwtToken;
+use App\Http\Controllers\AiStrategicController;
 
 // Controllers - Auth
 use App\Http\Controllers\Auth\LoginController;
@@ -135,6 +136,16 @@ Route::middleware('check.jwt')->group(function () {
         Route::put('/pestel', [PestelController::class, 'update'])->name('pestel.update');
     });
 
+    
+    Route::prefix('ai/strategic')->name('ai.strategic.')->group(function () {
+        Route::get('/', [AiStrategicController::class, 'index'])->name('index');
+        Route::get('/context/{id}', [AiStrategicController::class, 'getInitiativeContext'])->name('context');
+        Route::post('/generate', [AiStrategicController::class, 'generate'])->name('generate');
+        Route::get('/review', [AiStrategicController::class, 'review'])->name('review');
+        Route::post('/edit-plan', [AiStrategicController::class, 'editPlan'])->name('edit-plan');
+        Route::post('/approve', [AiStrategicController::class, 'approve'])->name('approve');
+    });
+
     // ========== مؤشرات الأداء ==========
     Route::prefix('kpis')->name('kpis.')->group(function () {
         Route::get('/', [KpiController::class, 'index'])->name('index');
@@ -147,6 +158,12 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/{id}/measurements/create', [KpiController::class, 'createMeasurement'])->name('measurements.create');
         Route::post('/{id}/measurements', [KpiController::class, 'storeMeasurement'])->name('measurements.store');
     });
+    
+        // حذف قياس
+        Route::delete('/kpis/measurements/{id}', [KpiController::class, 'destroyMeasurement'])->name('kpis.measurements.destroy');
+        // حذف مؤشر
+        Route::delete('/kpis/{id}', [KpiController::class, 'destroy'])->name('kpis.destroy');
+
 
     // ========== الميزانية ==========
     Route::prefix('budget')->name('budget.')->group(function () {

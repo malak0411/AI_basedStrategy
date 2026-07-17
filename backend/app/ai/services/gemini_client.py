@@ -19,9 +19,9 @@ except ImportError:
 class GeminiClient:
     
     # أسماء النماذج المتاحة
-    MODEL_PRO = "gemini-2.5-pro-exp-03-25"    # Gemini 2.5 Pro (تجريبي)
-    MODEL_FLASH = "gemini-2.5-flash"           # Gemini 2.5 Flash (سريع)
-    MODEL_FALLBACK = "gemini-1.5-flash"        # احتياطي إذا لم يتوفر 2.5
+    MODEL_PRO = "gemini-2.0-flash"   
+    MODEL_FLASH = "gemini-2.0-flash"          
+    MODEL_FALLBACK = "gemini-1.5-flash"     
     
     def __init__(self):
         if not GEMINI_AVAILABLE:

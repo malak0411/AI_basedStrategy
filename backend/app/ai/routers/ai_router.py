@@ -13,6 +13,8 @@ from app.ai.services.gemini_client import gemini_client
 from app.ai.models.delay_predictor import DelayPredictor
 from app.ai.models.recommender import Recommender
 from app.ai.tasks import call_gemini_sync, train_delay_model_sync
+from app.ai.services.strategic_planner import StrategicPlanner
+
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
 
@@ -122,6 +124,151 @@ async def test_gemini():
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+
+
+# ============================================================
+# AI Strategic Task Generation
+# ============================================================
+
+@router.post("/strategic/generate-major-tasks/{initiative_id}")
+async def generate_major_tasks(
+    initiative_id: int,
+    request: dict = None,
+    db: Session = Depends(get_db)
+):
+    """توليد المهام الرئيسية من مبادرة باستخدام Gemini"""
+    try:
+        planner = StrategicPlanner()
+        
+        # جمع السياق
+        context = planner.get_initiative_context(initiative_id)
+        
+        # إنشاء Job
+        job_id = planner.create_job(initiative_id)
+        
+        # بناء الـ Prompt
+        user_instructions = request.get('instructions', '') if request else ''
+        prompt = planner.build_prompt(context, user_instructions)
+        
+        # استدعاء Gemini
+        try:
+            response_text = gemini_client.generate(prompt, model_type="pro")
+            result = planner.parse_gemini_response(response_text)
+            
+            # تحديث job
+            planner.update_job(job_id, "review", {
+                "initiative_id": initiative_id,
+                "major_tasks": result.get("major_tasks", []),
+                "raw_response": response_text
+            })
+            
+            return {
+                "success": True,
+                "data": {
+                    "job_id": job_id,
+                    "status": "review",
+                    "major_tasks": result.get("major_tasks", [])
+                }
+            }
+        except Exception as e:
+            planner.update_job(job_id, "failed", {"error": str(e)})
+            raise e
+        finally:
+            planner.close()
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
+
+
+@router.get("/jobs/{job_id}")
+async def get_job_status(job_id: int, db: Session = Depends(get_db)):
+    """حالة مهمة AI"""
+    job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+    
+    return {
+        "success": True,
+        "data": {
+            "job_id": job.job_id,
+            "status": job.status,
+            "result": json.loads(job.result_json) if job.result_json else None
+        }
+    }
+
+
+@router.post("/strategic/edit-task-plan/{job_id}")
+async def edit_task_plan(job_id: int, request: dict, db: Session = Depends(get_db)):
+    """تعديل خطة المهام باستخدام Prompt"""
+    try:
+        job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="غير موجود")
+        
+        current_result = json.loads(job.result_json) if job.result_json else {}
+        edit_instruction = request.get('instruction', '')
+        
+        # بناء prompt للتعديل
+        prompt = f"""
+        لديك خطة المهام التالية:
+        {json.dumps(current_result.get('major_tasks', []), ensure_ascii=False, indent=2)}
+        
+        التعليمات: {edit_instruction}
+        
+        أعد JSON معدل بنفس الشكل.
+        """
+        
+        response_text = gemini_client.generate(prompt, model_type="pro")
+        new_result = StrategicPlanner().parse_gemini_response(response_text)
+        
+        # تحديث job
+        job.result_json = json.dumps({
+            **current_result,
+            "major_tasks": new_result.get("major_tasks", current_result.get("major_tasks", []))
+        })
+        job.updated_at = datetime.now()
+        db.commit()
+        
+        return {
+            "success": True,
+            "data": {
+                "job_id": job_id,
+                "major_tasks": new_result.get("major_tasks", [])
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/strategic/approve-task-plan/{job_id}")
+async def approve_task_plan(job_id: int, db: Session = Depends(get_db)):
+    """اعتماد وحفظ المهام الرئيسية"""
+    try:
+        job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="غير موجود")
+        
+        result = json.loads(job.result_json) if job.result_json else {}
+        initiative_id = result.get('initiative_id')
+        tasks = result.get('major_tasks', [])
+        
+        if not tasks:
+            raise HTTPException(status_code=400, detail="لا توجد مهام للحفظ")
+        
+        planner = StrategicPlanner()
+        saved = planner.save_major_tasks(initiative_id, tasks, job.created_by)
+        planner.update_job(job_id, "completed", {"saved_tasks": saved})
+        planner.close()
+        
+        return {
+            "success": True,
+            "data": {
+                "message": f"تم حفظ {len(saved)} مهمة رئيسية",
+                "tasks": saved
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
 # حالة النماذج

@@ -300,6 +300,9 @@
             <a class="nav-link {{ request()->routeIs('ai.dashboard') ? 'active' : '' }}" href="{{ route('ai.dashboard') }}">
                 <i class="fas fa-brain"></i><span class="nav-text">لوحة AI</span>
             </a>
+            <a class="nav-link {{ request()->routeIs('ai.strategic.*') ? 'active' : '' }}" href="{{ route('ai.strategic.index') }}">
+                <i class="fas fa-robot"></i><span class="nav-text">توليد المهام الرئيسية</span>
+            </a>
             <a class="nav-link {{ request()->routeIs('ai.models.*') ? 'active' : '' }}" href="{{ route('ai.models') }}">
                 <i class="fas fa-microchip"></i><span class="nav-text">النماذج</span>
             </a>
@@ -307,6 +310,7 @@
                 <i class="fas fa-lightbulb"></i><span class="nav-text">التوصيات</span>
             </a>
             @endif
+
 
             {{-- التقارير --}}
             <div class="nav-section">تقارير</div>
