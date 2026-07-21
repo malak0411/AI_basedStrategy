@@ -14,6 +14,7 @@ from app.ai.models.delay_predictor import DelayPredictor
 from app.ai.models.recommender import Recommender
 from app.ai.tasks import call_gemini_sync, train_delay_model_sync
 from app.ai.services.strategic_planner import StrategicPlanner
+from app.ai.services.scheduler import ai_scheduler
 
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
@@ -36,7 +37,7 @@ async def predict_task_delay(task_id: int):
 async def predict_all_delays():
     """تنبؤ بجميع المهام النشطة"""
     try:
-        results = prediction_service.predict_all_active(save=True)
+        results = prediction_service.predict_all_active(save=False)
         return {"success": True, "data": results, "count": len(results)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -267,6 +268,65 @@ async def approve_task_plan(job_id: int, db: Session = Depends(get_db)):
                 "tasks": saved
             }
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================
+# الجدولة التلقائية
+# ============================================================
+
+@router.post("/scheduler/start")
+async def start_scheduler():
+    """بدء الجدولة التلقائية"""
+    try:
+        ai_scheduler.start()
+        return {"success": True, "message": "تم بدء الجدولة التلقائية - تنبؤ يومي 6:00 + تدريب أسبوعي"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/scheduler/stop")
+async def stop_scheduler():
+    """إيقاف الجدولة"""
+    try:
+        ai_scheduler.stop()
+        return {"success": True, "message": "تم إيقاف الجدولة"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/scheduler/status")
+async def scheduler_status():
+    """حالة الجدولة"""
+    return {
+        "success": True,
+        "data": {
+            "is_running": ai_scheduler.is_running,
+            "next_prediction": "06:00 يومياً",
+            "next_training": "الإثنين 02:00 أسبوعياً"
+        }
+    }
+
+@router.post("/predict-now")
+async def predict_now():
+    """تشغيل التنبؤ فوراً"""
+    try:
+        results = ai_scheduler.run_daily_prediction()
+        return {
+            "success": True,
+            "data": {
+                "total_tasks": len(results) if results else 0,
+                "high_risk": sum(1 for r in results if r.get('risk_level') == 'High') if results else 0,
+                "message": "تم التنبؤ بنجاح"
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/train-now")
+async def train_now():
+    """تشغيل التدريب فوراً"""
+    try:
+        metrics = ai_scheduler.run_weekly_training()
+        return {"success": True, "data": metrics}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

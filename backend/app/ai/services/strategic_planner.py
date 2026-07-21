@@ -2,15 +2,15 @@
 Strategic Planning Service - تحويل المبادرات إلى مهام رئيسية باستخدام Gemini
 """
 import json
+import re
 from datetime import datetime
-from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import (
     Initiative, Program, StrategicGoal, StrategicPillar, StrategicVision,
     SWOTAnalysis, PESTELAnalysis, Department, BudgetLine, Risk,
     GoalKPI, KPI, SystemConfig, AiJob, MajorTask, MajorTaskDepartment
 )
-from app.ai.services.deepseek_client import deepseek_client
+from app.ai.services.gemini_client import gemini_client
 
 
 class StrategicPlanner:
@@ -55,7 +55,7 @@ class StrategicPlanner:
         pestel = self.db.query(PESTELAnalysis).first()
 
         # الإدارات
-        departments = self.db.query(Department).all()
+        departments = self.db.query(Department).filter(Department.is_active == True).all()
         dept_list = [{
             "id": d.department_id,
             "name": d.name,
@@ -68,11 +68,7 @@ class StrategicPlanner:
             BudgetLine.budgetable_id == initiative_id,
             BudgetLine.budgetable_type == 'initiative'
         ).all()
-        budget_list = [{
-            "allocated": float(b.allocated_amount or 0),
-            "spent": float(b.spent_amount or 0),
-            "fiscal_year": b.fiscal_year
-        } for b in budgets]
+        total_budget = sum(float(b.allocated_amount or 0) for b in budgets)
 
         # المخاطر
         risks = self.db.query(Risk).limit(10).all()
@@ -85,10 +81,7 @@ class StrategicPlanner:
             for gk in goal_kpis:
                 kpi = self.db.query(KPI).filter(KPI.kpi_id == gk.kpi_id).first()
                 if kpi:
-                    kpis.append({
-                        "name": kpi.name,
-                        "target": float(gk.target_value or 0)
-                    })
+                    kpis.append({"name": kpi.name, "target": float(gk.target_value or 0)})
 
         # إعدادات النظام
         configs = self.db.query(SystemConfig).all()
@@ -131,7 +124,7 @@ class StrategicPlanner:
                 "legal": pestel.legal if pestel else ""
             } if pestel else None,
             "departments": dept_list,
-            "budgets": budget_list,
+            "total_budget": total_budget,
             "risks": risk_list,
             "kpis": kpis,
             "organization": org_info
@@ -143,8 +136,8 @@ class StrategicPlanner:
 أنت خبير في التخطيط الاستراتيجي الحكومي. مهمتك تحليل مبادرة استراتيجية وتحويلها إلى مهام رئيسية قابلة للتنفيذ.
 
 === بيانات المؤسسة ===
-المؤسسة: {context['organization'].get('ministry_name', '')}
-نوع القطاع: {context['organization'].get('sector_type', '')}
+المؤسسة: {context['organization'].get('ministry_name', 'وزارة النفط والمعادن')}
+نوع القطاع: {context['organization'].get('sector_type', 'حكومي')}
 العملة: {context['organization'].get('currency', 'YER')}
 
 === الرؤية ===
@@ -160,7 +153,6 @@ class StrategicPlanner:
 
 === البرنامج ===
 {context['program']['name'] if context['program'] else ''}
-{context['program']['description'] if context['program'] else ''}
 
 === المبادرة ===
 الاسم: {context['initiative']['name']}
@@ -171,8 +163,8 @@ class StrategicPlanner:
 === الإدارات المتاحة ===
 {json.dumps(context['departments'], ensure_ascii=False, indent=2)}
 
-=== الميزانية ===
-{json.dumps(context['budgets'], ensure_ascii=False, indent=2)}
+=== الميزانية الإجمالية ===
+{context['total_budget']}
 
 === المخاطر ===
 {json.dumps(context['risks'], ensure_ascii=False, indent=2)}
@@ -226,32 +218,38 @@ class StrategicPlanner:
 
     def parse_gemini_response(self, response_text: str) -> dict:
         """تحليل استجابة Gemini واستخراج JSON"""
-        try:
-            # تنظيف النص
-            text = response_text.strip()
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
+        text = response_text.strip()
+        
+        # إزالة علامات markdown
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
 
+        # محاولة تحليل JSON مباشرة
+        try:
             return json.loads(text)
         except json.JSONDecodeError:
-            # محاولة استخراج JSON من النص
-            import re
-            match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if match:
+            pass
+
+        # محاولة استخراج JSON من النص
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if match:
+            try:
                 return json.loads(match.group())
-            raise ValueError("فشل تحليل استجابة Gemini")
+            except json.JSONDecodeError:
+                pass
+
+        raise ValueError("فشل تحليل استجابة Gemini - لم يتم العثور على JSON صالح")
 
     def save_major_tasks(self, initiative_id: int, tasks_data: list, created_by: int = None):
         """حفظ المهام الرئيسية في قاعدة البيانات"""
         saved_tasks = []
 
         for task_data in tasks_data:
-            # إنشاء المهمة الرئيسية
             priority_map = {"High": 3, "Medium": 2, "Low": 1}
             priority_id = priority_map.get(task_data.get("priority", "Medium"), 2)
 
@@ -267,9 +265,7 @@ class StrategicPlanner:
             self.db.add(major_task)
             self.db.flush()
 
-            # إضافة الإدارات
-            departments = task_data.get("departments", [])
-            for dept in departments:
+            for dept in task_data.get("departments", []):
                 mtd = MajorTaskDepartment(
                     major_task_id=major_task.major_task_id,
                     department_id=dept["department_id"],
@@ -280,15 +276,14 @@ class StrategicPlanner:
 
             saved_tasks.append({
                 "id": major_task.major_task_id,
-                "name": major_task.name,
-                "departments": departments
+                "name": major_task.name
             })
 
         self.db.commit()
         return saved_tasks
 
     def create_job(self, initiative_id: int, created_by: int = None) -> int:
-        """إنشاء سجل ai_jobs جديد"""
+        """إنشاء سجل ai_jobs"""
         job = AiJob(
             job_type="strategic_task_generation",
             status="pending",
@@ -306,9 +301,11 @@ class StrategicPlanner:
         if job:
             job.status = status
             if result:
-                job.result_json = json.dumps(result)
+                job.result_json = json.dumps(result, ensure_ascii=False)
             job.updated_at = datetime.now()
             self.db.commit()
 
     def close(self):
-        self.db.close()
+        """إغلاق اتصال قاعدة البيانات"""
+        if self.db:
+            self.db.close()

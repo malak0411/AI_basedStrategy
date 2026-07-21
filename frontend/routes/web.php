@@ -192,6 +192,12 @@ Route::middleware('check.jwt')->group(function () {
         Route::post('/{id}/mitigations', [RiskController::class, 'storeMitigation'])->name('mitigations.store');
     });
 
+    // AI Dashboard
+    Route::get('/ai/dashboard', [AiDashboardController::class, 'index'])->name('ai.dashboard');
+    Route::get('/ai/predict-all', [AiDashboardController::class, 'predictAll'])->name('ai.predict-all');
+    Route::get('/ai/train-now', [AiDashboardController::class, 'trainNow'])->name('ai.train-now');
+    Route::get('/ai/toggle-scheduler', [AiDashboardController::class, 'toggleScheduler'])->name('ai.toggle-scheduler');
+
     // ========== الذكاء الاصطناعي ==========
     Route::prefix('ai')->name('ai.')->group(function () {
         Route::get('/dashboard', [AiDashboardController::class, 'index'])->name('dashboard');

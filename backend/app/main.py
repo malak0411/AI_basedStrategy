@@ -90,3 +90,13 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# ============================================================
+# بدء جدولة AI عند تشغيل الخادم
+# ============================================================
+@app.on_event("startup")
+async def startup_event():
+    """بدء الجدولة التلقائية عند تشغيل الخادم"""
+    from app.ai.services.scheduler import ai_scheduler
+    ai_scheduler.start()
+    print("🚀 تم بدء جدولة AI التلقائية")

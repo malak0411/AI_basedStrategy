@@ -2,6 +2,8 @@
 Delay Predictor Model - نموذج التنبؤ بتأخير المهام
 يقارن بين XGBoost, Random Forest, LightGBM ويختار الأفضل
 """
+from pyexpat import features
+
 import numpy as np
 import pandas as pd
 import joblib
@@ -206,19 +208,35 @@ class DelayPredictor:
     def _get_top_factors(self, features):
         """استخراج أهم العوامل المؤثرة"""
         factors = []
+    
+        completion = float(features.get('completion_percentage', 100))
+        days_without = int(features.get('days_without_update', 0))
+        critical_risks = int(features.get('critical_risk_count', 0))
+        remaining = int(features.get('remaining_days', 30))
+        budget_ratio = float(features.get('budget_ratio', 0))
+        num_employees = int(features.get('num_assigned_employees', 0))
+        workload = float(features.get('department_workload', 0))
+    
+        if completion < 30:
+            factors.append({"feature": "نسبة الإنجاز منخفضة جداً ({}%)".format(int(completion)), "importance": 0.32})
+        if days_without > 14:
+            factors.append({"feature": "لا تحديثات منذ {} يوم".format(days_without), "importance": 0.25})
+        if critical_risks > 0:
+            factors.append({"feature": "يوجد {} مخاطر حرجة".format(critical_risks), "importance": 0.18})
+        if remaining < 7 and completion < 50:
+            factors.append({"feature": "الموعد النهائي قريب ({} يوم) والتقدم ضعيف".format(remaining), "importance": 0.15})
+        if budget_ratio > 0.9:
+            factors.append({"feature": "الميزانية مستنفدة تقريباً ({}%)".format(int(budget_ratio * 100)), "importance": 0.10})
+        if num_employees < 2 and workload > 1.5:
+            factors.append({"feature": "عدد الموظفين غير كافٍ ({} موظف)".format(num_employees), "importance": 0.08})
+        if completion >= 50:
+            factors.append({"feature": "التقدم جيد ({}%) - استمرار المتابعة".format(int(completion)), "importance": 0.05})
+    
+        if not factors:
+            factors.append({"feature": "المهمة تسير بشكل طبيعي", "importance": 0.5})
+
         
-        if features.get('completion_percentage', 100) < 30:
-            factors.append({"feature": "Low Progress", "importance": 0.32})
-        if features.get('days_without_update', 0) > 14:
-            factors.append({"feature": "No Updates for {} Days".format(features['days_without_update']), "importance": 0.25})
-        if features.get('critical_risk_count', 0) > 0:
-            factors.append({"feature": "High Risk Count", "importance": 0.18})
-        if features.get('remaining_days', 30) < 7:
-            factors.append({"feature": "Deadline Approaching", "importance": 0.15})
-        if features.get('budget_ratio', 0) > 0.9:
-            factors.append({"feature": "Budget Nearly Exhausted", "importance": 0.10})
-        
-        return factors[:3] if factors else [{"feature": "Normal Progress", "importance": 0.5}]
+        return factors[:3] 
     
     def _fallback_prediction(self):
         """تنبؤ احتياطي عند عدم توفر النموذج"""

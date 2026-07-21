@@ -3,6 +3,7 @@ Prediction Service - خدمة التنبؤ بتأخير المهام
 """
 import json
 from datetime import datetime
+from sqlalchemy import func
 from app.database import SessionLocal
 from app.models import OperationalTask, AIPrediction
 from app.ai.services.data_loader import DataLoader
@@ -19,8 +20,10 @@ class PredictionService:
             self._loaded = self.predictor.load_model()
     
     def predict_single(self, task_id: int, save: bool = True):
+        """تنبؤ بمهمة واحدة"""
         self._ensure_loaded()
         
+        # جلب الميزات
         loader = DataLoader()
         try:
             features = loader.get_task_features(task_id)
@@ -30,8 +33,18 @@ class PredictionService:
         if not features:
             return {"error": "المهمة غير موجودة", "task_id": int(task_id)}
         
+        # جلب اسم المهمة
+        db = SessionLocal()
+        try:
+            task = db.query(OperationalTask).filter(OperationalTask.task_id == task_id).first()
+            task_name = task.title if task else f"مهمة #{task_id}"
+        finally:
+            db.close()
+        
+        # التنبؤ
         result = self.predictor.predict(task_features=features)
         result["task_id"] = int(task_id)
+        result["task_name"] = task_name
         
         if "delay_probability" in result:
             result["delay_probability"] = round(float(result["delay_probability"]), 3)
@@ -44,6 +57,7 @@ class PredictionService:
         return result
     
     def predict_all_active(self, save: bool = True):
+        """تنبؤ بجميع المهام النشطة"""
         self._ensure_loaded()
         
         db = SessionLocal()
@@ -59,43 +73,68 @@ class PredictionService:
             db.close()
     
     def get_dashboard_stats(self):
+        """إحصائيات لوحة التحكم"""
         db = SessionLocal()
         try:
-            total_predictions = db.query(AIPrediction).count()
+            total_predicted_tasks = db.query(AIPrediction).filter(
+                AIPrediction.prediction_type == 'delay'
+            ).count()
             
             high_risk = db.query(AIPrediction).filter(
                 AIPrediction.prediction_type == 'delay',
                 AIPrediction.probability > 0.7
             ).count()
             
-            from sqlalchemy import func
             avg_prob = db.query(func.avg(AIPrediction.probability)).filter(
                 AIPrediction.prediction_type == 'delay'
             ).scalar() or 0
             
+            last_prediction = db.query(AIPrediction).order_by(
+                AIPrediction.created_at.desc()
+            ).first()
+            
             return {
-                "total_predictions": int(total_predictions),
+                "total_predictions": int(total_predicted_tasks),
                 "high_risk_tasks": int(high_risk),
-                "average_delay_probability": round(float(avg_prob), 1),
+                "average_delay_probability": round(float(avg_prob) * 100, 1),
                 "model_version": str(self.predictor.model_version),
-                "is_model_trained": bool(self._loaded)
+                "is_model_trained": bool(self._loaded),
+                "last_prediction_time": last_prediction.created_at.isoformat() if last_prediction else None,
+                "is_scheduler_running": True
             }
         finally:
             db.close()
     
     def _save_prediction(self, task_id: int, result: dict):
+        """تحديث أو إنشاء تنبؤ - تنبؤ واحد لكل مهمة"""
         db = SessionLocal()
         try:
-            prediction = AIPrediction(
-                task_id=int(task_id),
-                prediction_type='delay',
-                text=f"Risk: {result.get('risk_level', 'Unknown')}",
-                probability=float(result.get('delay_probability', 0)) / 100,
-                confidence=float(result.get('confidence', 0)),
-                features_used=json.dumps(result.get('top_factors', [])),
-                created_at=datetime.now()
-            )
-            db.add(prediction)
+            # البحث عن تنبؤ موجود
+            existing = db.query(AIPrediction).filter(
+                AIPrediction.task_id == int(task_id),
+                AIPrediction.prediction_type == 'delay'
+            ).first()
+            
+            if existing:
+                # تحديث الموجود
+                existing.probability = float(result.get('delay_probability', 0))
+                existing.confidence = float(result.get('confidence', 0))
+                existing.text = f"Risk: {result.get('risk_level', 'Unknown')}"
+                existing.features_used = json.dumps(result.get('top_factors', []), ensure_ascii=False)
+                existing.created_at = datetime.now()
+            else:
+                # إنشاء جديد
+                prediction = AIPrediction(
+                    task_id=int(task_id),
+                    prediction_type='delay',
+                    text=f"Risk: {result.get('risk_level', 'Unknown')}",
+                    probability=float(result.get('delay_probability', 0)),
+                    confidence=float(result.get('confidence', 0)),
+                    features_used=json.dumps(result.get('top_factors', []), ensure_ascii=False),
+                    created_at=datetime.now()
+                )
+                db.add(prediction)
+            
             db.commit()
         except Exception as e:
             print(f"⚠️ خطأ في حفظ التنبؤ: {str(e)}")
