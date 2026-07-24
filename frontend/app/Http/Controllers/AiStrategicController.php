@@ -14,9 +14,6 @@ class AiStrategicController extends Controller
         $this->apiClient = new ApiClient();
     }
 
-    /**
-     * الصفحة الرئيسية - اختيار المبادرة
-     */
     public function index()
     {
         $token = session('jwt_token');
@@ -24,9 +21,15 @@ class AiStrategicController extends Controller
         return view('ai.strategic.generate', compact('initiatives'));
     }
 
-    /**
-     * جلب سياق المبادرة (API)
-     */
+    public function waiting(Request $request)
+    {
+        return view('ai.strategic.waiting', [
+            'jobId' => $request->job_id,
+            'initiativeId' => $request->initiative_id
+        ]);
+    }
+
+
     public function getInitiativeContext($id)
     {
         $token = session('jwt_token');
@@ -44,10 +47,9 @@ class AiStrategicController extends Controller
         ]);
     }
 
-    /**
-     * توليد المهام - ثم توجيه تلقائي للمراجعة
-     */
+
     public function generate(Request $request)
+
     {
         $token = session('jwt_token');
         $initiativeId = $request->initiative_id;
@@ -58,49 +60,47 @@ class AiStrategicController extends Controller
             $token
         );
 
+
+        \Log::info('Generate Response: ' . json_encode($response));
+
         if ($response['success'] ?? false) {
             $data = $response['data'];
-            
-            // ✅ توجيه تلقائي إلى صفحة المراجعة مع البيانات
-            return redirect()->route('ai.strategic.review', [
-                'job_id' => $data['job_id'],
-                'initiative_id' => $initiativeId
-            ])->with('tasks', $data['major_tasks'] ?? []);
+        
+
+            return redirect()->to(
+                '/ai/strategic/waiting?job_id=' . $data['job_id'] . '&initiative_id=' . $initiativeId
+            );
         }
 
         return back()->with('error', $response['detail'] ?? 'فشل توليد المهام');
     }
 
-    /**
-     * صفحة المراجعة
-     */
+
+    public function checkJobStatus($job_id)
+    {
+        $token = session('jwt_token');
+        $response = $this->apiClient->get("/api/ai/jobs/{$job_id}", $token);
+        return response()->json($response);
+    }
+
     public function review(Request $request)
     {
         $token = session('jwt_token');
         $jobId = $request->job_id;
         $initiativeId = $request->initiative_id;
 
-        // جلب حالة الـ Job
         $jobResponse = $this->apiClient->get("/api/ai/jobs/{$jobId}", $token);
-        $job = $jobResponse['data'] ?? [];
-
-        // جلب المبادرة للعرض
-        $initiative = $this->apiClient->safeGet("/api/strategic/initiatives/{$initiativeId}", $token, []);
-
-        // المهام من الجلسة أو من الـ Job
-        $tasks = session('tasks', []);
-        if (empty($tasks) && !empty($job['result']['major_tasks'])) {
-            $tasks = $job['result']['major_tasks'];
+    
+        $tasks = [];
+        if (!empty($jobResponse['data']['result']['major_tasks'])) {
+        $tasks = $jobResponse['data']['result']['major_tasks'];
         }
 
-        return view('ai.strategic.review', compact(
-            'job', 'initiative', 'tasks', 'jobId', 'initiativeId'
-        ));
+        $initiative = $this->apiClient->safeGet("/api/strategic/initiatives/{$initiativeId}", $token, []);
+
+        return view('ai.strategic.review', compact('tasks', 'initiative', 'jobId', 'initiativeId'));
     }
 
-    /**
-     * تعديل الخطة باستخدام Prompt (API)
-     */
     public function editPlan(Request $request)
     {
         $token = session('jwt_token');
@@ -116,9 +116,6 @@ class AiStrategicController extends Controller
         return response()->json(['error' => $response['detail'] ?? 'فشل التعديل'], 500);
     }
 
-    /**
-     * اعتماد الخطة وحفظها - ثم توجيه للمبادرة
-     */
     public function approve(Request $request)
     {
         $token = session('jwt_token');
@@ -129,7 +126,6 @@ class AiStrategicController extends Controller
         );
 
         if ($response['success'] ?? false) {
-            // ✅ توجيه إلى صفحة المبادرة بعد الحفظ
             return redirect()->route('strategic.initiatives.show', $request->initiative_id)
                 ->with('success', $response['data']['message'] ?? 'تم حفظ المهام بنجاح');
         }

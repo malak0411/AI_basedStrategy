@@ -71,7 +71,7 @@ async def recommendation_detail(recommendation_id: int, db: Session = Depends(ge
 
 @router.get("/predict-delay/{task_id}")
 async def predict_task_delay(task_id: int, db: Session = Depends(get_db)):
-    """التنبؤ بتأخر مهمة محددة"""
+
     try:
         task = db.query(OperationalTask).filter(OperationalTask.task_id == task_id).first()
         if not task:
@@ -98,10 +98,10 @@ async def predict_task_delay(task_id: int, db: Session = Depends(get_db)):
 
 @router.get("/predict-all-delays")
 async def predict_all_delays(db: Session = Depends(get_db)):
-    """التنبؤ بتأخر جميع المهام النشطة"""
+
     try:
         tasks = db.query(OperationalTask).filter(
-            OperationalTask.status_id.in_([1, 2])  # معلق وقيد التنفيذ
+            OperationalTask.status_id.in_([1, 2])  
         ).all()
         
         results = []
@@ -126,7 +126,7 @@ async def predict_all_delays(db: Session = Depends(get_db)):
                 "risk_label": prediction['risk_label']
             })
         
-        # ترتيب حسب نسبة الخطر
+
         results.sort(key=lambda x: x['delay_probability'], reverse=True)
         
         return {"success": True, "data": results}
@@ -136,7 +136,7 @@ async def predict_all_delays(db: Session = Depends(get_db)):
 
 @router.get("/recommendations/task/{task_id}")
 async def task_recommendations(task_id: int, db: Session = Depends(get_db)):
-    """توصيات لمهمة محددة"""
+
     try:
         task = db.query(OperationalTask).filter(OperationalTask.task_id == task_id).first()
         if not task:
@@ -169,7 +169,7 @@ async def task_recommendations(task_id: int, db: Session = Depends(get_db)):
 
 @router.get("/recommendations/dashboard")
 async def dashboard_recommendations(db: Session = Depends(get_db)):
-    """توصيات لوحة التحكم"""
+
     try:
         from datetime import date
         

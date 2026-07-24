@@ -9,11 +9,9 @@ from typing import Optional
 
 router = APIRouter(prefix="/api/budget", tags=["Budget"])
 
-# ============================================================
-# Schemas
-# ============================================================
+
 class BudgetLineCreate(BaseModel):
-    budgetable_type: str  # 'program', 'initiative', 'major_task', 'operational_task'
+    budgetable_type: str  
     budgetable_id: int
     department_id: Optional[int] = None
     allocated_amount: float = 0
@@ -31,13 +29,11 @@ class TransactionCreate(BaseModel):
     description: Optional[str] = ""
     transaction_date: Optional[str] = None
 
-# ============================================================
-# GET - نظرة عامة
-# ============================================================
+
 
 @router.get("/overview")
 async def budget_overview(db: Session = Depends(get_db)):
-    """نظرة عامة على الميزانية"""
+
     try:
         total_allocated = db.query(func.sum(BudgetLine.allocated_amount)).scalar() or 0
         total_spent = db.query(func.sum(BudgetLine.spent_amount)).scalar() or 0
@@ -54,7 +50,7 @@ async def budget_overview(db: Session = Depends(get_db)):
 
 @router.get("/")
 async def budget_lines(db: Session = Depends(get_db)):
-    """جميع بنود الميزانية"""
+
     try:
         lines = db.query(BudgetLine).all()
         result = [{
@@ -73,7 +69,7 @@ async def budget_lines(db: Session = Depends(get_db)):
 
 @router.get("/{budget_id}")
 async def budget_detail(budget_id: int, db: Session = Depends(get_db)):
-    """تفاصيل بند ميزانية"""
+
     try:
         b = db.query(BudgetLine).filter(BudgetLine.budget_id == budget_id).first()
         if not b:
@@ -96,13 +92,11 @@ async def budget_detail(budget_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-# ============================================================
-# POST/PUT/DELETE - بنود الميزانية
-# ============================================================
+
 
 @router.post("/")
 async def create_budget_line(data: BudgetLineCreate, db: Session = Depends(get_db)):
-    """إنشاء بند ميزانية جديد"""
+
     try:
         budget = BudgetLine(
             budgetable_type=data.budgetable_type,
@@ -121,7 +115,7 @@ async def create_budget_line(data: BudgetLineCreate, db: Session = Depends(get_d
 
 @router.put("/{budget_id}")
 async def update_budget_line(budget_id: int, data: BudgetLineUpdate, db: Session = Depends(get_db)):
-    """تحديث بند ميزانية"""
+
     try:
         b = db.query(BudgetLine).filter(BudgetLine.budget_id == budget_id).first()
         if not b:
@@ -143,7 +137,7 @@ async def update_budget_line(budget_id: int, data: BudgetLineUpdate, db: Session
 
 @router.delete("/{budget_id}")
 async def delete_budget_line(budget_id: int, db: Session = Depends(get_db)):
-    """حذف بند ميزانية"""
+
     try:
         b = db.query(BudgetLine).filter(BudgetLine.budget_id == budget_id).first()
         if not b:
@@ -157,13 +151,11 @@ async def delete_budget_line(budget_id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-# ============================================================
-# المعاملات
-# ============================================================
+
 
 @router.get("/transactions")
 async def budget_transactions(db: Session = Depends(get_db)):
-    """معاملات الميزانية"""
+
     try:
         transactions = db.query(BudgetTransaction).order_by(
             BudgetTransaction.transaction_date.desc()
@@ -183,7 +175,7 @@ async def budget_transactions(db: Session = Depends(get_db)):
 
 @router.get("/transactions/{transaction_id}")
 async def transaction_detail(transaction_id: int, db: Session = Depends(get_db)):
-    """تفاصيل معاملة"""
+
     try:
         t = db.query(BudgetTransaction).filter(BudgetTransaction.transaction_id == transaction_id).first()
         if not t:
@@ -205,7 +197,7 @@ async def transaction_detail(transaction_id: int, db: Session = Depends(get_db))
 
 @router.post("/transactions")
 async def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
-    """تسجيل معاملة جديدة"""
+
     try:
         tx = BudgetTransaction(
             budget_id=data.budget_id,
@@ -216,7 +208,7 @@ async def create_transaction(data: TransactionCreate, db: Session = Depends(get_
         )
         db.add(tx)
         
-        # تحديث المبلغ المنفق في البند
+
         budget = db.query(BudgetLine).filter(BudgetLine.budget_id == data.budget_id).first()
         if budget:
             budget.spent_amount = (budget.spent_amount or 0) + data.amount
@@ -231,7 +223,7 @@ async def create_transaction(data: TransactionCreate, db: Session = Depends(get_
 
 @router.delete("/transactions/{transaction_id}")
 async def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):
-    """حذف معاملة"""
+
     try:
         t = db.query(BudgetTransaction).filter(BudgetTransaction.transaction_id == transaction_id).first()
         if not t:

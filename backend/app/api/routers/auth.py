@@ -18,12 +18,12 @@ from app.core.dependencies import get_current_employee
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
-# إعدادات
+
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
-# Schemas
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -36,7 +36,7 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
-# دوال مساعدة
+
 def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -44,7 +44,7 @@ def create_access_token(data: dict):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def verify_password(plain_password, hashed_password):
-    """التحقق من كلمة المرور باستخدام bcrypt"""
+
     try:
         return bcrypt.checkpw(
             plain_password.encode('utf-8'),
@@ -54,15 +54,13 @@ def verify_password(plain_password, hashed_password):
         return False
 
 def hash_password(password):
-    """تشفير كلمة المرور باستخدام bcrypt"""
+
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def generate_random_password(length=10):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
-# ============================================================
-# تسجيل الدخول
-# ============================================================
+
 @router.post("/login")
 async def login(request: LoginRequest, db: Session = Depends(get_db)):
     try:
@@ -71,7 +69,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         if not employee:
             raise HTTPException(status_code=401, detail="البريد الإلكتروني أو كلمة المرور غير صحيحة")
         
-        # التحقق من كلمة المرور باستخدام bcrypt
+
         if not verify_password(request.password, employee.password):
             raise HTTPException(status_code=401, detail="البريد الإلكتروني أو كلمة المرور غير صحيحة")
         
@@ -92,7 +90,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         employee.last_login = datetime.now()
         db.commit()
         
-        # تسجيل تدقيق - تسجيل دخول
+
         log_audit(
             employee_id=employee.employee_id,
             action="LOGIN",
@@ -120,9 +118,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-# ============================================================
-# معلومات المستخدم
-# ============================================================
+
 @router.get("/me")
 async def get_current_user_info(
     db: Session = Depends(get_db),
@@ -153,9 +149,7 @@ async def get_current_user_info(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-# ============================================================
-# نسيت كلمة المرور
-# ============================================================
+
 @router.post("/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     try:
@@ -168,7 +162,7 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
             return {"success": True, "message": "إذا كانت المعلومات صحيحة، ستتلقى كلمة المرور الجديدة"}
         
         new_password = generate_random_password()
-        employee.password = hash_password(new_password)  # تشفير كلمة المرور
+        employee.password = hash_password(new_password)  
         db.commit()
         
         email_sent = False
@@ -193,7 +187,7 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
                 server.quit()
                 email_sent = True
             except Exception as e:
-                print(f"❌ فشل إرسال البريد: {str(e)}")
+                print(f" فشل إرسال البريد: {str(e)}")
         
         if email_sent:
             return {"success": True, "message": "تم إرسال كلمة المرور إلى بريدك الإلكتروني"}
@@ -203,9 +197,7 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-# ============================================================
-# تغيير كلمة المرور
-# ============================================================
+
 @router.post("/change-password")
 async def change_password(
     request: ChangePasswordRequest,

@@ -1,17 +1,15 @@
-"""
-Ollama Client - نموذج Qwen 2.5 محلي
-"""
+
 import ollama
 
 class OllamaClient:
-    def __init__(self, model: str = "qwen2.5:7b"):
+    def __init__(self, model: str = "qwen2.5:3b"):
         self.model = model
-        # اختبار الاتصال
+
         try:
             ollama.list()
-            print(f"✅ Ollama Client جاهز (نموذج: {self.model})")
+            print(f" Ollama Client جاهز (نموذج: {self.model})")
         except Exception as e:
-            print(f"⚠️ تأكد من تشغيل Ollama: {str(e)}")
+            print(f" تأكد من تشغيل Ollama: {str(e)}")
 
     def generate(self, prompt: str, system_instruction: str = None) -> str:
         messages = []

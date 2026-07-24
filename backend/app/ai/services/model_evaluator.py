@@ -1,6 +1,4 @@
-"""
-Model Evaluator Service
-"""
+
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 from sklearn.model_selection import cross_val_score
@@ -12,7 +10,7 @@ class ModelEvaluator:
         self.results = []
     
     def evaluate_model(self, model, X_test, y_test, model_name="Model", cv=None):
-        print(f"\n📊 تقييم {model_name}...")
+        print(f"\nتقييم {model_name}...")
         
         y_pred = model.predict(X_test)
         
@@ -59,7 +57,7 @@ class ModelEvaluator:
         if not results:
             return None
         best = max(results, key=lambda x: x['f1_score'])
-        print(f"\n🏆 أفضل نموذج: {best['model_name']} (F1: {best['f1_score']:.2%})")
+        print(f"\n أفضل نموذج: {best['model_name']} (F1: {best['f1_score']:.2%})")
         return best
     
     def compare_models(self, results=None):

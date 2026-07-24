@@ -197,6 +197,9 @@ Route::middleware('check.jwt')->group(function () {
     Route::get('/ai/predict-all', [AiDashboardController::class, 'predictAll'])->name('ai.predict-all');
     Route::get('/ai/train-now', [AiDashboardController::class, 'trainNow'])->name('ai.train-now');
     Route::get('/ai/toggle-scheduler', [AiDashboardController::class, 'toggleScheduler'])->name('ai.toggle-scheduler');
+    Route::get('/ai/strategic/waiting', [AiStrategicController::class, 'waiting'])->name('ai.strategic.waiting');
+    Route::get('/api/ai/jobs/{job_id}', [AiStrategicController::class, 'checkJobStatus']);
+
 
     // ========== الذكاء الاصطناعي ==========
     Route::prefix('ai')->name('ai.')->group(function () {

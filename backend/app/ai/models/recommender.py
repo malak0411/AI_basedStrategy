@@ -1,7 +1,4 @@
-"""
-Recommendation Engine - نموذج التوصيات الذكية
-يستخدم Ollama (Qwen 2.5) للتوصيات المتقدمة + قواعد منطقية للتوصيات الأساسية
-"""
+
 import json
 from datetime import datetime
 from app.ai.services.data_loader import DataLoader
@@ -27,14 +24,12 @@ ACTION_AR = {
 }
 
 class Recommender:
-    """نموذج التوصيات الذكية - قواعد + Ollama"""
 
     def __init__(self):
         self.is_trained = True
         self.model_version = "3.0.0-ollama-qwen"
 
     def recommend(self, task_id=None, task_features=None):
-        """توليد توصيات لمهمة"""
         if task_features is None and task_id:
             loader = DataLoader()
             try:
@@ -45,18 +40,14 @@ class Recommender:
         if task_features is None:
             return self._fallback()
 
-        # أولاً: توصيات من القواعد المنطقية (سريعة)
         rule_recs = self._generate_rules(task_features)
 
-        # ثانياً: توصيات من Ollama (إذا كان متاحاً)
         try:
             ai_recs = self._generate_ai(task_features)
-            # دمج التوصيات
             all_recs = rule_recs + ai_recs
         except Exception:
             all_recs = rule_recs
 
-        # إزالة التكرارات
         seen = set()
         unique_recs = []
         for r in sorted(all_recs, key=lambda x: x['confidence'], reverse=True):
@@ -72,7 +63,6 @@ class Recommender:
         }
 
     def _generate_rules(self, f):
-        """توصيات سريعة من القواعد"""
         recs = []
         c = float(f.get('completion_percentage', 0))
         d = int(f.get('days_without_update', 0))
@@ -106,7 +96,6 @@ class Recommender:
         return recs
 
     def _generate_ai(self, f):
-        """توصيات متقدمة من Ollama"""
         prompt = f"""
 كمستشار في إدارة المشاريع الحكومية، قم بتحليل حالة المهمة التالية واقترح إجراءات تصحيحية:
 
@@ -157,6 +146,6 @@ class Recommender:
         return True
 
     def train(self, force=False):
-        print("✅ نموذج التوصيات (قواعد + Ollama) جاهز")
+        print(" نموذج التوصيات (قواعد + Ollama) جاهز")
         return {"model_name": "Rule-Based + Ollama", "f1_score": 1.0, "accuracy": 1.0}
 

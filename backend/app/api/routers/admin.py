@@ -7,9 +7,7 @@ from typing import Optional
 
 router = APIRouter(prefix="/api", tags=["Admin"])
 
-# ============================================================
-# Schemas
-# ============================================================
+
 class RoleCreate(BaseModel):
     name: str
     description: Optional[str] = ""
@@ -27,13 +25,11 @@ class RolePermissionAssign(BaseModel):
     role_id: int
     permission_id: int
 
-# ============================================================
-# AUDIT LOGS
-# ============================================================
+
 
 @router.get("/audit-logs")
 async def audit_logs(db: Session = Depends(get_db)):
-    """سجل التدقيق"""
+
     try:
         logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(100).all()
         result = []
@@ -59,7 +55,7 @@ async def audit_logs(db: Session = Depends(get_db)):
 
 @router.get("/audit-logs/{log_id}")
 async def audit_log_detail(log_id: int, db: Session = Depends(get_db)):
-    """تفاصيل سجل تدقيق"""
+
     try:
         l = db.query(AuditLog).filter(AuditLog.audit_id == log_id).first()
         if not l:
@@ -86,13 +82,11 @@ async def audit_log_detail(log_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ============================================================
-# ROLES - GET/POST/PUT/DELETE
-# ============================================================
+
 
 @router.get("/roles")
 async def roles(db: Session = Depends(get_db)):
-    """قائمة الأدوار"""
+
     try:
         roles = db.query(Role).all()
         result = [{
@@ -108,7 +102,7 @@ async def roles(db: Session = Depends(get_db)):
 
 @router.get("/roles/{role_id}")
 async def role_detail(role_id: int, db: Session = Depends(get_db)):
-    """تفاصيل دور"""
+
     try:
         r = db.query(Role).filter(Role.role_id == role_id).first()
         if not r:
@@ -129,7 +123,7 @@ async def role_detail(role_id: int, db: Session = Depends(get_db)):
 
 @router.post("/roles")
 async def create_role(data: RoleCreate, db: Session = Depends(get_db)):
-    """إنشاء دور جديد"""
+
     try:
         role = Role(
             name=data.name,
@@ -146,7 +140,7 @@ async def create_role(data: RoleCreate, db: Session = Depends(get_db)):
 
 @router.put("/roles/{role_id}")
 async def update_role(role_id: int, data: RoleUpdate, db: Session = Depends(get_db)):
-    """تحديث دور"""
+
     try:
         r = db.query(Role).filter(Role.role_id == role_id).first()
         if not r:
@@ -165,7 +159,7 @@ async def update_role(role_id: int, data: RoleUpdate, db: Session = Depends(get_
 
 @router.delete("/roles/{role_id}")
 async def delete_role(role_id: int, db: Session = Depends(get_db)):
-    """حذف دور"""
+
     try:
         r = db.query(Role).filter(Role.role_id == role_id).first()
         if not r:
@@ -179,13 +173,11 @@ async def delete_role(role_id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-# ============================================================
-# PERMISSIONS
-# ============================================================
+
 
 @router.get("/permissions")
 async def permissions(db: Session = Depends(get_db)):
-    """قائمة الصلاحيات"""
+
     try:
         perms = db.query(Permission).all()
         result = [{
@@ -199,7 +191,7 @@ async def permissions(db: Session = Depends(get_db)):
 
 @router.get("/permissions/{permission_id}")
 async def permission_detail(permission_id: int, db: Session = Depends(get_db)):
-    """تفاصيل صلاحية"""
+
     try:
         p = db.query(Permission).filter(Permission.permission_id == permission_id).first()
         if not p:
@@ -217,13 +209,11 @@ async def permission_detail(permission_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ============================================================
-# EMPLOYEE ROLES - ربط الموظفين بالأدوار
-# ============================================================
+
 
 @router.get("/employee-roles")
 async def get_employee_roles(db: Session = Depends(get_db)):
-    """قائمة ارتباطات الموظفين بالأدوار"""
+
     try:
         result = db.execute(employee_roles.select()).fetchall()
         data = []
@@ -255,7 +245,7 @@ async def get_employee_roles(db: Session = Depends(get_db)):
 
 @router.post("/employee-roles")
 async def assign_employee_role(data: EmployeeRoleAssign, db: Session = Depends(get_db)):
-    """ربط موظف بدور"""
+
     try:
         db.execute(employee_roles.insert().values(
             employee_id=data.employee_id,
@@ -269,7 +259,7 @@ async def assign_employee_role(data: EmployeeRoleAssign, db: Session = Depends(g
 
 @router.delete("/employee-roles")
 async def remove_employee_role(data: EmployeeRoleAssign, db: Session = Depends(get_db)):
-    """إلغاء ربط موظف بدور"""
+
     try:
         db.execute(employee_roles.delete().where(
             (employee_roles.c.employee_id == data.employee_id) &
@@ -281,13 +271,11 @@ async def remove_employee_role(data: EmployeeRoleAssign, db: Session = Depends(g
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-# ============================================================
-# ROLE PERMISSIONS - ربط الأدوار بالصلاحيات
-# ============================================================
+
 
 @router.get("/role-permissions")
 async def get_role_permissions(db: Session = Depends(get_db)):
-    """قائمة ارتباطات الأدوار بالصلاحيات"""
+
     try:
         result = db.execute(role_permissions.select()).fetchall()
         data = []
@@ -319,7 +307,7 @@ async def get_role_permissions(db: Session = Depends(get_db)):
 
 @router.post("/role-permissions")
 async def assign_role_permission(data: RolePermissionAssign, db: Session = Depends(get_db)):
-    """ربط دور بصلاحية"""
+
     try:
         db.execute(role_permissions.insert().values(
             role_id=data.role_id,
@@ -333,7 +321,7 @@ async def assign_role_permission(data: RolePermissionAssign, db: Session = Depen
 
 @router.delete("/role-permissions")
 async def remove_role_permission(data: RolePermissionAssign, db: Session = Depends(get_db)):
-    """إلغاء ربط دور بصلاحية"""
+
     try:
         db.execute(role_permissions.delete().where(
             (role_permissions.c.role_id == data.role_id) &

@@ -1,6 +1,4 @@
-"""
-Feature Engineering Service
-"""
+
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -19,7 +17,7 @@ class FeatureEngineer:
         self.is_fitted = False
     
     def prepare_data(self, df, target_col='is_delayed', test_size=0.2, random_state=42):
-        print("🔧 بدء معالجة الميزات...")
+        print(" بدء معالجة الميزات...")
         
         feature_cols = [c for c in df.columns if c not in [target_col, 'task_id']]
         self._identify_features(df, feature_cols)
@@ -27,7 +25,7 @@ class FeatureEngineer:
         X = df[feature_cols]
         y = df[target_col].astype(int)
         
-        # تقسيم بدون stratify إذا كان unbalanced
+
         y_counts = pd.Series(y).value_counts()
         if y_counts.min() >= 2:
             X_train, X_test, y_train, y_test = train_test_split(
@@ -38,14 +36,14 @@ class FeatureEngineer:
                 X, y, test_size=test_size, random_state=random_state
             )
         
-        print(f"📊 تدريب: {len(X_train)} | اختبار: {len(X_test)} | ميزات: {len(feature_cols)}")
+        print(f" تدريب: {len(X_train)} | اختبار: {len(X_test)} | ميزات: {len(feature_cols)}")
         
         self._build_preprocessor()
         X_train_p = self.preprocessor.fit_transform(X_train)
         X_test_p = self.preprocessor.transform(X_test)
         self.is_fitted = True
         
-        print("✅ اكتملت معالجة الميزات")
+        print("اكتملت معالجة الميزات")
         return X_train_p, X_test_p, y_train, y_test
     
     def transform_single(self, features_dict):
@@ -77,7 +75,7 @@ class FeatureEngineer:
             'categorical': self.categorical_features,
             'fitted': self.is_fitted
         }, filepath)
-        print(f"💾 تم الحفظ: {filepath}")
+        print(f" تم الحفظ: {filepath}")
     
     def load(self, filepath):
         if os.path.exists(filepath):
