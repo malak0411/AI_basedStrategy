@@ -49,6 +49,13 @@ use App\Http\Controllers\Admin\RolePermissionController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\LocationController;
+// Controllers - Dictionaries
+use App\Http\Controllers\Admin\Dictionary\DictStatusController;
+use App\Http\Controllers\Admin\Dictionary\DictPriorityController;
+use App\Http\Controllers\Admin\Dictionary\DictRiskLevelController;
+use App\Http\Controllers\Admin\Dictionary\DictRoleTypeController;
+use App\Http\Controllers\Admin\Dictionary\DictTransactionTypeController;
+
 
 // ============================================================
 Route::aliasMiddleware('check.jwt', CheckJwtToken::class);
@@ -277,6 +284,35 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/role-permissions', [RolePermissionController::class, 'index'])->name('role-permissions.index');
         Route::post('/role-permissions', [RolePermissionController::class, 'store'])->name('role-permissions.store');
         Route::delete('/role-permissions', [RolePermissionController::class, 'destroy'])->name('role-permissions.destroy');
+    });
+
+
+    Route::prefix('admin/dictionaries')->name('admin.dictionaries.')->group(function () {
+        Route::get('/statuses', [DictStatusController::class, 'index'])->name('statuses');
+        Route::post('/statuses', [DictStatusController::class, 'store'])->name('statuses.store');
+        Route::put('/statuses/{id}', [DictStatusController::class, 'update'])->name('statuses.update');
+        Route::delete('/statuses/{id}', [DictStatusController::class, 'destroy'])->name('statuses.destroy');
+
+        Route::get('/priorities', [DictPriorityController::class, 'index'])->name('priorities');
+        Route::post('/priorities', [DictPriorityController::class, 'store'])->name('priorities.store');
+        Route::put('/priorities/{id}', [DictPriorityController::class, 'update'])->name('priorities.update');
+        Route::delete('/priorities/{id}', [DictPriorityController::class, 'destroy'])->name('priorities.destroy');
+
+        Route::get('/risk-levels', [DictRiskLevelController::class, 'index'])->name('risk-levels');
+        Route::post('/risk-levels', [DictRiskLevelController::class, 'store'])->name('risk-levels.store');
+        Route::put('/risk-levels/{id}', [DictRiskLevelController::class, 'update'])->name('risk-levels.update');
+        Route::delete('/risk-levels/{id}', [DictRiskLevelController::class, 'destroy'])->name('risk-levels.destroy');
+
+        Route::get('/role-types', [DictRoleTypeController::class, 'index'])->name('role-types');
+        Route::post('/role-types', [DictRoleTypeController::class, 'store'])->name('role-types.store');
+        Route::put('/role-types/{id}', [DictRoleTypeController::class, 'update'])->name('role-types.update');
+        Route::delete('/role-types/{id}', [DictRoleTypeController::class, 'destroy'])->name('role-types.destroy');
+
+        Route::get('/transaction-types', [DictTransactionTypeController::class, 'index'])->name('transaction-types');
+        Route::post('/transaction-types', [DictTransactionTypeController::class, 'store'])->name('transaction-types.store');
+        Route::put('/transaction-types/{id}', [DictTransactionTypeController::class, 'update'])->name('transaction-types.update');
+        Route::delete('/transaction-types/{id}', [DictTransactionTypeController::class, 'destroy'])->name('transaction-types.destroy');
+    
     });
 
     // ========== تسجيل الخروج ==========

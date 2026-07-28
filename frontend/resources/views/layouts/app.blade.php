@@ -362,6 +362,13 @@
             <a class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}" href="{{ route('admin.settings.index') }}">
                 <i class="fas fa-cogs"></i><span class="nav-text">تهيئة النظام</span>
             </a>
+            <div class="nav-section">القواميس</div>
+            <a class="nav-link" href="{{ route('admin.dictionaries.statuses') }}"><i class="fas fa-tag"></i> الحالات</a>
+            <a class="nav-link" href="{{ route('admin.dictionaries.priorities') }}"><i class="fas fa-sort-amount-up"></i> الأولويات</a>
+            <a class="nav-link" href="{{ route('admin.dictionaries.risk-levels') }}"><i class="fas fa-exclamation-circle"></i> مستويات المخاطر</a>
+            <a class="nav-link" href="{{ route('admin.dictionaries.role-types') }}"><i class="fas fa-user-tag"></i> أنواع الأدوار</a>
+            <a class="nav-link" href="{{ route('admin.dictionaries.transaction-types') }}"><i class="fas fa-exchange-alt"></i> أنواع المعاملات</a>
+
             @endif
 
             {{-- تسجيل الخروج --}}

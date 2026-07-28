@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routers import auth, strategic, tasks, dashboard, employees, budget, risks, kpis
 from app.api.routers import system_config, admin, location, departments as dept_routes
 from app.ai.routers.ai_router import router as ai_router
+from app.api.routers import dict_router 
+
 
 # ============================================================
 # إنشاء التطبيق
@@ -69,6 +71,8 @@ app.include_router(location.router)
 
 # الإدارات
 app.include_router(dept_routes.router)
+# القواميس
+app.include_router(dict_router.router)
 
 # ============================================================
 # الذكاء الاصطناعي (AI Router)
