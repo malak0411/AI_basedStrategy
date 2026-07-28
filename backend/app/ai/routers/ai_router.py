@@ -27,7 +27,7 @@ def generate_in_background(job_id: int, initiative_id: int, user_instructions: s
 
         response_text = ollama_client.generate(
             prompt,
-            system_instruction="You are a government strategic planning expert. Return ONLY valid JSON array."
+            system_instruction="Return ONLY valid JSON array. No other text."
         )
 
         planner2 = StrategicPlanner()
@@ -59,6 +59,35 @@ def generate_in_background(job_id: int, initiative_id: int, user_instructions: s
             pass
         finally:
             db.close()
+
+
+@router.post("/strategic/save-edited-tasks/{job_id}")
+async def save_edited_tasks(job_id: int, request: dict, db: Session = Depends(get_db)):
+    try:
+        job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        initiative_id = request.get('initiative_id')
+        tasks = request.get('major_tasks', [])
+        
+        if not tasks:
+            raise HTTPException(status_code=400, detail="No tasks to save")
+        
+        planner = StrategicPlanner()
+        saved = planner.save_major_tasks(initiative_id, tasks, job.created_by)
+        planner.update_job(job_id, "completed", {"saved_tasks": saved})
+        planner.close()
+        
+        return {
+            "success": True,
+            "data": {
+                "message": f"Saved {len(saved)} major tasks",
+                "tasks": saved
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/predict-delay/{task_id}")
@@ -175,37 +204,87 @@ async def edit_task_plan(job_id: int, request: dict, db: Session = Depends(get_d
         job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
-        current_result = json.loads(job.result_json) if job.result_json else {}
-        prompt = f"""
-Current task plan:
-{json.dumps(current_result.get('major_tasks', []), ensure_ascii=False, indent=2)}
-
-Instructions: {request.get('instruction', '')}
-
-Return the modified JSON array in the same format.
-"""
-        response_text = ollama_client.generate(
-            prompt,
-            system_instruction="Return ONLY valid JSON array. No other text."
-        )
-        planner = StrategicPlanner()
-        new_result = planner.parse_response(response_text)
-        planner.close()
-        job.result_json = json.dumps({
-            **current_result,
-            "major_tasks": new_result if new_result else current_result.get("major_tasks", [])
-        }, ensure_ascii=False)
-        job.updated_at = datetime.now()
+        
+        edit_instruction = request.get('instruction', '')
+        
+        job.status = "editing"
         db.commit()
+        
+        thread = threading.Thread(
+            target=edit_in_background,
+            args=(job_id, edit_instruction),
+            daemon=True
+        )
+        thread.start()
+        
         return {
             "success": True,
             "data": {
                 "job_id": job_id,
-                "major_tasks": new_result if new_result else current_result.get("major_tasks", [])
+                "status": "editing",
+                "message": "Edit started in background"
             }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def edit_in_background(job_id: int, instruction: str):
+    try:
+        print(f"Job #{job_id}: Starting background edit...")
+        db = SessionLocal()
+        job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
+        
+        if not job:
+            return
+        
+        current_result = json.loads(job.result_json) if job.result_json else {}
+        current_tasks = current_result.get('major_tasks', [])
+        
+        prompt = f"""
+You have this task plan:
+{json.dumps(current_tasks, ensure_ascii=False, indent=2)}
+
+User instruction: {instruction}
+
+Apply the user's instruction to modify the task plan. Return the COMPLETE modified JSON array with ALL tasks.
+
+Return ONLY the JSON array.
+"""
+        response_text = ollama_client.generate(
+            prompt,
+            system_instruction="Return ONLY the complete modified JSON array. No other text."
+        )
+        
+        planner = StrategicPlanner()
+        new_tasks = planner.parse_response(response_text)
+        planner.close()
+        
+        if new_tasks and len(new_tasks) > 0:
+            current_result["major_tasks"] = new_tasks
+        else:
+            current_result["major_tasks"] = current_tasks
+        
+        job.result_json = json.dumps(current_result, ensure_ascii=False)
+        job.status = "review"
+        job.updated_at = datetime.now()
+        db.commit()
+        print(f"Job #{job_id}: Edit completed")
+        
+    except Exception as e:
+        print(f"Job #{job_id}: Edit failed - {str(e)}")
+        db = SessionLocal()
+        try:
+            job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
+            if job:
+                job.status = "review"
+                db.commit()
+        finally:
+            db.close()
+    finally:
+        if 'db' in locals():
+            db.close()
+
 
 
 @router.post("/strategic/approve-task-plan/{job_id}")

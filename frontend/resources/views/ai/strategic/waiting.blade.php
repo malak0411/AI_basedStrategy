@@ -12,7 +12,7 @@
         </div>
         <h3>توليد المهام الرئيسية</h3>
         <p class="text-muted">تحليل المبادرة وتوليد المهام باستخدام الذكاء الاصطناعي</p>
-        <p class="text-muted small">قد يستغرق هذا 1-2 دقيقة</p>
+        <p class="text-muted small">قد يستغرق هذا 2-4 دقيقة</p>
 
         <div class="progress mt-4" style="width: 300px; margin: 0 auto;">
             <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>

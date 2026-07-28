@@ -90,45 +90,76 @@ class AiStrategicController extends Controller
         $initiativeId = $request->initiative_id;
 
         $jobResponse = $this->apiClient->get("/api/ai/jobs/{$jobId}", $token);
+        $job = $jobResponse['data'] ?? [];
     
         $tasks = [];
-        if (!empty($jobResponse['data']['result']['major_tasks'])) {
-        $tasks = $jobResponse['data']['result']['major_tasks'];
+        if (!empty($job['result']['major_tasks'])) {
+            $tasks = $job['result']['major_tasks'];
         }
 
         $initiative = $this->apiClient->safeGet("/api/strategic/initiatives/{$initiativeId}", $token, []);
 
-        return view('ai.strategic.review', compact('tasks', 'initiative', 'jobId', 'initiativeId'));
+        $departmentsResponse = $this->apiClient->get('/api/departments', $token);
+        $departments = $departmentsResponse['data'] ?? [];
+
+        return view('ai.strategic.review', compact('job', 'initiative', 'tasks', 'jobId', 'initiativeId', 'departments'));
     }
 
     public function editPlan(Request $request)
-    {
-        $token = session('jwt_token');
-        $response = $this->apiClient->post(
-            "/api/ai/strategic/edit-task-plan/{$request->job_id}",
-            ['instruction' => $request->instruction],
-            $token
-        );
+{
+    $token = session('jwt_token');
+    $response = $this->apiClient->post(
+        "/api/ai/strategic/edit-task-plan/{$request->job_id}",
+        ['instruction' => $request->instruction],
+        $token
+    );
 
-        if ($response['success'] ?? false) {
-            return response()->json($response['data']);
+    return response()->json($response);
+}
+
+
+
+public function approve(Request $request)
+{
+    $token = session('jwt_token');
+    $jobId = $request->job_id;
+    $initiativeId = $request->initiative_id;
+    $tasksData = $request->tasks_data;
+
+    if ($tasksData) {
+        $editedTasks = json_decode($tasksData, true);
+        if (json_last_error() !== JSON_ERROR_NONE || empty($editedTasks)) {
+            return back()->with('error', 'بيانات المهام غير صالحة');
         }
-        return response()->json(['error' => $response['detail'] ?? 'فشل التعديل'], 500);
-    }
-
-    public function approve(Request $request)
-    {
-        $token = session('jwt_token');
+        
         $response = $this->apiClient->post(
-            "/api/ai/strategic/approve-task-plan/{$request->job_id}",
-            [],
+            "/api/ai/strategic/save-edited-tasks/{$jobId}",
+            [
+                'initiative_id' => (int)$initiativeId,
+                'major_tasks' => $editedTasks
+            ],
             $token
         );
 
         if ($response['success'] ?? false) {
-            return redirect()->route('strategic.initiatives.show', $request->initiative_id)
+            return redirect()->route('strategic.initiatives.show', $initiativeId)
                 ->with('success', $response['data']['message'] ?? 'تم حفظ المهام بنجاح');
         }
-        return back()->with('error', $response['detail'] ?? 'فشل الاعتماد');
+        return back()->with('error', $response['detail'] ?? 'فشل حفظ المهام');
     }
+
+    $response = $this->apiClient->post(
+        "/api/ai/strategic/approve-task-plan/{$jobId}",
+        [],
+        $token
+    );
+
+    if ($response['success'] ?? false) {
+        return redirect()->route('strategic.initiatives.show', $initiativeId)
+            ->with('success', $response['data']['message'] ?? 'تم حفظ المهام بنجاح');
+    }
+    return back()->with('error', $response['detail'] ?? 'فشل الاعتماد');
+}
+
+
 }
