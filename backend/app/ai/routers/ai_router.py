@@ -13,8 +13,154 @@ from app.ai.models.delay_predictor import DelayPredictor
 from app.ai.models.recommender import Recommender
 from app.ai.services.strategic_planner import StrategicPlanner
 from app.ai.services.scheduler import ai_scheduler
+from app.ai.services.operational_planner import OperationalPlanner
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
+
+def operational_in_background(job_id: int, major_task_id: int, instructions: str = ""):
+    try:
+        print(f"Job #{job_id}: Starting operational task generation")
+        planner = OperationalPlanner()
+        context = planner.get_major_task_context(major_task_id)
+        prompt = planner.build_prompt(context, instructions)
+        planner.close()
+
+        response_text = ollama_client.generate(
+            prompt,
+            system_instruction="Return ONLY valid JSON array. No other text."
+        )
+
+        planner2 = OperationalPlanner()
+        tasks = planner2.parse_response(response_text)
+        if not tasks:
+            raise ValueError("No tasks generated")
+
+        planner2.update_job(job_id, "review", {
+            "major_task_id": major_task_id,
+            "operational_tasks": tasks
+        })
+        planner2.close()
+        print(f"Job #{job_id}: Completed - {len(tasks)} tasks generated")
+
+    except Exception as e:
+        print(f"Job #{job_id}: Failed - {str(e)}")
+        import traceback
+        traceback.print_exc()
+        db = SessionLocal()
+        try:
+            job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
+            if job:
+                job.status = "failed"
+                job.result_json = json.dumps({"error": str(e)}, ensure_ascii=False)
+                job.updated_at = datetime.now()
+                db.commit()
+        except Exception:
+            pass
+        finally:
+            db.close()
+
+
+@router.post("/operational/generate-tasks/{major_task_id}")
+async def generate_operational_tasks(major_task_id: int, request: dict = None):
+    try:
+        planner = OperationalPlanner()
+        job_id = planner.create_job(major_task_id)
+        planner.close()
+
+        instructions = (request or {}).get('instructions', '')
+        thread = threading.Thread(
+            target=operational_in_background,
+            args=(job_id, major_task_id, instructions),
+            daemon=True
+        )
+        thread.start()
+
+        return {
+            "success": True,
+            "data": {
+                "job_id": job_id,
+                "status": "pending",
+                "message": "Task generation started in background"
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/operational/edit-tasks/{job_id}")
+async def edit_operational_tasks(job_id: int, request: dict, db: Session = Depends(get_db)):
+    try:
+        job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        current = json.loads(job.result_json) if job.result_json else {}
+        current_tasks = current.get('operational_tasks', [])
+
+        prompt = f"""
+Current tasks:
+{json.dumps(current_tasks, ensure_ascii=False, indent=2)}
+
+Instructions: {request.get('instruction', '')}
+
+Apply the instructions and return the modified JSON array.
+"""
+        response_text = ollama_client.generate(
+            prompt,
+            system_instruction="Return ONLY valid JSON array. No other text."
+        )
+
+        planner = OperationalPlanner()
+        new_tasks = planner.parse_response(response_text)
+        planner.close()
+
+        if new_tasks:
+            current["operational_tasks"] = new_tasks
+
+        job.result_json = json.dumps(current, ensure_ascii=False)
+        job.updated_at = datetime.now()
+        db.commit()
+
+        return {
+            "success": True,
+            "data": {
+                "job_id": job_id,
+                "operational_tasks": current.get("operational_tasks", [])
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/operational/approve-tasks/{job_id}")
+async def approve_operational_tasks(job_id: int, db: Session = Depends(get_db)):
+    try:
+        job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        result = json.loads(job.result_json) if job.result_json else {}
+        major_task_id = result.get("major_task_id")
+        tasks = result.get("operational_tasks", [])
+
+        if not tasks:
+            raise HTTPException(status_code=400, detail="No tasks to save")
+
+        planner = OperationalPlanner()
+        saved = planner.save_tasks(major_task_id, tasks)
+        planner.update_job(job_id, "completed", {"saved_tasks": saved})
+        planner.close()
+
+        return {
+            "success": True,
+            "data": {
+                "message": f"Saved {len(saved)} operational tasks",
+                "tasks": saved
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 def generate_in_background(job_id: int, initiative_id: int, user_instructions: str = ""):

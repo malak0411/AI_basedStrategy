@@ -26,6 +26,9 @@ use App\Http\Controllers\Strategic\SwotController;
 use App\Http\Controllers\Strategic\PestelController;
 use App\Http\Controllers\Strategic\VisionController;
 
+use App\Http\Controllers\OperationalTaskController;
+
+
 // Controllers - KPIs, Budget, Risks
 use App\Http\Controllers\KpiController;
 use App\Http\Controllers\BudgetController;
@@ -131,6 +134,7 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/initiatives/{id}/edit', [InitiativeController::class, 'edit'])->name('initiatives.edit');
         Route::put('/initiatives/{id}', [InitiativeController::class, 'update'])->name('initiatives.update');
         Route::delete('/initiatives/{id}', [InitiativeController::class, 'destroy'])->name('initiatives.destroy');
+        Route::get('/strategic/initiatives/{id}', [InitiativeController::class, 'show'])->name('strategic.initiatives.show');
 
         // SWOT
         Route::get('/swot', [SwotController::class, 'index'])->name('swot.index');
@@ -152,6 +156,25 @@ Route::middleware('check.jwt')->group(function () {
         Route::post('/edit-plan', [AiStrategicController::class, 'editPlan'])->name('edit-plan');
         Route::post('/approve', [AiStrategicController::class, 'approve'])->name('approve');
     });
+
+
+  Route::middleware('check.jwt')->group(function () {
+    Route::prefix('operational')->name('operational.')->group(function () {
+        Route::get('/major-tasks', [OperationalTaskController::class, 'majorTasks'])->name('major-tasks');
+        Route::get('/major-task/{id}', [OperationalTaskController::class, 'showMajorTask'])->name('show-major-task');
+        Route::post('/store', [OperationalTaskController::class, 'storeOperational'])->name('store');
+        Route::put('/update/{id}', [OperationalTaskController::class, 'updateOperational'])->name('update');
+        Route::delete('/destroy/{id}', [OperationalTaskController::class, 'destroyOperational'])->name('destroy');
+        Route::get('/generate/{majorTaskId}', [OperationalTaskController::class, 'generate'])->name('generate');
+        Route::post('/start-generation', [OperationalTaskController::class, 'startGeneration'])->name('start-generation');
+        Route::get('/waiting', [OperationalTaskController::class, 'waiting'])->name('waiting');
+        Route::get('/review', [OperationalTaskController::class, 'review'])->name('review');
+        Route::post('/edit-prompt', [OperationalTaskController::class, 'editWithPrompt'])->name('edit-prompt');
+        Route::post('/approve', [OperationalTaskController::class, 'approve'])->name('approve');
+    });
+});
+
+
 
     // ========== مؤشرات الأداء ==========
     Route::prefix('kpis')->name('kpis.')->group(function () {

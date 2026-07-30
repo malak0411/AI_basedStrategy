@@ -51,13 +51,27 @@ class InitiativeController extends Controller
     }
 
     public function show($id)
-    {
-        $token = session('jwt_token');
-        $response = $this->apiClient->get("/api/strategic/initiatives/{$id}", $token);
-        $initiative = $response['data'] ?? [];
-        if (empty($initiative)) return redirect()->route('strategic.initiatives.index')->with('error', 'المبادرة غير موجودة');
-        return view('strategic.initiatives.show', compact('initiative'));
+{
+    $token = session('jwt_token');
+    $response = $this->apiClient->get("/api/strategic/initiatives/{$id}", $token);
+    $initiative = $response['data'] ?? [];
+
+    if (empty($initiative)) {
+        return redirect()->route('strategic.initiatives.index')->with('error', 'المبادرة غير موجودة');
     }
+
+    $majorTasksResponse = $this->apiClient->get("/api/strategic/initiatives/{$id}/major-tasks", $token);
+    $majorTasks = $majorTasksResponse['data'] ?? [];
+
+    $departmentsResponse = $this->apiClient->get('/api/departments', $token);
+    $departments = $departmentsResponse['data'] ?? [];
+
+    $prioritiesResponse = $this->apiClient->get('/api/dict/priorities', $token);
+    $priorities = $prioritiesResponse['data'] ?? [];
+
+    return view('strategic.initiatives.show', compact('initiative', 'majorTasks', 'departments', 'priorities'));
+}
+
 
     public function edit($id)
     {

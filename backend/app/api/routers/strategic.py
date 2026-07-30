@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import StrategicPillar, StrategicGoal, Program, Initiative, StrategicVision, SWOTAnalysis, PESTELAnalysis
+from app.models import StrategicPillar, StrategicGoal, Program, Initiative, StrategicVision, SWOTAnalysis, PESTELAnalysis, Department, MajorTask, MajorTaskDepartment
 from pydantic import BaseModel
 from datetime import date as date_type
 from typing import Optional
+
 
 router = APIRouter(prefix="/api/strategic", tags=["Strategic"])
 
@@ -536,6 +537,116 @@ async def get_pestel(db: Session = Depends(get_db)):
         return {"success": True, "data": {"political": "", "economic": "", "social": "", "technological": "", "environmental": "", "legal": ""}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/initiatives/{initiative_id}/major-tasks")
+async def get_initiative_major_tasks(initiative_id: int, db: Session = Depends(get_db)):
+    try:
+        tasks = db.query(MajorTask).filter(
+            MajorTask.initiative_id == initiative_id,
+            MajorTask.is_active == True
+        ).all()
+        
+        result = []
+        for task in tasks:
+            depts = db.query(MajorTaskDepartment).filter(
+                MajorTaskDepartment.major_task_id == task.major_task_id
+            ).all()
+            
+            dept_list = []
+            for d in depts:
+                department = db.query(Department).filter(Department.department_id == d.department_id).first()
+                dept_list.append({
+                    "department_id": d.department_id,
+                    "department_name": department.name if department else f"قسم #{d.department_id}",
+                    "responsibility_type": d.responsibility_type or "SUPPORT",
+                    "notes": d.notes or ""
+                })
+            
+            result.append({
+                "id": task.major_task_id,
+                "name": task.name or "",
+                "description": task.description or "",
+                "priority_id": task.priority_id or 2,
+                "estimated_duration_days": task.estimated_duration_days or 30,
+                "is_cross_department": bool(task.is_cross_department),
+                "departments": dept_list,
+                "created_at": task.created_at.isoformat() if task.created_at else None
+            })
+        
+        return {"success": True, "data": result}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.post("/initiatives/{initiative_id}/major-tasks")
+async def create_major_task_manual(initiative_id: int, data: dict, db: Session = Depends(get_db)):
+    try:
+        task = MajorTask(
+            initiative_id=initiative_id,
+            name=data.get("name"),
+            description=data.get("description", ""),
+            priority_id=data.get("priority_id", 2),
+            estimated_duration_days=data.get("estimated_duration_days", 30),
+            is_cross_department=data.get("is_cross_department", False),
+            is_active=True
+        )
+        db.add(task)
+        db.flush()
+        
+        for dept in data.get("departments", []):
+            mtd = MajorTaskDepartment(
+                major_task_id=task.major_task_id,
+                department_id=dept.get("department_id"),
+                responsibility_type=dept.get("responsibility_type", "SUPPORT"),
+                notes=dept.get("notes", "")
+            )
+            db.add(mtd)
+        
+        db.commit()
+        return {"success": True, "data": {"id": task.major_task_id, "name": task.name}}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/major-tasks/{task_id}")
+async def update_major_task(task_id: int, data: dict, db: Session = Depends(get_db)):
+    try:
+        task = db.query(MajorTask).filter(MajorTask.major_task_id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        if "name" in data: task.name = data["name"]
+        if "description" in data: task.description = data["description"]
+        if "priority_id" in data: task.priority_id = data["priority_id"]
+        if "estimated_duration_days" in data: task.estimated_duration_days = data["estimated_duration_days"]
+        if "is_cross_department" in data: task.is_cross_department = data["is_cross_department"]
+        
+        db.commit()
+        return {"success": True, "message": "Updated"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/major-tasks/{task_id}")
+async def delete_major_task(task_id: int, db: Session = Depends(get_db)):
+    try:
+        task = db.query(MajorTask).filter(MajorTask.major_task_id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        db.query(MajorTaskDepartment).filter(MajorTaskDepartment.major_task_id == task_id).delete()
+        db.delete(task)
+        db.commit()
+        return {"success": True, "message": "Deleted"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.put("/pestel")
 async def update_pestel(data: dict, db: Session = Depends(get_db)):

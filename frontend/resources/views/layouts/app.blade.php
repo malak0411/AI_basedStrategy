@@ -309,6 +309,9 @@
             <a class="nav-link {{ request()->routeIs('ai.recommendations.*') ? 'active' : '' }}" href="{{ route('ai.recommendations') }}">
                 <i class="fas fa-lightbulb"></i><span class="nav-text">التوصيات</span>
             </a>
+            <a class="nav-link" href="{{ route('operational.major-tasks') }}">
+                <i class="fas fa-tasks"></i><span class="nav-text">المهام التشغيلية</span>
+            </a>
             @endif
 
 
