@@ -121,3 +121,24 @@ async def update_employee(employee_id: int, data: EmployeeUpdate, db: Session = 
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"خطأ في تحديث الموظف: {str(e)}")
+
+
+@router.get("/department/{department_id}")
+async def get_employees_by_department(department_id: int, db: Session = Depends(get_db)):
+    try:
+        employees = db.query(Employee).filter(
+            Employee.department_id == department_id,
+            Employee.is_active == True
+        ).all()
+        result = [{
+            "employee_id": e.employee_id,
+            "full_name": e.full_name,
+            "job_title": e.job_title or "",
+            "department_id": e.department_id
+        } for e in employees]
+        print(f"Found {len(result)} employees for department {department_id}")
+        return {"success": True, "data": result}
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+

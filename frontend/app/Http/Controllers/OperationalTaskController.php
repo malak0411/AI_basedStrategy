@@ -14,8 +14,24 @@ class OperationalTaskController extends Controller
         $this->apiClient = new ApiClient();
     }
 
+    private function isManager(): bool
+    {
+        $role = session('user_role', 'employee');
+        return in_array($role, ['manager', 'general_manager', 'deputy', 'minister']);
+    }
+
+    private function getDepartmentId(): int
+    {
+
+        return (int)(session('user_department_id') ?? 6);
+    }
+
     public function majorTasks()
     {
+        if (!$this->isManager()) {
+            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+        }
+
         $token = session('jwt_token');
         $response = $this->apiClient->get('/api/tasks/major-tasks/by-department', $token);
         $tasks = $response['data'] ?? [];
@@ -24,21 +40,47 @@ class OperationalTaskController extends Controller
 
     public function showMajorTask($id)
     {
+        if (!$this->isManager()) {
+            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+        }
+
         $token = session('jwt_token');
+
         $majorTaskResponse = $this->apiClient->get("/api/tasks/major-tasks/{$id}/details", $token);
         $majorTask = $majorTaskResponse['data'] ?? [];
 
         $operationalResponse = $this->apiClient->get("/api/tasks/by-major-task/{$id}", $token);
         $operationalTasks = $operationalResponse['data'] ?? [];
 
+        $departmentId = $this->getDepartmentId();
+
+        $employeesResponse = $this->apiClient->get("/api/employees/department/{$departmentId}", $token);
+        $employees = $employeesResponse['data'] ?? [];
+
+        $roleTypesResponse = $this->apiClient->get('/api/tasks/role-types', $token);
+        $roleTypes = $roleTypesResponse['data'] ?? [];
+
+        $prioritiesResponse = $this->apiClient->get('/api/dict/priorities', $token);
+        $priorities = $prioritiesResponse['data'] ?? [];
+
         $departments = $this->apiClient->safeGet('/api/departments', $token, []);
 
-        return view('operational.show-major-task', compact('majorTask', 'operationalTasks', 'departments'));
+        return view('operational.show-major-task', compact(
+            'majorTask', 'operationalTasks', 'departments', 'employees',
+            'roleTypes', 'priorities', 'departmentId'
+        ));
     }
 
     public function storeOperational(Request $request)
     {
+        if (!$this->isManager()) {
+            return back()->with('error', 'غير مصرح');
+        }
+
         $token = session('jwt_token');
+
+        $isCross = count($request->assigned_employees ?? []) > 1;
+
         $data = [
             'major_task_id' => (int)$request->major_task_id,
             'department_id' => (int)$request->department_id,
@@ -48,43 +90,62 @@ class OperationalTaskController extends Controller
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'estimated_hours' => (float)($request->estimated_hours ?? 0),
+            'is_cross_functional' => $isCross,
             'assigned_employees' => $request->assigned_employees ?? [],
         ];
+
         $response = $this->apiClient->post('/api/tasks/', $data, $token);
+
         if ($response['success'] ?? false) {
-            return back()->with('success', 'تمت إضافة المهمة التشغيلية');
+            return back()->with('success', 'تمت إضافة المهمة التشغيلية بنجاح');
         }
-        return back()->with('error', $response['detail'] ?? 'فشلت الإضافة');
+        return back()->with('error', $response['detail'] ?? 'فشلت إضافة المهمة');
     }
 
     public function updateOperational(Request $request, $id)
     {
+        if (!$this->isManager()) {
+            return back()->with('error', 'غير مصرح');
+        }
+
         $token = session('jwt_token');
         $data = [];
+
         foreach (['title', 'description', 'status_id', 'priority_id', 'end_date', 'estimated_hours'] as $field) {
             if ($request->filled($field)) {
                 $data[$field] = $request->$field;
             }
         }
+
         $response = $this->apiClient->put("/api/tasks/{$id}", $data, $token);
+
         if ($response['success'] ?? false) {
-            return back()->with('success', 'تم تحديث المهمة');
+            return back()->with('success', 'تم تحديث المهمة بنجاح');
         }
-        return back()->with('error', $response['detail'] ?? 'فشل التحديث');
+        return back()->with('error', $response['detail'] ?? 'فشل تحديث المهمة');
     }
 
     public function destroyOperational($id)
     {
+        if (!$this->isManager()) {
+            return back()->with('error', 'غير مصرح');
+        }
+
         $token = session('jwt_token');
         $response = $this->apiClient->delete("/api/tasks/{$id}", $token);
+
         if ($response['success'] ?? false) {
-            return back()->with('success', 'تم حذف المهمة');
+            return back()->with('success', 'تم حذف المهمة بنجاح');
         }
-        return back()->with('error', $response['detail'] ?? 'فشل الحذف');
+        return back()->with('error', $response['detail'] ?? 'فشل حذف المهمة');
     }
 
     public function generate($majorTaskId)
     {
+        if (!$this->isManager()) {
+            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+        }
+
         $token = session('jwt_token');
         $majorTask = $this->apiClient->get("/api/tasks/major-tasks/{$majorTaskId}/details", $token);
         return view('operational.generate', ['majorTask' => $majorTask['data'] ?? []]);
@@ -92,17 +153,22 @@ class OperationalTaskController extends Controller
 
     public function startGeneration(Request $request)
     {
+        if (!$this->isManager()) {
+            return back()->with('error', 'غير مصرح');
+        }
+
         $token = session('jwt_token');
         $response = $this->apiClient->post(
             "/api/ai/operational/generate-tasks/{$request->major_task_id}",
             ['instructions' => $request->instructions ?? ''],
             $token
         );
+
         if ($response['success'] ?? false) {
             $data = $response['data'];
             return redirect()->to('/operational/waiting?job_id=' . $data['job_id'] . '&major_task_id=' . $request->major_task_id);
         }
-        return back()->with('error', 'فشل التوليد');
+        return back()->with('error', 'فشل توليد المهام');
     }
 
     public function waiting(Request $request)
@@ -120,6 +186,7 @@ class OperationalTaskController extends Controller
         $job = $jobResponse['data'] ?? [];
         $tasks = $job['result']['operational_tasks'] ?? [];
         $departments = $this->apiClient->safeGet('/api/departments', $token, []);
+
         return view('operational.review', compact('tasks', 'job', 'departments'));
     }
 
@@ -134,6 +201,8 @@ class OperationalTaskController extends Controller
         return response()->json($response);
     }
 
+  
+
     public function approve(Request $request)
     {
         $token = session('jwt_token');
@@ -142,11 +211,13 @@ class OperationalTaskController extends Controller
             [],
             $token
         );
+
         if ($response['success'] ?? false) {
             $jobResponse = $this->apiClient->get("/api/ai/jobs/{$request->job_id}", $token);
             $jobData = $jobResponse['data'] ?? [];
             $result = json_decode($jobData['result_json'] ?? '{}', true);
             $majorTaskId = $result['major_task_id'] ?? 0;
+
             return redirect()->to('/operational/major-task/' . $majorTaskId)
                 ->with('success', 'تم حفظ المهام التشغيلية بنجاح');
         }

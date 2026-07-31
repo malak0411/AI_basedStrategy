@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
-from app.models import OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority
+from app.models import DictRoleType, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority
 from pydantic import BaseModel
 from datetime import date as date_type, datetime
 from typing import Optional
+from app.core.dependencies import get_current_employee
+
 
 router = APIRouter(prefix="/api/tasks", tags=["Tasks"])
 
@@ -157,9 +159,30 @@ async def department_major_tasks(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @router.get("/major-tasks/by-department")
-async def major_tasks_by_department(db: Session = Depends(get_db)):
+async def major_tasks_by_department(
+    db: Session = Depends(get_db),
+    employee_id: int = Depends(get_current_employee)
+):
     try:
-        tasks = db.query(MajorTask).order_by(MajorTask.is_active.desc(), MajorTask.created_at.desc()).all()
+        employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
+        
+        department_id = employee.department_id
+        
+        dept_tasks = db.query(MajorTaskDepartment).filter(
+            MajorTaskDepartment.department_id == department_id
+        ).all()
+        
+        major_task_ids = list(set(d.major_task_id for d in dept_tasks))
+        
+        if not major_task_ids:
+            return {"success": True, "data": []}
+        
+        tasks = db.query(MajorTask).filter(
+            MajorTask.major_task_id.in_(major_task_ids)
+        ).order_by(MajorTask.is_active.desc(), MajorTask.created_at.desc()).all()
+        
         result = []
         for t in tasks:
             result.append({
@@ -244,7 +267,7 @@ async def create_task(data: TaskCreate, db: Session = Depends(get_db)):
             end_date=data.end_date,
             estimated_hours=data.estimated_hours,
             is_cross_functional=data.is_cross_functional,
-            status_id=5,
+            status_id=16,
             is_active=True
         )
         db.add(task)
@@ -257,6 +280,7 @@ async def create_task(data: TaskCreate, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
 
 @router.put("/{task_id}")
 async def update_task(task_id: int, data: TaskUpdate, db: Session = Depends(get_db)):
@@ -310,3 +334,13 @@ async def delete_task(task_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+@router.get("/role-types")
+async def get_role_types(db: Session = Depends(get_db)):
+    try:
+        types = db.query(DictRoleType).all()
+        result = [{"role_type_id": t.role_type_id, "name_ar": t.name_ar, "name_en": t.name_en} for t in types]
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

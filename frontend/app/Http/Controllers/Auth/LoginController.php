@@ -65,6 +65,7 @@ class LoginController extends Controller
                 'user_name' => $user['full_name'] ?? 'مستخدم',
                 'user_email' => $user['email'] ?? $request->email,
                 'user_department' => $user['department_name'] ?? '',
+                'user_department_id' => $user['department_id'] ?? '',
                 'user_id' => $user['employee_id'] ?? '',
             ]);
 
