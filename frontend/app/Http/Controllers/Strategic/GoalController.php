@@ -50,13 +50,13 @@ class GoalController extends Controller
     }
 
     public function show($id)
-    {
-        $token = session('jwt_token');
-        $response = $this->apiClient->get("/api/strategic/goals/{$id}", $token);
-        $goal = $response['data'] ?? [];
-        if (empty($goal)) return redirect()->route('strategic.goals.index')->with('error', 'الهدف غير موجود');
-        return view('strategic.goals.show', compact('goal'));
-    }
+{
+    $token = session('jwt_token');
+    $response = $this->apiClient->get("/api/strategic/goals/{$id}/details", $token);
+    $goal = $response['data'] ?? [];
+    return view('strategic.goals.show', compact('goal'));
+}
+
 
     public function edit($id)
     {

@@ -51,13 +51,13 @@ class ProgramController extends Controller
     }
 
     public function show($id)
-    {
-        $token = session('jwt_token');
-        $response = $this->apiClient->get("/api/strategic/programs/{$id}", $token);
-        $program = $response['data'] ?? [];
-        if (empty($program)) return redirect()->route('strategic.programs.index')->with('error', 'البرنامج غير موجود');
-        return view('strategic.programs.show', compact('program'));
-    }
+{
+    $token = session('jwt_token');
+    $response = $this->apiClient->get("/api/strategic/programs/{$id}/details", $token);
+    $program = $response['data'] ?? [];
+    return view('strategic.programs.show', compact('program'));
+}
+
 
     public function edit($id)
     {

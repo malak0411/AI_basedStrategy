@@ -67,4 +67,13 @@ class PillarController extends Controller
         }
         return back()->with('error', $response['detail'] ?? 'فشل');
     }
+
+    public function show($id)
+{
+    $token = session('jwt_token');
+    $response = $this->apiClient->get("/api/strategic/pillars/{$id}/details", $token);
+    $pillar = $response['data'] ?? [];
+    return view('strategic.pillars.show', compact('pillar'));
+}
+
 }

@@ -668,3 +668,105 @@ async def update_pestel(data: dict, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/pillars/{pillar_id}/details")
+async def get_pillar_details(pillar_id: int, db: Session = Depends(get_db)):
+    try:
+        pillar = db.query(StrategicPillar).filter(StrategicPillar.pillar_id == pillar_id).first()
+        if not pillar:
+            raise HTTPException(status_code=404, detail="Pillar not found")
+        
+        goals = db.query(StrategicGoal).filter(
+            StrategicGoal.pillar_id == pillar_id,
+            StrategicGoal.is_active == True
+        ).all()
+        
+        return {
+            "success": True,
+            "data": {
+                "id": pillar.pillar_id,
+                "name": pillar.name,
+                "description": pillar.description or "",
+                "order_index": pillar.order_index,
+                "is_active": pillar.is_active,
+                "goals": [{
+                    "id": g.goal_id,
+                    "title": g.title,
+                    "description": g.description or "",
+                    "target_date": g.target_date.isoformat() if g.target_date else None
+                } for g in goals]
+            }
+        }
+    except HTTPException: raise
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/goals/{goal_id}/details")
+async def get_goal_details(goal_id: int, db: Session = Depends(get_db)):
+    try:
+        goal = db.query(StrategicGoal).filter(StrategicGoal.goal_id == goal_id).first()
+        if not goal:
+            raise HTTPException(status_code=404, detail="Goal not found")
+        
+        programs = db.query(Program).filter(
+            Program.goal_id == goal_id,
+            Program.is_active == True
+        ).all()
+        
+        return {
+            "success": True,
+            "data": {
+                "id": goal.goal_id,
+                "title": goal.title,
+                "description": goal.description or "",
+                "pillar_name": goal.pillar.name if goal.pillar else "",
+                "target_date": goal.target_date.isoformat() if goal.target_date else None,
+                "programs": [{
+                    "id": p.program_id,
+                    "name": p.name,
+                    "description": p.description or "",
+                    "budget_estimate": float(p.budget_estimate or 0),
+                    "start_date": p.start_date.isoformat() if p.start_date else None,
+                    "end_date": p.end_date.isoformat() if p.end_date else None
+                } for p in programs]
+            }
+        }
+    except HTTPException: raise
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/programs/{program_id}/details")
+async def get_program_details(program_id: int, db: Session = Depends(get_db)):
+    try:
+        program = db.query(Program).filter(Program.program_id == program_id).first()
+        if not program:
+            raise HTTPException(status_code=404, detail="Program not found")
+        
+        initiatives = db.query(Initiative).filter(
+            Initiative.program_id == program_id,
+            Initiative.is_active == True
+        ).all()
+        
+        return {
+            "success": True,
+            "data": {
+                "id": program.program_id,
+                "name": program.name,
+                "description": program.description or "",
+                "goal_name": program.goal.title if program.goal else "",
+                "budget_estimate": float(program.budget_estimate or 0),
+                "start_date": program.start_date.isoformat() if program.start_date else None,
+                "end_date": program.end_date.isoformat() if program.end_date else None,
+                "initiatives": [{
+                    "id": i.initiative_id,
+                    "name": i.name,
+                    "description": i.description or "",
+                    "priority_id": i.priority_id,
+                    "start_date": i.start_date.isoformat() if i.start_date else None,
+                    "end_date": i.end_date.isoformat() if i.end_date else None,
+                    "budget_estimate": float(i.budget_estimate or 0)
+                } for i in initiatives]
+            }
+        }
+    except HTTPException: raise
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
