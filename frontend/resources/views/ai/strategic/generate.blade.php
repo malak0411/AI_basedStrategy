@@ -28,9 +28,9 @@
 
     {{-- خطوات المؤشر --}}
     <div class="step-indicator">
-        <div class="step active" id="step1">1️⃣ اختيار المبادرة</div>
-        <div class="step" id="step2">2️⃣ مراجعة السياق</div>
-        <div class="step" id="step3">3️⃣ إضافة تعليمات</div>
+        <div class="step active" id="step1"> اختيار المبادرة</div>
+        <div class="step" id="step2"> مراجعة السياق</div>
+        <div class="step" id="step3"> إضافة تعليمات</div>
     </div>
 
     <div class="row">
@@ -81,7 +81,7 @@
                     <li>يراجع النظام الرؤية والركائز والأهداف والبرنامج</li>
                     <li>يحلل SWOT و PESTEL والميزانية والمخاطر</li>
                     <li>أضف تعليمات اختيارية</li>
-                    <li>Gemini 2.5 Pro يولد المهام الرئيسية</li>
+                    <li يولد المهام الرئيسية</li>
                     <li>تراجع وتعدل وتعتمد الخطة</li>
                 </ol>
                 <hr>
@@ -123,15 +123,15 @@
             
             // المبادرة
             if (data.initiative?.name) {
-                html += `<div class="flow-item">🎯 <strong>المبادرة:</strong> ${data.initiative.name}</div>`;
+                html += `<div class="flow-item"> <strong>المبادرة:</strong> ${data.initiative.name}</div>`;
                 if (data.initiative.description) {
-                    html += `<div class="flow-item">📝 ${data.initiative.description.substring(0, 200)}</div>`;
+                    html += `<div class="flow-item"> ${data.initiative.description.substring(0, 200)}</div>`;
                 }
                 if (data.initiative.budget_estimate) {
-                    html += `<div class="flow-item">💰 الميزانية: ${Number(data.initiative.budget_estimate).toLocaleString()}</div>`;
+                    html += `<div class="flow-item"> الميزانية: ${Number(data.initiative.budget_estimate).toLocaleString()}</div>`;
                 }
                 if (data.initiative.start_date) {
-                    html += `<div class="flow-item">📅 ${data.initiative.start_date} → ${data.initiative.end_date || 'غير محدد'}</div>`;
+                    html += `<div class="flow-item"> ${data.initiative.start_date} → ${data.initiative.end_date || 'غير محدد'}</div>`;
                 }
             }
             
@@ -142,16 +142,16 @@
                 html += '<div class="context-grid">';
                 
                 if (data.swot?.strengths) {
-                    html += `<div class="context-mini"><h6>💪 نقاط القوة</h6><p>${data.swot.strengths.substring(0, 150)}</p></div>`;
+                    html += `<div class="context-mini"><h6> نقاط القوة</h6><p>${data.swot.strengths.substring(0, 150)}</p></div>`;
                 }
                 if (data.swot?.weaknesses) {
-                    html += `<div class="context-mini"><h6>⚠️ نقاط الضعف</h6><p>${data.swot.weaknesses.substring(0, 150)}</p></div>`;
+                    html += `<div class="context-mini"><h6> نقاط الضعف</h6><p>${data.swot.weaknesses.substring(0, 150)}</p></div>`;
                 }
                 if (data.swot?.opportunities) {
-                    html += `<div class="context-mini"><h6>💡 الفرص</h6><p>${data.swot.opportunities.substring(0, 150)}</p></div>`;
+                    html += `<div class="context-mini"><h6> الفرص</h6><p>${data.swot.opportunities.substring(0, 150)}</p></div>`;
                 }
                 if (data.swot?.threats) {
-                    html += `<div class="context-mini"><h6>🔥 التهديدات</h6><p>${data.swot.threats.substring(0, 150)}</p></div>`;
+                    html += `<div class="context-mini"><h6> التهديدات</h6><p>${data.swot.threats.substring(0, 150)}</p></div>`;
                 }
                 
                 html += '</div>';
@@ -160,7 +160,7 @@
             document.getElementById('contextData').innerHTML = html;
         } catch (error) {
             document.getElementById('contextLoading').innerHTML = 
-                '<p class="text-danger">❌ خطأ في تحميل السياق</p>';
+                '<p class="text-danger"> خطأ في تحميل السياق</p>';
         }
     });
 

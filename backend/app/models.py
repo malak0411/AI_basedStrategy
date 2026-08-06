@@ -214,6 +214,7 @@ class StrategicGoal(Base):
     # العلاقات
     pillar = relationship("StrategicPillar", back_populates="goals")
     programs = relationship("Program", back_populates="goal")
+    creator = relationship("Employee", foreign_keys=[created_by])
 
 
 class Program(Base):

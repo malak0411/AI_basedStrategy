@@ -17,6 +17,9 @@
     <a href="{{ route('strategic.programs.index') }}" class="btn btn-outline-secondary mb-3">
         <i class="fas fa-arrow-right"></i> العودة للبرامج
     </a>
+     <a href="{{ route('strategic.goals.show', $program['goal_id']) }}" class="btn btn-outline-secondary mb-3">
+        <i class="fas fa-arrow-right"></i> العودة للهدف
+    </a>
 
     <div class="card-custom mb-4">
         <h4>{{ $program['name'] ?? $program['title'] ?? '' }}</h4>

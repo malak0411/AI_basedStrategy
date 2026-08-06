@@ -17,6 +17,9 @@
     <a href="{{ route('strategic.goals.index') }}" class="btn btn-outline-secondary mb-3">
         <i class="fas fa-arrow-right"></i> العودة للأهداف
     </a>
+     <a href="{{ route('strategic.pillars.show', $goal['pillar_id']) }}" class="btn btn-outline-secondary mb-3">
+        <i class="fas fa-arrow-right"></i> العودة للركيزة
+    </a>
 
     <div class="card-custom mb-4">
         <h4>{{ $goal['name'] ?? $goal['title'] ?? '' }}</h4>
@@ -25,6 +28,14 @@
             <div class="col-md-3"><small>الركيزة</small><div><strong>{{ $goal['pillar_name'] ?? '' }}</strong></div></div>
             <div class="col-md-3"><small>تاريخ البداية</small><div>{{ $goal['start_date'] ?? '-' }}</div></div>
             <div class="col-md-3"><small>تاريخ النهاية</small><div>{{ $goal['end_date'] ?? '-' }}</div></div>
+            <div class="col-md-3"><small>تاريخ الهدف</small><div>{{ $goal['target_date'] ?? '-' }}</div></div>
+            <div class="col-md-3"><small>الوزن</small><div>{{ $goal['weight'] ?? 0 }}</div></div>
+
+            <div class="col-md-3"><small>الحالة</small><div>
+                <span class="badge bg-{{ ($goal['status'] ?? 'active') == 'active' ? 'success' : 'secondary' }}">
+                    {{ ($goal['status'] ?? 'active') == 'active' ? 'نشط' : 'غير نشط' }}
+                </span>
+            </div></div>
         </div>
     </div>
 

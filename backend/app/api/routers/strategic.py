@@ -2,16 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import StrategicPillar, StrategicGoal, Program, Initiative, StrategicVision, SWOTAnalysis, PESTELAnalysis, Department, MajorTask, MajorTaskDepartment
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import date as date_type
 from typing import Optional
 
 
 router = APIRouter(prefix="/api/strategic", tags=["Strategic"])
 
-# ============================================================
-# Schemas
-# ============================================================
 class PillarCreate(BaseModel):
     name: str
     description: Optional[str] = ""
@@ -25,6 +22,8 @@ class GoalCreate(BaseModel):
     target_date: Optional[date_type] = None
     valid_from: Optional[date_type] = None
     valid_until: Optional[date_type] = None
+    created_by: Optional[int] = None
+    
 
 class ProgramCreate(BaseModel):
     goal_id: int
@@ -166,11 +165,15 @@ async def get_goal(goal_id: int, db: Session = Depends(get_db)):
             "success": True,
             "data": {
                 "id": g.goal_id, "name": g.title, "title": g.title,
-                "description": g.description or "", "pillar_name": pillar_name,
-                "pillar_id": g.pillar_id, "progress": 0,
+                "description": g.description or "",
+                "pillar_name": pillar_name,
+                "pillar_id": g.pillar_id,
+                "progress": 0,
+                "weight": g.weight if g.weight is not None else 0,
                 "status": "active" if g.is_active else "inactive",
                 "start_date": g.valid_from.isoformat() if g.valid_from else None,
-                "end_date": g.valid_until.isoformat() if g.valid_until else None
+                "end_date": g.valid_until.isoformat() if g.valid_until else None,
+                "target_date": g.target_date.isoformat() if g.target_date else None,
             }
         }
     except HTTPException:
@@ -720,6 +723,11 @@ async def get_goal_details(goal_id: int, db: Session = Depends(get_db)):
                 "title": goal.title,
                 "description": goal.description or "",
                 "pillar_name": goal.pillar.name if goal.pillar else "",
+                "pillar_id": goal.pillar_id,
+                "weight": goal.weight if goal.weight is not None else 0,
+                "status": "active" if goal.is_active else "inactive",
+                "start_date": goal.valid_from.isoformat() if goal.valid_from else None,
+                "end_date": goal.valid_until.isoformat() if goal.valid_until else None,
                 "target_date": goal.target_date.isoformat() if goal.target_date else None,
                 "programs": [{
                     "id": p.program_id,
@@ -753,6 +761,7 @@ async def get_program_details(program_id: int, db: Session = Depends(get_db)):
                 "id": program.program_id,
                 "name": program.name,
                 "description": program.description or "",
+                "goal_id": program.goal_id,
                 "goal_name": program.goal.title if program.goal else "",
                 "budget_estimate": float(program.budget_estimate or 0),
                 "start_date": program.start_date.isoformat() if program.start_date else None,
