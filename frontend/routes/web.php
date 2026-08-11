@@ -146,6 +146,7 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/{id}', [KpiController::class, 'show'])->name('show');
         Route::get('/{id}/edit', [KpiController::class, 'edit'])->name('edit');
         Route::put('/{id}', [KpiController::class, 'update'])->name('update');
+        Route::delete('/{id}', [KpiController::class, 'destroy'])->name('destroy');
         Route::get('/{id}/measurements', [KpiController::class, 'measurements'])->name('measurements');
         Route::get('/{id}/measurements/create', [KpiController::class, 'createMeasurement'])->name('measurements.create');
         Route::post('/{id}/measurements', [KpiController::class, 'storeMeasurement'])->name('measurements.store');
@@ -192,6 +193,8 @@ Route::middleware('check.jwt')->group(function () {
             Route::get('/', [AiStrategicController::class, 'index'])->name('index');
             Route::get('/context/{id}', [AiStrategicController::class, 'getInitiativeContext'])->name('context');
             Route::post('/generate', [AiStrategicController::class, 'generate'])->name('generate');
+            Route::get('/waiting', [AiStrategicController::class, 'waiting'])->name('waiting');
+            Route::post('/edit-prompt', [AiStrategicController::class, 'editWithPrompt'])->name('edit-prompt');
             Route::get('/review', [AiStrategicController::class, 'review'])->name('review');
             Route::post('/edit-plan', [AiStrategicController::class, 'editPlan'])->name('edit-plan');
             Route::post('/approve', [AiStrategicController::class, 'approve'])->name('approve');

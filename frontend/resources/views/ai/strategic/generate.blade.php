@@ -23,7 +23,7 @@
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3><i class="fas fa-robot ml-2"></i>توليد المهام الرئيسية بالذكاء الاصطناعي</h3>
-        <span class="badge bg-info"><i class="fas fa-brain"></i> Gemini 2.5 Pro</span>
+        <span class="badge bg-info"><i class="fas fa-brain"></i> ollama </span>
     </div>
 
     {{-- خطوات المؤشر --}}
