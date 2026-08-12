@@ -103,13 +103,5 @@ class InitiativeController extends Controller
         return back()->with('error', $response['detail'] ?? 'فشل تحديث المبادرة');
     }
 
-    public function destroy($id)
-    {
-        $token = session('jwt_token');
-        $response = $this->apiClient->delete("/api/strategic/initiatives/{$id}", $token);
-        if ($response['success'] ?? false) {
-            return redirect()->route('strategic.initiatives.index')->with('success', 'تم حذف المبادرة');
-        }
-        return back()->with('error', $response['detail'] ?? 'فشل حذف المبادرة');
-    }
+    
 }

@@ -34,7 +34,12 @@
         @foreach($programs as $program)
         <div class="col-md-4 mb-4">
             <div class="program-card" onclick="window.location='{{ route('strategic.programs.show', $program['id']) }}'">
+            <div class="d-flex justify-content-between align-items-start mb-3">
                 <span class="badge bg-info mb-2">{{ $program['goal_name'] ?? '' }}</span>
+                <div class="program-actions" onclick="event.stopPropagation()">
+                    <button class="btn btn-sm btn-outline-primary" onclick="editProgram({{ json_encode($program) }})" title="تعديل"><i class="fas fa-edit"></i></button>
+                </div>
+            </div>
                 <h5 class="fw-bold mb-2">{{ $program['name'] ?? $program['title'] ?? '' }}</h5>
                 <p class="text-muted small">{{ Str::limit($program['description'] ?? '', 120) }}</p>
                 <small class="text-muted">الميزانية: {{ number_format($program['budget'] ?? 0) }}</small>

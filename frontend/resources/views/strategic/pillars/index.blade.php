@@ -47,10 +47,6 @@
             <div class="pillar-card {{ $active ? '' : 'inactive' }}" onclick="window.location='{{ route('strategic.pillars.show', $pillar['id']) }}'">
                 <div class="pillar-actions" onclick="event.stopPropagation()">
                     <button class="btn btn-sm btn-outline-primary" onclick="editPillar({{ json_encode($pillar) }})" title="تعديل"><i class="fas fa-edit"></i></button>
-                    <form action="{{ route('strategic.pillars.destroy', $pillar['id']) }}" method="POST" onsubmit="return confirm('متأكد من الحذف؟')">
-                        @csrf @method('DELETE')
-                        <button class="btn btn-sm btn-outline-danger" title="حذف"><i class="fas fa-trash"></i></button>
-                    </form>
                 </div>
                 <div class="d-flex justify-content-between align-items-start mb-3 mt-4">
                     <div class="pillar-number">{{ $pillar['order_index'] ?? $loop->iteration }}</div>

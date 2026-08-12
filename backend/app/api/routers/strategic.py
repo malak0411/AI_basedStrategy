@@ -101,21 +101,7 @@ async def update_pillar(pillar_id: int, data: PillarCreate, db: Session = Depend
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/pillars/{pillar_id}")
-async def delete_pillar(pillar_id: int, db: Session = Depends(get_db)):
-    """حذف ركيزة"""
-    try:
-        pillar = db.query(StrategicPillar).filter(StrategicPillar.pillar_id == pillar_id).first()
-        if not pillar:
-            raise HTTPException(status_code=404, detail="غير موجودة")
-        db.delete(pillar)
-        db.commit()
-        return {"success": True, "message": "تم حذف الركيزة"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ============================================================
 # GOALS - GET/POST/PUT/DELETE
@@ -219,21 +205,6 @@ async def update_goal(goal_id: int, data: GoalCreate, db: Session = Depends(get_
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/goals/{goal_id}")
-async def delete_goal(goal_id: int, db: Session = Depends(get_db)):
-    """حذف هدف"""
-    try:
-        goal = db.query(StrategicGoal).filter(StrategicGoal.goal_id == goal_id).first()
-        if not goal:
-            raise HTTPException(status_code=404, detail="غير موجود")
-        db.delete(goal)
-        db.commit()
-        return {"success": True, "message": "تم حذف الهدف"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
 # PROGRAMS - GET/POST/PUT/DELETE
@@ -332,21 +303,6 @@ async def update_program(program_id: int, data: ProgramCreate, db: Session = Dep
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/programs/{program_id}")
-async def delete_program(program_id: int, db: Session = Depends(get_db)):
-    """حذف برنامج"""
-    try:
-        program = db.query(Program).filter(Program.program_id == program_id).first()
-        if not program:
-            raise HTTPException(status_code=404, detail="غير موجود")
-        db.delete(program)
-        db.commit()
-        return {"success": True, "message": "تم حذف البرنامج"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
 # INITIATIVES - GET/POST/PUT/DELETE
@@ -444,21 +400,6 @@ async def update_initiative(initiative_id: int, data: InitiativeCreate, db: Sess
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/initiatives/{initiative_id}")
-async def delete_initiative(initiative_id: int, db: Session = Depends(get_db)):
-    """حذف مبادرة"""
-    try:
-        initiative = db.query(Initiative).filter(Initiative.initiative_id == initiative_id).first()
-        if not initiative:
-            raise HTTPException(status_code=404, detail="غير موجودة")
-        db.delete(initiative)
-        db.commit()
-        return {"success": True, "message": "تم حذف المبادرة"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
 # VISION - GET/PUT
@@ -635,20 +576,7 @@ async def update_major_task(task_id: int, data: dict, db: Session = Depends(get_
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/major-tasks/{task_id}")
-async def delete_major_task(task_id: int, db: Session = Depends(get_db)):
-    try:
-        task = db.query(MajorTask).filter(MajorTask.major_task_id == task_id).first()
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        
-        db.query(MajorTaskDepartment).filter(MajorTaskDepartment.major_task_id == task_id).delete()
-        db.delete(task)
-        db.commit()
-        return {"success": True, "message": "Deleted"}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.put("/pestel")

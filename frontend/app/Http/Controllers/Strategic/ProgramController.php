@@ -88,13 +88,5 @@ class ProgramController extends Controller
         return back()->with('error', $response['detail'] ?? 'فشل تحديث البرنامج');
     }
 
-    public function destroy($id)
-    {
-        $token = session('jwt_token');
-        $response = $this->apiClient->delete("/api/strategic/programs/{$id}", $token);
-        if ($response['success'] ?? false) {
-            return redirect()->route('strategic.programs.index')->with('success', 'تم حذف البرنامج');
-        }
-        return back()->with('error', $response['detail'] ?? 'فشل حذف البرنامج');
-    }
+    
 }

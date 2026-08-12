@@ -87,13 +87,5 @@ class GoalController extends Controller
         return back()->with('error', $response['detail'] ?? 'فشل تحديث الهدف');
     }
 
-    public function destroy($id)
-    {
-        $token = session('jwt_token');
-        $response = $this->apiClient->delete("/api/strategic/goals/{$id}", $token);
-        if ($response['success'] ?? false) {
-            return redirect()->route('strategic.goals.index')->with('success', 'تم حذف الهدف');
-        }
-        return back()->with('error', $response['detail'] ?? 'فشل حذف الهدف');
-    }
+    
 }

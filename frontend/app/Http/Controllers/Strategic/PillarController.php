@@ -57,16 +57,7 @@ class PillarController extends Controller
         return back()->with('error', $response['detail'] ?? 'فشل');
     }
 
-    public function destroy($id)
-    {
-        $token = session('jwt_token');
-        $response = $this->apiClient->delete("/api/strategic/pillars/{$id}", $token);
-
-        if ($response['success'] ?? false) {
-            return redirect()->route('strategic.pillars.index')->with('success', 'تم حذف الركيزة');
-        }
-        return back()->with('error', $response['detail'] ?? 'فشل');
-    }
+    
 
     public function show($id)
 {

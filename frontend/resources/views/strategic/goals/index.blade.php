@@ -43,6 +43,9 @@
                 <div class="d-flex justify-content-between align-items-start mb-3">
                     <span class="badge bg-info">{{ $goal['pillar_name'] ?? '' }}</span>
                     <span class="badge bg-{{ $active ? 'success' : 'secondary' }}">{{ $active ? 'نشط' : 'غير نشط' }}</span>
+                    <div class="goal-actions" onclick="event.stopPropagation()">
+                        <button class="btn btn-sm btn-outline-primary" onclick="window.location='{{ route('strategic.goals.edit', $goal['id']) }}'"title="تعديل"><i class="fas fa-edit"></i></button>
+                    </div>
                 </div>
                 <h5 class="fw-bold mb-2">{{ $goal['name'] ?? $goal['title'] ?? '' }}</h5>
                 <p class="text-muted small">{{ Str::limit($goal['description'] ?? '', 120) }}</p>

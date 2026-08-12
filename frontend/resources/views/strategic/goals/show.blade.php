@@ -20,7 +20,6 @@
      <a href="{{ route('strategic.pillars.show', $goal['pillar_id']) }}" class="btn btn-outline-secondary mb-3">
         <i class="fas fa-arrow-right"></i> العودة للركيزة
     </a>
-
     <div class="card-custom mb-4">
         <h4>{{ $goal['name'] ?? $goal['title'] ?? '' }}</h4>
         <p class="text-muted">{{ $goal['description'] ?? '' }}</p>
@@ -38,9 +37,16 @@
             </div></div>
         </div>
     </div>
-
-    <h5 class="mb-3"><i class="fas fa-project-diagram ml-2"></i>البرامج المرتبطة ({{ count($goal['programs'] ?? []) }})</h5>
-
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-3">
+            <i class="fas fa-project-diagram ml-2"></i>البرامج المرتبطة ({{ count($goal['programs'] ?? []) }})
+        </h5>
+        <div class="col-md-6">
+            <a href="{{ route('strategic.programs.create', ['goal_id' => $goal['id']]) }}" class="btn-gold">
+                <i class="fas fa-plus"></i> برنامج جديد
+            </a>    
+        </div>
+    </div>
     @if(empty($goal['programs']))
     <div class="card-custom text-center py-4"><p class="text-muted">لا توجد برامج</p></div>
     @else

@@ -32,7 +32,12 @@
         @foreach($initiatives as $initiative)
         <div class="col-md-4 mb-4">
             <div class="initiative-card" onclick="window.location='{{ route('strategic.initiatives.show', $initiative['id']) }}'">
-                <span class="badge bg-info mb-2">{{ $initiative['program_name'] ?? '' }}</span>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <span class="badge bg-info mb-2">{{ $initiative['program_name'] ?? '' }}</span>
+                    <div class="initiative-actions" onclick="event.stopPropagation()">
+                        <button class="btn btn-sm btn-outline-primary" onclick="editInitiative({{ json_encode($initiative) }})" title="تعديل"><i class="fas fa-edit"></i></button>
+                    </div>
+                </div>
                 <h5 class="fw-bold mb-2">{{ $initiative['name'] ?? $initiative['title'] ?? '' }}</h5>
                 <p class="text-muted small">{{ Str::limit($initiative['description'] ?? '', 120) }}</p>
                 <small class="text-muted">الأولوية: {{ $initiative['priority'] ?? '-' }} | {{ $initiative['start_date'] ?? '' }}</small>
