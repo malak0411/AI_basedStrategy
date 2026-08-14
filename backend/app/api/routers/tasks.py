@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
-from app.models import DictRoleType, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority
+from app.models import DictRoleType, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority, TaskComment , TaskProgressLog
 from pydantic import BaseModel
 from datetime import date as date_type, datetime
 from typing import Optional
@@ -341,6 +341,89 @@ async def get_role_types(db: Session = Depends(get_db)):
     try:
         types = db.query(DictRoleType).all()
         result = [{"role_type_id": t.role_type_id, "name_ar": t.name_ar, "name_en": t.name_en} for t in types]
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class StatusUpdateRequest(BaseModel):
+    status_id: int
+    comment: Optional[str] = ""
+
+@router.put("/{task_id}/update-status")
+async def update_task_status(
+    task_id: int,
+    data: StatusUpdateRequest,
+    db: Session = Depends(get_db),
+    employee_id: int = Depends(get_current_employee)
+):
+    try:
+        task = db.query(OperationalTask).filter(OperationalTask.task_id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        old_status = task.status_id
+        task.status_id = data.status_id
+        task.updated_at = datetime.now()
+        
+        log = TaskProgressLog(
+            task_id=task_id,
+            employee_id=employee_id,
+            progress_percent=0,
+            status_old=old_status,
+            status_new=data.status_id,
+            notes=data.comment or "",
+            log_time=datetime.now()
+        )
+        db.add(log)
+        
+        if data.comment:
+            comment = TaskComment(
+                task_id=task_id,
+                employee_id=employee_id,
+                comment=data.comment,
+                created_at=datetime.now()
+            )
+            db.add(comment)
+        
+        db.commit()
+        return {"success": True, "message": "Status updated", "employee_id": employee_id}
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@router.get("/by-department/{department_id}")
+async def tasks_by_department(department_id: int, db: Session = Depends(get_db)):
+    try:
+        tasks = db.query(OperationalTask).filter(
+            OperationalTask.department_id == department_id,
+            OperationalTask.is_active == True
+        ).order_by(OperationalTask.created_at.desc()).all()
+        
+        result = []
+        for task in tasks:
+            assignment = db.query(TaskAssignment).filter(TaskAssignment.task_id == task.task_id).first()
+            assigned_name = None
+            if assignment:
+                emp = db.query(Employee).filter(Employee.employee_id == assignment.employee_id).first()
+                assigned_name = emp.full_name if emp else None
+            
+            result.append({
+                "id": task.task_id,
+                "task_name": task.title,
+                "title": task.title,
+                "description": task.description or "",
+                "status": task.status_id,
+                "status_name": get_status_map(db).get(task.status_id, str(task.status_id)),
+                "priority": task.priority_id,
+                "due_date": task.end_date.isoformat() if task.end_date else None,
+                "end_date": task.end_date.isoformat() if task.end_date else None,
+                "start_date": task.start_date.isoformat() if task.start_date else None,
+                "assigned_to_name": assigned_name,
+                "department_id": task.department_id
+            })
+        
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

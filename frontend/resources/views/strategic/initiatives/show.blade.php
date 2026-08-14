@@ -104,10 +104,6 @@
                             <button class="btn btn-sm btn-outline-primary" onclick="editTask({{ json_encode($task) }})" title="تعديل">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <form action="/api/strategic/major-tasks/{{ $task['id'] }}" method="POST" class="d-inline" onsubmit="return confirm('متأكد من حذف المهمة؟')">
-                                @csrf @method('DELETE')
-                                <button class="btn btn-sm btn-outline-danger" title="حذف"><i class="fas fa-trash"></i></button>
-                            </form>
                         </div>
                     </div>
                 </div>

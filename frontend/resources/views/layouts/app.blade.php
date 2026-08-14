@@ -292,6 +292,10 @@
             <a class="nav-link {{ request()->routeIs('risks.*') ? 'active' : '' }}" href="{{ route('risks.index') }}">
                 <i class="fas fa-exclamation-triangle"></i><span class="nav-text">المخاطر</span>
             </a>
+            <a class="nav-link" href="{{ route('operational.kanban') }}">
+                <i class="fas fa-columns"></i><span class="nav-text">لوحة المهام</span>
+            </a>
+
             @endif
 
             {{-- الذكاء الاصطناعي --}}

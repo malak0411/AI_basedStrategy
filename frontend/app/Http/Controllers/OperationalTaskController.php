@@ -21,10 +21,22 @@ class OperationalTaskController extends Controller
     }
 
     private function getDepartmentId(): int
-    {
-
-        return (int)(session('user_department_id') ?? 6);
+{
+    $deptId = session('user_department_id');
+    
+    if ($deptId && (int)$deptId > 0) {
+        return (int)$deptId;
     }
+    
+    $token = session('jwt_token');
+    $me = $this->apiClient->get('/api/auth/me', $token);
+    $deptId = $me['data']['department_id'] ?? 0;
+    
+    session(['user_department_id' => (int)$deptId]);
+    
+    return (int)$deptId;
+}
+
 
     public function majorTasks()
     {
@@ -223,4 +235,45 @@ class OperationalTaskController extends Controller
         }
         return back()->with('error', $response['detail'] ?? 'فشل الاعتماد');
     }
+
+public function kanbanBoard()
+{
+    if (!$this->isManager()) {
+        return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+    }
+
+    $token = session('jwt_token');
+    $departmentId = $this->getDepartmentId();
+
+    \Log::info('Kanban Board - Department ID: ' . $departmentId);
+
+    $tasksResponse = $this->apiClient->get("/api/tasks/by-department/{$departmentId}", $token);
+    $allTasks = $tasksResponse['data'] ?? [];
+
+    $todoTasks = array_filter($allTasks, fn($t) => in_array($t['status'] ?? 0, [16, 5]));
+    $inProgressTasks = array_filter($allTasks, fn($t) => ($t['status'] ?? 0) == 6);
+    $pendingTasks = array_filter($allTasks, fn($t) => ($t['status'] ?? 0) == 7);
+    $reviewTasks = array_filter($allTasks, fn($t) => ($t['status'] ?? 0) == 8);
+    $completedTasks = array_filter($allTasks, fn($t) => in_array($t['status'] ?? 0, [4, 10]));
+
+    return view('operational.kanban', compact(
+        'todoTasks', 'inProgressTasks', 'pendingTasks', 'reviewTasks', 'completedTasks'
+    ));
+}
+
+
+public function updateTaskStatus(Request $request, $id)
+{
+    if (!$this->isManager()) {
+        return response()->json(['error' => 'غير مصرح'], 403);
+    }
+
+    $token = session('jwt_token');
+    $response = $this->apiClient->put("/api/tasks/{$id}/update-status", [
+        'status_id' => (int)$request->status_id,
+        'comment' => $request->comment ?? ''
+    ], $token);
+
+    return response()->json($response);
+}
 }

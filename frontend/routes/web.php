@@ -80,7 +80,9 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/{id}/edit', [TaskController::class, 'edit'])->name('edit');
         Route::put('/{id}', [TaskController::class, 'update'])->name('update');
     });
-
+    
+    Route::get('/operational/kanban', [OperationalTaskController::class, 'kanbanBoard'])->name('operational.kanban');
+    Route::put('/operational/update-status/{id}', [OperationalTaskController::class, 'updateTaskStatus'])->name('operational.update-status');
     Route::prefix('operational')->name('operational.')->group(function () {
         Route::get('/major-tasks', [OperationalTaskController::class, 'majorTasks'])->name('major-tasks');
         Route::get('/major-task/{id}', [OperationalTaskController::class, 'showMajorTask'])->name('show-major-task');
