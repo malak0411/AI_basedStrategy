@@ -276,4 +276,17 @@ public function updateTaskStatus(Request $request, $id)
 
     return response()->json($response);
 }
+
+public function showOperationalTask($id)
+{
+    $token = session('jwt_token');
+    $taskResponse = $this->apiClient->get("/api/tasks/{$id}", $token);
+    $task = $taskResponse['data'] ?? [];
+    
+    $logsResponse = $this->apiClient->get("/api/tasks/{$id}/progress-logs", $token);
+    $logs = $logsResponse['data'] ?? [];
+    
+    return view('operational.task-detail', compact('task', 'logs'));
+}
+
 }

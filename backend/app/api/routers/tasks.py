@@ -353,22 +353,29 @@ class StatusUpdateRequest(BaseModel):
 async def update_task_status(
     task_id: int,
     data: StatusUpdateRequest,
-    db: Session = Depends(get_db),
-    employee_id: int = Depends(get_current_employee)
+    db: Session = Depends(get_db)
 ):
     try:
         task = db.query(OperationalTask).filter(OperationalTask.task_id == task_id).first()
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
+        # جلب الموظف المسؤول عن المهمة
+        assignment = db.query(TaskAssignment).filter(TaskAssignment.task_id == task_id).first()
+        responsible_employee_id = assignment.employee_id if assignment else task.created_by or 1
+        
         old_status = task.status_id
         task.status_id = data.status_id
         task.updated_at = datetime.now()
         
+        # حساب نسبة التقدم بناءً على الحالة الجديدة
+        progress_map = {16: 0, 5: 0, 6: 30, 7: 20, 8: 80, 4: 100, 10: 100}
+        progress_percent = progress_map.get(data.status_id, 0)
+        
         log = TaskProgressLog(
             task_id=task_id,
-            employee_id=employee_id,
-            progress_percent=0,
+            employee_id=responsible_employee_id,
+            progress_percent=progress_percent,
             status_old=old_status,
             status_new=data.status_id,
             notes=data.comment or "",
@@ -376,17 +383,14 @@ async def update_task_status(
         )
         db.add(log)
         
-        if data.comment:
-            comment = TaskComment(
-                task_id=task_id,
-                employee_id=employee_id,
-                comment=data.comment,
-                created_at=datetime.now()
-            )
-            db.add(comment)
-        
         db.commit()
-        return {"success": True, "message": "Status updated", "employee_id": employee_id}
+        return {
+            "success": True,
+            "message": "Status updated",
+            "task_id": task_id,
+            "responsible_employee_id": responsible_employee_id,
+            "progress_percent": progress_percent
+        }
     except Exception as e:
         db.rollback()
         import traceback
@@ -424,6 +428,26 @@ async def tasks_by_department(department_id: int, db: Session = Depends(get_db))
                 "department_id": task.department_id
             })
         
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{task_id}/progress-logs")
+async def task_progress_logs(task_id: int, db: Session = Depends(get_db)):
+    try:
+        logs = db.query(TaskProgressLog).filter(TaskProgressLog.task_id == task_id).order_by(TaskProgressLog.log_time.desc()).all()
+        result = []
+        for log in logs:
+            emp = db.query(Employee).filter(Employee.employee_id == log.employee_id).first()
+            result.append({
+                "id": log.log_id,
+                "employee_name": emp.full_name if emp else "غير معروف",
+                "progress_percent": log.progress_percent,
+                "status_old": log.status_old,
+                "status_new": log.status_new,
+                "notes": log.notes or "",
+                "log_time": log.log_time.isoformat() if log.log_time else None
+            })
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

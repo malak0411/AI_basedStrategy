@@ -229,7 +229,17 @@ document.querySelectorAll('.kanban-task').forEach(task => {
     task.addEventListener('dragend', function() {
         this.classList.remove('dragging');
     });
+    
+    task.addEventListener('click', function(e) {
+        if (this.classList.contains('dragging')) return;
+        
+        const taskId = this.getAttribute('data-task-id');
+        window.location.href = '/operational/task/' + taskId;
+    });
+    
+    task.style.cursor = 'pointer';
 });
+
 
 document.querySelectorAll('.drop-zone').forEach(zone => {
     zone.addEventListener('dragover', function(e) {
