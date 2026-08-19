@@ -24,35 +24,47 @@ class ForgotPasswordController extends Controller
     }
 
     /**
-     * إرسال رابط استعادة كلمة المرور
+     * طلب إعادة تعيين كلمة المرور
+     *
+     * يتم التحقق من البريد ورقم الهاتف،
+     * ثم يقوم FastAPI بتوليد كلمة مرور عشوائية
+     * وإرسالها إلى البريد الإلكتروني للموظف.
      */
     public function sendResetLink(Request $request)
     {
         $request->validate([
             'email' => 'required|email',
-            'phone_number' => 'required',
+            'phone_number' => 'required|string',
         ]);
 
-        // إرسال الطلب إلى API
-        $response = $this->apiClient->post('/api/auth/forgot-password', [
-            'email' => $request->email,
-            'phone_number' => $request->phone_number,
-        ]);
+        try {
+            // إرسال الطلب إلى FastAPI
+            $response = $this->apiClient->post('/api/auth/forgot-password', [
+                'email' => $request->email,
+                'phone_number' => $request->phone_number,
+            ]);
 
-        if ($response['success']) {
-            $message = $response['data']['message'] ?? 'تم إرسال كلمة المرور الجديدة';
-            
-            // إذا كانت كلمة المرور الجديدة موجودة في الرد (وضع التطوير)
-            if (isset($response['data']['new_password'])) {
-                return back()->with('success', 'تم إعادة تعيين كلمة المرور بنجاح')
-                             ->with('new_password', $response['data']['new_password']);
+            // نجاح العملية
+            if (!empty($response['success'])) {
+
+                $message = $response['data']['message']
+                    ?? 'تم إرسال كلمة المرور المؤقتة إلى بريدك الإلكتروني.';
+
+                return back()->with('success', $message);
             }
-            
-            return back()->with('success', $message);
-        }
 
-        return back()->withErrors([
-            'email' => $response['detail'] ?? 'حدث خطأ في استعادة كلمة المرور',
-        ]);
+            // فشل العملية
+            return back()->withErrors([
+                'email' => $response['detail']
+                    ?? $response['message']
+                    ?? 'تعذر إعادة تعيين كلمة المرور.',
+            ]);
+
+        } catch (\Exception $e) {
+
+            return back()->withErrors([
+                'email' => 'حدث خطأ أثناء الاتصال بالخادم. يرجى المحاولة مرة أخرى.',
+            ]);
+        }
     }
 }

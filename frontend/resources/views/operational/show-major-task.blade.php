@@ -11,6 +11,13 @@
     .dept-badge { display: inline-block; padding: 3px 10px; border-radius: 14px; font-size: 11px; margin: 2px; font-weight: 600; }
     .dept-lead { background: #d4af37; color: #1a1a2e; }
     .dept-support { background: #e2e8f0; color: #4a5568; }
+    .employee-checkbox-item { cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; }
+    .employee-checkbox-item:hover { background: #e9ecef !important; border-color: #dee2e6; }
+    .employee-checkbox-item.bg-primary.bg-opacity-10 { border-color: #0d6efd; }
+    .employee-checkbox-item .employee-name { font-size: 14px; font-weight: 500; }
+    .employee-checkbox-item .employee-title { font-size: 11px; }
+    .modal-dialog-scrollable .modal-body { max-height: calc(100vh - 200px); }
+    #durationInfo .alert { background: #f0f4ff; border-color: #cfe2ff; }
 </style>
 @endpush
 
@@ -24,16 +31,22 @@
     @if(session('error')) <div class="alert alert-danger">{{ session('error') }}</div> @endif
 
     @php
-        $tid = $majorTask['id'] ?? 0;
-        $taskEndDate = $majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days'));
-        $isActive = $majorTask['is_active'] ?? true;
+        $tid = is_array($majorTask) ? ($majorTask['id'] ?? 0) : ($majorTask->id ?? 0);
+        $taskEndDate = is_array($majorTask) ? ($majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days'))) : ($majorTask->end_date ?? date('Y-m-d', strtotime('+30 days')));
+        $isActive = is_array($majorTask) ? ($majorTask['is_active'] ?? true) : ($majorTask->is_active ?? true);
+        $taskTitle = is_array($majorTask) ? ($majorTask['name'] ?? $majorTask['title'] ?? 'غير محدد') : ($majorTask->name ?? $majorTask->title ?? 'غير محدد');
+        $taskDescription = is_array($majorTask) ? ($majorTask['description'] ?? '') : ($majorTask->description ?? '');
+        $estimatedDays = is_array($majorTask) ? ($majorTask['estimated_duration_days'] ?? 0) : ($majorTask->estimated_duration_days ?? 0);
+        $isCrossDept = is_array($majorTask) ? ($majorTask['is_cross_department'] ?? false) : ($majorTask->is_cross_department ?? false);
+        $initiativeName = is_array($majorTask) ? ($majorTask['initiative_name'] ?? 'غير محدد') : ($majorTask->initiative_name ?? 'غير محدد');
+        $departments = is_array($majorTask) ? ($majorTask['departments'] ?? []) : ($majorTask->departments ?? []);
     @endphp
 
     <div class="card-custom mb-4">
         <div class="d-flex justify-content-between align-items-start">
             <div>
-                <h4>{{ $majorTask['name'] ?? '' }}</h4>
-                <p class="text-muted">{{ $majorTask['description'] ?? '' }}</p>
+                <h4>{{ $taskTitle }}</h4>
+                <p class="text-muted">{{ $taskDescription }}</p>
             </div>
             <span class="badge bg-{{ $isActive ? 'success' : 'secondary' }} fs-6">
                 {{ $isActive ? 'نشط' : 'غير نشط' }}
@@ -42,7 +55,7 @@
         <div class="row mt-3">
             <div class="col-md-3">
                 <small class="text-muted">المدة</small>
-                <div><strong>{{ $majorTask['estimated_duration_days'] ?? 0 }} يوم</strong></div>
+                <div><strong>{{ $estimatedDays }} يوم</strong></div>
             </div>
             <div class="col-md-3">
                 <small class="text-muted">تاريخ النهاية</small>
@@ -50,20 +63,20 @@
             </div>
             <div class="col-md-3">
                 <small class="text-muted">مشتركة بين الإدارات</small>
-                <div><strong>{{ ($majorTask['is_cross_department'] ?? false) ? 'نعم' : 'لا' }}</strong></div>
+                <div><strong>{{ $isCrossDept ? 'نعم' : 'لا' }}</strong></div>
             </div>
             <div class="col-md-3">
                 <small class="text-muted">المبادرة</small>
-                <div><strong>{{ $majorTask['initiative_name'] ?? '' }}</strong></div>
+                <div><strong>{{ $initiativeName }}</strong></div>
             </div>
         </div>
-        @if(!empty($majorTask['departments']))
+        @if(!empty($departments))
         <div class="mt-3">
             <small class="text-muted">الإدارات المشاركة:</small>
             <div class="mt-1">
-                @foreach($majorTask['departments'] as $dept)
+                @foreach($departments as $dept)
                 <span class="dept-badge {{ ($dept['responsibility_type'] ?? '') == 'LEAD' ? 'dept-lead' : 'dept-support' }}">
-                    {{ ($dept['responsibility_type'] ?? '') == 'LEAD' ?  'رئيسية' : 'مساندة' }} -
+                    {{ ($dept['responsibility_type'] ?? '') == 'LEAD' ? 'رئيسية' : 'مساندة' }} -
                     {{ $dept['department_name'] ?? '' }}
                 </span>
                 @endforeach
@@ -75,7 +88,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5><i class="fas fa-list-check ml-2"></i>المهام التشغيلية ({{ count($operationalTasks ?? []) }})</h5>
         <div class="d-flex gap-2">
-            <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addModal">
+            <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addOperationalModal">
                 <i class="fas fa-plus"></i> إضافة مهمة يدوياً
             </button>
             <a href="{{ route('operational.generate', $tid) }}" class="btn-gold btn-sm">
@@ -89,14 +102,6 @@
         <i class="fas fa-robot"></i>
         <h5>لا توجد مهام تشغيلية</h5>
         <p class="text-muted">يمكنك إضافة المهام يدوياً أو استخدام الذكاء الاصطناعي لتوليدها</p>
-        <div class="mt-3">
-            <button class="btn btn-outline-primary btn-lg me-2" data-bs-toggle="modal" data-bs-target="#addModal">
-                <i class="fas fa-plus"></i> إضافة يدوياً
-            </button>
-            <a href="{{ route('operational.generate', $tid) }}" class="btn-gold btn-lg">
-                <i class="fas fa-robot"></i> توليد بالذكاء الاصطناعي
-            </a>
-        </div>
     </div>
     @else
     @foreach($operationalTasks as $task)
@@ -106,9 +111,6 @@
                 <h6>{{ $task['task_name'] ?? $task['title'] ?? '' }}</h6>
                 <p class="text-muted small mb-2">{{ Str::limit($task['description'] ?? '', 150) }}</p>
                 <div class="d-flex gap-3 flex-wrap align-items-center">
-                    <span class="badge bg-{{ ($task['status'] ?? 16) == 8 ? 'success' : (($task['status'] ?? 16) == 7 ? 'danger' : 'warning') }}">
-                        {{ $task['status_name'] ?? 'معلق مؤقتاً' }}
-                    </span>
                     <small><i class="far fa-clock ml-1"></i> {{ $task['end_date'] ?? 'غير محدد' }}</small>
                     <small><i class="fas fa-user ml-1"></i> {{ $task['assigned_to_name'] ?? 'غير معين' }}</small>
                 </div>
@@ -127,71 +129,184 @@
     @endforeach
     @endif
 
-    <div class="modal fade" id="addModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+    <div class="modal fade" id="addOperationalModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title"><i class="fas fa-plus-circle ml-2"></i>إضافة مهمة تشغيلية</h5>
+                <div class="modal-header bg-gradient-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus-circle ml-2"></i>
+                        إضافة مهمة تشغيلية جديدة
+                    </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="{{ route('operational.store') }}" id="addForm" onsubmit="return validateAddForm()">
+               
+                <form id="addOperationalForm" method="POST" action="{{ route('operational.store') }}">
                     @csrf
-                    <input type="hidden" name="major_task_id" value="{{ $tid }}">
+                   
+                    @php
+                        $majorTaskId = is_array($majorTask) ? ($majorTask['id'] ?? 0) : ($majorTask->id ?? 0);
+                        $departmentId = is_array($majorTask) ? ($majorTask['department_id'] ?? 0) : ($majorTask->department_id ?? 0);
+                        $initiativeStart = is_array($initiative ?? null) ? ($initiative['start_date'] ?? '') : ($initiative->start_date ?? '');
+                        $initiativeEnd = is_array($initiative ?? null) ? ($initiative['end_date'] ?? '') : ($initiative->end_date ?? '');
+                        $expectedDays = is_array($majorTask) ? ($majorTask['expected_days'] ?? 30) : ($majorTask->expected_days ?? 30);
+                        $majorTaskTitle = is_array($majorTask) ? ($majorTask['title'] ?? 'غير محدد') : ($majorTask->title ?? 'غير محدد');
+                        $departmentName = is_array($majorTask) ? ($majorTask['department']['name_ar'] ?? 'غير محدد') : ($majorTask->department->name_ar ?? 'غير محدد');
+                        $majorTaskStartDate = is_array($majorTask) ? ($majorTask['start_date'] ?? '') : ($majorTask->start_date ?? '');
+                        $majorTaskEndDate = is_array($majorTask) ? ($majorTask['end_date'] ?? '') : ($majorTask->end_date ?? '');
+                    @endphp
+                   
+                    <input type="hidden" name="major_task_id" value="{{ $majorTaskId }}">
                     <input type="hidden" name="department_id" value="{{ $departmentId }}">
-                    <input type="hidden" id="taskEndDate" value="{{ $taskEndDate }}">
+                    <input type="hidden" name="created_by" value="{{ auth()->user()->employee_id ?? 0 }}">
+                    <input type="hidden" name="status_id" value="16">
+                   
+                    <input type="hidden" id="initiativeStartDate" value="{{ $initiativeStart }}">
+                    <input type="hidden" id="initiativeEndDate" value="{{ $initiativeEnd }}">
+                    <input type="hidden" id="majorTaskExpectedDays" value="{{ $expectedDays }}">
+                   
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">اسم المهمة <span class="text-danger">*</span></label>
-                            <input type="text" name="title" id="addTitle" class="form-control" required maxlength="255">
+                        <div class="alert alert-info alert-dismissible fade show">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-info-circle fa-2x ml-3"></i>
+                                <div>
+                                    <strong>المهمة الرئيسية:</strong> {{ $majorTaskTitle }}
+                                    <br>
+                                    <small>
+                                        <i class="fas fa-building"></i> {{ $departmentName }} |
+                                        <i class="fas fa-calendar-alt"></i>
+                                        {{ $majorTaskStartDate ? \Carbon\Carbon::parse($majorTaskStartDate)->format('Y-m-d') : 'غير محدد' }}
+                                        →
+                                        {{ $majorTaskEndDate ? \Carbon\Carbon::parse($majorTaskEndDate)->format('Y-m-d') : 'غير محدد' }}
+                                        @if($expectedDays)
+                                            | <i class="fas fa-clock"></i> المدة المتوقعة: {{ $expectedDays }} يوم
+                                        @endif
+                                    </small>
+                                </div>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">الوصف</label>
-                            <textarea name="description" id="addDesc" class="form-control" rows="2"></textarea>
+
+                        <div class="form-group">
+                            <label class="fw-bold">
+                                عنوان المهمة <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="title" id="taskTitle" class="form-control form-control-lg"
+                                   placeholder="أدخل عنوان المهمة التشغيلية..."
+                                   maxlength="255" required>
+                            <div class="error-feedback" id="titleFeedback">الرجاء إدخال عنوان المهمة (3 أحرف على الأقل)</div>
+                            <small class="text-muted" id="titleCount">0/255 حرف</small>
                         </div>
+
+                        <div class="form-group">
+                            <label class="fw-bold">
+                                الوصف <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="description" id="taskDescription" class="form-control" rows="3"
+                                      placeholder="أدخل وصفاً تفصيلياً للمهمة..."
+                                      maxlength="1000" required></textarea>
+                            <div class="error-feedback" id="descFeedback">الرجاء إدخال وصف للمهمة</div>
+                            <small class="text-muted" id="descCount">0/1000 حرف</small>
+                        </div>
+
                         <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">الأولوية</label>
-                                <select name="priority_id" class="form-control">
+                            <div class="col-md-4 form-group">
+                                <label class="fw-bold">
+                                    الأولوية <span class="text-danger">*</span>
+                                </label>
+                                <select name="priority_id" id="taskPriority" class="form-select" required>
+                                    <option value="">-- اختر الأولوية --</option>
                                     @foreach($priorities as $p)
-                                    <option value="{{ $p['priority_id'] }}" {{ ($p['level'] ?? 0) == 2 ? 'selected' : '' }}>{{ $p['name_ar'] }}</option>
+                                        <option value="{{ $p['priority_id'] }}"
+                                            {{ ($p['level'] ?? 0) == 2 ? 'selected' : '' }}>
+                                            {{ $p['name_ar'] }}
+                                        </option>
                                     @endforeach
                                 </select>
+                                <div class="error-feedback" id="priorityFeedback">الرجاء اختيار الأولوية</div>
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">الساعات المقدرة</label>
-                                <input type="number" name="estimated_hours" id="estimatedHours" class="form-control" value="40" min="1" max="500">
-                                <small class="text-danger d-none" id="hoursError">الساعات غير منطقية للفترة المختارة</small>
+
+                            <div class="col-md-4 form-group">
+                                <label class="fw-bold">
+                                    الساعات المقدرة <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" name="estimated_hours" id="estimatedHours"
+                                       class="form-control" value="40"
+                                       min="1" max="720" required>
+                                <small class="text-muted">(1-720 ساعة)</small>
+                                <div class="error-feedback" id="hoursFeedback"></div>
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">الحالة</label>
-                                <input type="text" class="form-control" value="معلق مؤقتاً" disabled>
-                                <small class="text-muted">سيتم تعيينها كمعلق مؤقتاً تلقائياً</small>
+
+                            <div class="col-md-4 form-group">
+                                <label class="fw-bold">الحالة</label>
+                                <input type="text" class="form-control bg-light text-muted" value="معلق مؤقتاً" disabled>
                             </div>
                         </div>
+
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">تاريخ البداية</label>
-                                <input type="date" name="start_date" id="startDate" class="form-control" onchange="validateDates()">
+                            <div class="col-md-6 form-group">
+                                <label class="fw-bold">
+                                    تاريخ البداية <span class="text-danger">*</span>
+                                </label>
+                                <input type="date" name="start_date" id="startDate"
+                                       class="form-control" required>
+                                <small class="text-muted" id="startDateHelp">
+                                    <i class="fas fa-info-circle"></i>
+                                    الحد الأدنى: <span id="minStartDate">{{ $initiativeStart ?? 'غير محدد' }}</span>
+                                </small>
+                                <div class="error-feedback" id="startDateFeedback"></div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">تاريخ التسليم</label>
-                                <input type="date" name="end_date" id="endDate" class="form-control" onchange="validateDates()">
-                                <small class="text-danger d-none" id="dateError">تاريخ التسليم يجب أن يكون بعد البداية وقبل نهاية المهمة الرئيسية</small>
+
+                            <div class="col-md-6 form-group">
+                                <label class="fw-bold">
+                                    تاريخ التسليم <span class="text-danger">*</span>
+                                </label>
+                                <input type="date" name="end_date" id="endDate"
+                                       class="form-control" required>
+                                <small class="text-muted" id="endDateHelp">
+                                    <i class="fas fa-info-circle"></i>
+                                    الحد الأعلى: <span id="maxEndDate">{{ $initiativeEnd ?? 'غير محدد' }}</span>
+                                </small>
+                                <div class="error-feedback" id="endDateFeedback"></div>
                             </div>
                         </div>
-                        <hr>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">الموظفين المسؤولين عن المهمة</label>
-                            <p class="text-muted small mb-2">اختر موظفاً واحداً على الأقل. إذا اخترت أكثر من موظف تصبح المهمة مشتركة تلقائياً.</p>
-                            <div id="employeesList">
-                                <p class="text-muted small">جاري تحميل الموظفين...</p>
+
+                        <div class="row mb-3" id="durationInfo" style="display:none;">
+                            <div class="col-12">
+                                <div class="alert alert-secondary">
+                                    <div class="row text-center">
+                                        <div class="col-md-4">
+                                            <h6>المدة المتوقعة</h6>
+                                            <span id="expectedDaysDisplay" class="badge bg-info">0 يوم</span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6>المدة المختارة</h6>
+                                            <span id="selectedDaysDisplay" class="badge bg-primary">0 يوم</span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6>المتبقي</h6>
+                                            <span id="remainingDaysDisplay" class="badge bg-success">0 يوم</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <small class="text-muted mt-2 d-block" id="employeesCount">تم اختيار 0 موظفين</small>
+                        </div>
+
+                        <div class="row mt-2">
+                            <div class="col-md-6 text-md-end">
+                                <small class="text-muted">
+                                    <i class="fas fa-clock"></i>
+                                    تاريخ الإنشاء: <strong>{{ now()->format('Y-m-d H:i') }}</strong>
+                                </small>
+                            </div>
                         </div>
                     </div>
+
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                        <button type="submit" class="btn btn-primary">إضافة المهمة</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times"></i> إلغاء
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="fas fa-save"></i> إضافة المهمة
+                        </button>
                     </div>
                 </form>
             </div>
@@ -208,10 +323,10 @@
                 <form id="editForm" method="POST">
                     @csrf @method('PUT')
                     <div class="modal-body">
-                        <div class="mb-3"><label class="form-label">اسم المهمة</label><input type="text" name="title" id="e_title" class="form-control" required></div>
-                        <div class="mb-3"><label class="form-label">الوصف</label><textarea name="description" id="e_desc" class="form-control" rows="2"></textarea></div>
-                        <div class="mb-3"><label class="form-label">الحالة</label><select name="status_id" id="e_status" class="form-control"><option value="16">معلق مؤقتاً</option><option value="5">معلق</option><option value="6">جاري العمل</option><option value="8">مكتمل</option><option value="7">متأخر</option></select></div>
-                        <div class="mb-3"><label class="form-label">تاريخ التسليم</label><input type="date" name="end_date" id="e_end" class="form-control"></div>
+                        <div class="form-group"><label class="fw-bold">اسم المهمة</label><input type="text" name="title" id="e_title" class="form-control" required></div>
+                        <div class="form-group"><label class="fw-bold">الوصف</label><textarea name="description" id="e_desc" class="form-control" rows="2" required></textarea></div>
+                        <div class="form-group"><label class="fw-bold">الحالة</label><select name="status_id" id="e_status" class="form-control"><option value="16">معلق مؤقتاً</option><option value="5">معلق</option><option value="6">جاري العمل</option><option value="8">مكتمل</option><option value="7">متأخر</option></select></div>
+                        <div class="form-group"><label class="fw-bold">تاريخ التسليم</label><input type="date" name="end_date" id="e_end" class="form-control"></div>
                     </div>
                     <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button><button type="submit" class="btn btn-warning">حفظ التعديلات</button></div>
                 </form>
@@ -223,167 +338,298 @@
 
 @push('scripts')
 <script>
-const roleTypes = @json($roleTypes ?? []);
-let deptId = {{ $departmentId ?? 0 }};
-
-document.addEventListener('DOMContentLoaded', function() {
-    loadEmployees();
+$(document).ready(function() {
+    initializeDates();
+   
+    $('#taskTitle').on('input', function() {
+        const count = $(this).val().length;
+        $('#titleCount').text(count + '/255');
+        validateTitle();
+    });
+   
+    $('#taskDescription').on('input', function() {
+        const count = $(this).val().length;
+        $('#descCount').text(count + '/1000');
+        validateDescription();
+    });
+   
+    $('#taskPriority').on('change', function() {
+        validatePriority();
+    });
+   
+    $('#estimatedHours').on('input', function() {
+        validateHours();
+        validateDates();
+    });
+   
+    $('#startDate, #endDate').on('change', function() {
+        validateDates();
+    });
 });
 
-function loadEmployees() {
-    const container = document.getElementById('employeesList');
-    
-    fetch('/api/auth/me')
-        .then(r => r.json())
-        .then(userData => {
-            if (userData.data && userData.data.department_id) {
-                deptId = userData.data.department_id;
-                return fetch('/api/employees/department/' + deptId);
-            }
-            throw new Error('No department_id');
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.data && data.data.length > 0) {
-                let html = '';
-                data.data.forEach(emp => {
-                    html += `
-                    <div class="card mb-2 p-2">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="form-check">
-                                <input type="checkbox" name="assigned_employees[]" value="${emp.employee_id}" class="form-check-input emp-checkbox" id="emp_${emp.employee_id}" onchange="toggleRole('${emp.employee_id}'); updateEmployeeCount();">
-                                <label class="form-check-label" for="emp_${emp.employee_id}">
-                                    <strong>${emp.full_name}</strong>
-                                    <br><small class="text-muted">${emp.job_title || ''}</small>
-                                </label>
-                            </div>
-                            <div class="d-none" id="role_${emp.employee_id}">
-                                <label class="small">الدور:</label>
-                                <select name="employee_roles[${emp.employee_id}]" class="form-select form-select-sm" style="width:160px;">
-                                    ${roleTypes.map(r => `<option value="${r.role_type_id}">${r.name_ar}</option>`).join('')}
-                                </select>
-                            </div>
-                        </div>
-                    </div>`;
-                });
-                container.innerHTML = html;
-            } else {
-                container.innerHTML = '<p class="text-danger small">لا يوجد موظفين في إدارتك</p>';
-            }
-        })
-        .catch(err => {
-            container.innerHTML = '<p class="text-danger small">خطأ في تحميل الموظفين: ' + err.message + '</p>';
-        });
-}
-
-function toggleRole(empId) {
-    const roleDiv = document.getElementById('role_' + empId);
-    const checkbox = document.getElementById('emp_' + empId);
-    if (roleDiv) roleDiv.classList.toggle('d-none', !checkbox.checked);
-}
-
-function updateEmployeeCount() {
-    const count = document.querySelectorAll('.emp-checkbox:checked').length;
-    const msg = document.getElementById('employeesCount');
-    msg.textContent = 'تم اختيار ' + count + ' موظفين';
-    if (count > 1) msg.textContent += ' (مهمة مشتركة)';
-}
-
-function validateAddForm() {
-    const title = document.getElementById('addTitle').value.trim();
-    if (!title) { alert('اسم المهمة مطلوب'); return false; }
-    const checkedCount = document.querySelectorAll('.emp-checkbox:checked').length;
-    if (checkedCount === 0) { alert('يجب اختيار موظف واحد على الأقل'); return false; }
-    return validateDates() && validateHours();
-}
-
-
-function loadEmployees() {
-    const container = document.getElementById('employeesList');
-    container.innerHTML = '<p class="text-muted small">جاري تحميل الموظفين...</p>';
-    fetch('/api/employees/department/' + deptId)
-        .then(r => r.json())
-        .then(data => {
-            if (data.data && data.data.length > 0) {
-                let html = '';
-                data.data.forEach(emp => {
-                    html += `
-                    <div class="card mb-2 p-2">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="form-check">
-                                <input type="checkbox" name="assigned_employees[]" value="${emp.employee_id}" class="form-check-input emp-checkbox" id="emp_${emp.employee_id}" onchange="toggleRole('${emp.employee_id}'); updateEmployeeCount();">
-                                <label class="form-check-label" for="emp_${emp.employee_id}">
-                                    <strong>${emp.full_name}</strong>
-                                    <br><small class="text-muted">${emp.job_title || ''}</small>
-                                </label>
-                            </div>
-                            <div class="d-none" id="role_${emp.employee_id}">
-                                <label class="small">الدور:</label>
-                                <select name="employee_roles[${emp.employee_id}]" class="form-select form-select-sm" style="width:160px;">
-                                    ${roleTypes.map(r => `<option value="${r.role_type_id}">${r.name_ar}</option>`).join('')}
-                                </select>
-                            </div>
-                        </div>
-                    </div>`;
-                });
-                container.innerHTML = html;
-            } else {
-                container.innerHTML = '<p class="text-danger small">لا يوجد موظفين في إدارتك</p>';
-            }
-        })
-        .catch(err => { container.innerHTML = '<p class="text-danger small">خطأ في تحميل الموظفين</p>'; });
-}
-
-function toggleRole(empId) {
-    const roleDiv = document.getElementById('role_' + empId);
-    const checkbox = document.getElementById('emp_' + empId);
-    if (roleDiv) roleDiv.classList.toggle('d-none', !checkbox.checked);
-}
-
-function updateEmployeeCount() {
-    const count = document.querySelectorAll('.emp-checkbox:checked').length;
-    const msg = document.getElementById('employeesCount');
-    msg.textContent = 'تم اختيار ' + count + ' موظفين';
-    if (count > 1) msg.textContent += ' (مهمة مشتركة)';
-}
-
-function validateDates() {
-    const start = document.getElementById('startDate').value;
-    const end = document.getElementById('endDate').value;
-    const taskEnd = document.getElementById('taskEndDate').value;
-    const dateError = document.getElementById('dateError');
-    dateError.classList.add('d-none');
-    if (start && end) {
-        if (start >= end) { dateError.textContent = 'تاريخ التسليم يجب أن يكون بعد تاريخ البداية'; dateError.classList.remove('d-none'); return false; }
-        if (end > taskEnd) { dateError.textContent = 'تاريخ التسليم يجب أن يكون قبل ' + taskEnd; dateError.classList.remove('d-none'); return false; }
+function initializeDates() {
+    const initiativeStart = $('#initiativeStartDate').val();
+    const initiativeEnd = $('#initiativeEndDate').val();
+    const today = new Date().toISOString().split('T')[0];
+    const minStart = initiativeStart || today;
+   
+    $('#startDate').attr('min', minStart);
+    $('#startDate').val(minStart);
+    $('#minStartDate').text(minStart || 'غير محدد');
+   
+    if (initiativeEnd) {
+        $('#endDate').attr('max', initiativeEnd);
+        $('#maxEndDate').text(initiativeEnd);
     }
-    validateHours();
+   
+    const startDate = new Date(minStart);
+    startDate.setDate(startDate.getDate() + 7);
+    $('#endDate').val(startDate.toISOString().split('T')[0]);
+   
+    setTimeout(function() {
+        validateDates();
+    }, 100);
+}
+
+function validateTitle() {
+    const value = $('#taskTitle').val().trim();
+    const feedback = $('#titleFeedback');
+   
+    if (value.length < 3) {
+        $('#taskTitle').addClass('is-invalid').removeClass('is-valid');
+        feedback.text('العنوان يجب أن يكون 3 أحرف على الأقل').addClass('show');
+        return false;
+    }
+    $('#taskTitle').removeClass('is-invalid').addClass('is-valid');
+    feedback.removeClass('show');
+    return true;
+}
+
+function validateDescription() {
+    const value = $('#taskDescription').val().trim();
+    const feedback = $('#descFeedback');
+   
+    if (value.length === 0) {
+        $('#taskDescription').addClass('is-invalid').removeClass('is-valid');
+        feedback.text('الرجاء إدخال وصف للمهمة').addClass('show');
+        return false;
+    }
+    $('#taskDescription').removeClass('is-invalid').addClass('is-valid');
+    feedback.removeClass('show');
+    return true;
+}
+
+function validatePriority() {
+    const value = $('#taskPriority').val();
+    const feedback = $('#priorityFeedback');
+   
+    if (!value) {
+        $('#taskPriority').addClass('is-invalid').removeClass('is-valid');
+        feedback.addClass('show');
+        return false;
+    }
+    $('#taskPriority').removeClass('is-invalid').addClass('is-valid');
+    feedback.removeClass('show');
     return true;
 }
 
 function validateHours() {
-    const start = document.getElementById('startDate').value;
-    const end = document.getElementById('endDate').value;
-    const hours = parseInt(document.getElementById('estimatedHours').value) || 0;
-    const hoursError = document.getElementById('hoursError');
-    hoursError.classList.add('d-none');
-    if (start && end && hours > 0) {
-        const days = Math.ceil((new Date(end) - new Date(start)) / (1000 * 60 * 60 * 24)) + 1;
-        if (hours > days * 8) { hoursError.textContent = 'الساعات غير منطقية (الحد الأقصى ' + (days * 8) + ' ساعة)'; hoursError.classList.remove('d-none'); return false; }
+    const hours = parseInt($('#estimatedHours').val());
+    const feedback = $('#hoursFeedback');
+   
+    if (isNaN(hours) || hours < 1) {
+        $('#estimatedHours').addClass('is-invalid').removeClass('is-valid');
+        feedback.text('الرجاء إدخال عدد ساعات صحيح (1-720)').addClass('show');
+        return false;
     }
+   
+    if (hours > 720) {
+        $('#estimatedHours').addClass('is-invalid').removeClass('is-valid');
+        feedback.text('الحد الأقصى للساعات هو 720').addClass('show');
+        return false;
+    }
+   
+    const startDate = $('#startDate').val();
+    const endDate = $('#endDate').val();
+   
+    if (startDate && endDate) {
+        const days = calculateWorkingDays(startDate, endDate);
+        const maxHours = days * 8;
+       
+        if (hours > maxHours) {
+            $('#estimatedHours').addClass('is-invalid').removeClass('is-valid');
+            feedback.text(`الساعات المقدرة (${hours}) تتجاوز الحد الأقصى (${maxHours} ساعة) للفترة المحددة`).addClass('show');
+            return false;
+        }
+    }
+   
+    $('#estimatedHours').removeClass('is-invalid').addClass('is-valid');
+    feedback.removeClass('show');
     return true;
 }
 
-function validateAddForm() {
-    const title = document.getElementById('addTitle').value.trim();
-    if (!title) { alert('اسم المهمة مطلوب'); return false; }
-    const checkedCount = document.querySelectorAll('.emp-checkbox:checked').length;
-    if (checkedCount === 0) { alert('يجب اختيار موظف واحد على الأقل'); return false; }
-    return validateDates() && validateHours();
+function validateDates() {
+    const startDate = $('#startDate').val();
+    const endDate = $('#endDate').val();
+    const initiativeStart = $('#initiativeStartDate').val();
+    const initiativeEnd = $('#initiativeEndDate').val();
+    const expectedDays = parseInt($('#majorTaskExpectedDays').val()) || 30;
+   
+    const startFeedback = $('#startDateFeedback');
+    const endFeedback = $('#endDateFeedback');
+   
+    let isValid = true;
+   
+    $('#startDate').removeClass('is-invalid is-valid');
+    $('#endDate').removeClass('is-invalid is-valid');
+    startFeedback.removeClass('show');
+    endFeedback.removeClass('show');
+   
+    if (!startDate) {
+        $('#startDate').addClass('is-invalid');
+        startFeedback.text('الرجاء تحديد تاريخ البداية').addClass('show');
+        isValid = false;
+    } else if (initiativeStart && startDate < initiativeStart) {
+        $('#startDate').addClass('is-invalid');
+        startFeedback.text(`تاريخ البداية (${startDate}) يجب أن يكون بعد أو يساوي بداية المبادرة (${initiativeStart})`).addClass('show');
+        isValid = false;
+    } else if (startDate) {
+        $('#startDate').addClass('is-valid');
+    }
+   
+    if (!endDate) {
+        $('#endDate').addClass('is-invalid');
+        endFeedback.text('الرجاء تحديد تاريخ التسليم').addClass('show');
+        isValid = false;
+    } else if (startDate && endDate < startDate) {
+        $('#endDate').addClass('is-invalid');
+        endFeedback.text('تاريخ التسليم يجب أن يكون بعد تاريخ البداية').addClass('show');
+        isValid = false;
+    } else if (initiativeEnd && endDate > initiativeEnd) {
+        $('#endDate').addClass('is-invalid');
+        endFeedback.text(`تاريخ التسليم (${endDate}) يجب أن يكون قبل أو يساوي نهاية المبادرة (${initiativeEnd})`).addClass('show');
+        isValid = false;
+    } else if (endDate) {
+        $('#endDate').addClass('is-valid');
+    }
+   
+    if (startDate && endDate && isValid) {
+        const days = calculateWorkingDays(startDate, endDate);
+       
+        if (days > expectedDays) {
+            $('#endDate').addClass('is-invalid').removeClass('is-valid');
+            endFeedback.text(`المدة المختارة (${days} يوم) تتجاوز المدة المتوقعة للمهمة الرئيسية (${expectedDays} يوم)`).addClass('show');
+            isValid = false;
+        } else {
+            showDurationInfo(days, expectedDays);
+        }
+    }
+   
+    if (isValid) {
+        updateExpectedHours(startDate, endDate);
+        validateHours();
+    }
+   
+    return isValid;
 }
 
-document.getElementById('estimatedHours').addEventListener('change', validateHours);
-document.getElementById('startDate').addEventListener('change', validateDates);
-document.getElementById('endDate').addEventListener('change', validateDates);
+function calculateWorkingDays(startDate, endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    let workingDays = 0;
+   
+    while (start <= end) {
+        const dayOfWeek = start.getDay();
+        if (dayOfWeek !== 5 && dayOfWeek !== 6) {
+            workingDays++;
+        }
+        start.setDate(start.getDate() + 1);
+    }
+   
+    return workingDays;
+}
+
+function showDurationInfo(selectedDays, expectedDays) {
+    $('#durationInfo').show();
+    $('#expectedDaysDisplay').text(expectedDays + ' يوم');
+    $('#selectedDaysDisplay').text(selectedDays + ' يوم');
+   
+    const remaining = expectedDays - selectedDays;
+    if (remaining >= 0) {
+        $('#remainingDaysDisplay').text(remaining + ' يوم');
+        $('#remainingDaysDisplay').removeClass('bg-danger').addClass('bg-success');
+    } else {
+        $('#remainingDaysDisplay').text(Math.abs(remaining) + ' يوم (زيادة)');
+        $('#remainingDaysDisplay').removeClass('bg-success').addClass('bg-danger');
+    }
+}
+
+function updateExpectedHours(startDate, endDate) {
+    if (!startDate || !endDate) return;
+   
+    const days = calculateWorkingDays(startDate, endDate);
+    const maxHours = days * 8;
+   
+    const hoursInput = $('#estimatedHours');
+    const currentHours = parseInt(hoursInput.val()) || 0;
+   
+    hoursInput.attr('max', maxHours);
+   
+    if (currentHours > maxHours) {
+        hoursInput.val(maxHours);
+        validateHours();
+    }
+}
+
+function validateForm() {
+    const isTitleValid = validateTitle();
+    const isDescValid = validateDescription();
+    const isPriorityValid = validatePriority();
+    const isHoursValid = validateHours();
+    const isDatesValid = validateDates();
+   
+    return isTitleValid && isDescValid && isPriorityValid && isHoursValid && isDatesValid;
+}
+
+function editTask(task) {
+    $('#editForm').attr('action', '/operational/tasks/' + task.id);
+    $('#e_title').val(task.title || task.task_name || '');
+    $('#e_desc').val(task.description || '');
+    $('#e_status').val(task.status_id || task.status || 16);
+    $('#e_end').val(task.end_date || '');
+    $('#editModal').modal('show');
+}
+
+function showToast(message, type) {
+    if (typeof toastr !== 'undefined') {
+        toastr[type](message);
+    } else {
+        alert(message);
+    }
+}
+
+$('#addOperationalForm').on('submit', function(e) {
+    if (!validateForm()) {
+        e.preventDefault();
+        showToast('الرجاء تصحيح جميع الأخطاء في النموذج', 'error');
+        return false;
+    }
+});
+
+@if(session('success'))
+    $(document).ready(function() { showToast('{{ session('success') }}', 'success'); });
+@endif
+
+@if(session('error'))
+    $(document).ready(function() { showToast('{{ session('error') }}', 'error'); });
+@endif
+
+@if($errors->any())
+    $(document).ready(function() {
+        @foreach($errors->all() as $error)
+            showToast('{{ $error }}', 'error');
+        @endforeach
+    });
+@endif
 </script>
 @endpush

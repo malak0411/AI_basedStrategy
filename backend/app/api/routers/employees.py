@@ -4,6 +4,7 @@ from app.database import get_db
 from app.models import Employee
 from pydantic import BaseModel
 from typing import Optional
+from app.models import TaskAssignment, OperationalTask
 
 router = APIRouter(prefix="/api/employees", tags=["Employees"])
 
@@ -142,3 +143,34 @@ async def get_employees_by_department(department_id: int, db: Session = Depends(
         print(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/department/{department_id}")
+async def get_employees_by_department(department_id: int, db: Session = Depends(get_db)):
+    try:
+        employees = db.query(Employee).filter(
+            Employee.department_id == department_id,
+            Employee.is_active == True
+        ).all()
+        
+        result = []
+        for e in employees:
+            assignments = db.query(TaskAssignment).filter(TaskAssignment.employee_id == e.employee_id).all()
+            total_hours = 0
+            for a in assignments:
+                task = db.query(OperationalTask).filter(OperationalTask.task_id == a.task_id).first()
+                if task:
+                    total_hours += float(task.estimated_hours or 0)
+            
+            workload = min(round((total_hours / 160) * 100, 1), 100)
+            
+            result.append({
+                "employee_id": e.employee_id,
+                "full_name": e.full_name,
+                "job_title": e.job_title or "",
+                "assigned_tasks": len(assignments),
+                "assigned_hours": total_hours,
+                "workload_percent": workload
+            })
+        
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

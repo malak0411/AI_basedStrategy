@@ -55,18 +55,15 @@
             </div>
         </div>
     </div>
-    <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-3">
-                    <i class="fas fa-bullseye ml-2"></i>الأهداف المرتبطة ({{ count($goals) }})
-                </h5>
-                <div class="col-md-6">
-                <button class="btn-gold btn-sm float-start" data-bs-toggle="modal" data-bs-target="#addGoalModal">
-                    <i class="fas fa-plus"></i> إضافة هدف جديد
-                </button>
-                
-    </div>
-            </div>
     
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>
+           <i class="fas fa-bullseye ml-2"></i>الأهداف المرتبطة ({{ count($goals) }})
+        </h5>
+         <button class="btn-gold btn-sm float-start" data-bs-toggle="modal" data-bs-target="#addGoalModal">
+            <i class="fas fa-plus"></i> إضافة هدف جديد
+        </button>
+    </div>
     
     @if(empty($goals))
     <div class="card-custom text-center py-5">

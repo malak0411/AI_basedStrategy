@@ -360,7 +360,6 @@ async def update_task_status(
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
-        # جلب الموظف المسؤول عن المهمة
         assignment = db.query(TaskAssignment).filter(TaskAssignment.task_id == task_id).first()
         responsible_employee_id = assignment.employee_id if assignment else task.created_by or 1
         
@@ -368,7 +367,6 @@ async def update_task_status(
         task.status_id = data.status_id
         task.updated_at = datetime.now()
         
-        # حساب نسبة التقدم بناءً على الحالة الجديدة
         progress_map = {16: 0, 5: 0, 6: 30, 7: 20, 8: 80, 4: 100, 10: 100}
         progress_percent = progress_map.get(data.status_id, 0)
         
@@ -450,4 +448,77 @@ async def task_progress_logs(task_id: int, db: Session = Depends(get_db)):
             })
         return {"success": True, "data": result}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/major-tasks/by-department/{department_id}")
+async def major_tasks_by_department_id(department_id: int, db: Session = Depends(get_db)):
+    try:
+        dept_tasks = db.query(MajorTaskDepartment).filter(
+            MajorTaskDepartment.department_id == department_id
+        ).all()
+        
+        major_task_ids = list(set(d.major_task_id for d in dept_tasks))
+        if not major_task_ids:
+            return {"success": True, "data": []}
+        
+        tasks = db.query(MajorTask).filter(MajorTask.major_task_id.in_(major_task_ids)).all()
+        
+        result = []
+        for t in tasks:
+            dept_role = next((d.responsibility_type for d in dept_tasks if d.major_task_id == t.major_task_id), 'SUPPORT')
+            result.append({
+                "id": t.major_task_id,
+                "name": t.name,
+                "description": t.description or "",
+                "priority_id": t.priority_id,
+                "estimated_duration_days": t.estimated_duration_days,
+                "is_cross_department": t.is_cross_department,
+                "is_active": t.is_active,
+                "responsibility_type": dept_role,
+                "initiative_name": t.initiative.name if t.initiative else ""
+            })
+        
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{task_id}/assign")
+async def assign_task(task_id: int, request: dict, db: Session = Depends(get_db)):
+    try:
+        existing = db.query(TaskAssignment).filter(
+            TaskAssignment.task_id == task_id,
+            TaskAssignment.employee_id == request.get('employee_id')
+        ).first()
+        
+        if existing:
+            return {"success": True, "message": "Already assigned"}
+        
+        assignment = TaskAssignment(
+            task_id=task_id,
+            employee_id=request.get('employee_id'),
+            role_type_id=request.get('role_type_id', 1),
+            assigned_by=6,
+            assigned_at=datetime.now()
+        )
+        db.add(assignment)
+        db.commit()
+        return {"success": True, "message": "Assigned"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{task_id}/assign/{employee_id}")
+async def remove_assignment(task_id: int, employee_id: int, db: Session = Depends(get_db)):
+    try:
+        db.query(TaskAssignment).filter(
+            TaskAssignment.task_id == task_id,
+            TaskAssignment.employee_id == employee_id
+        ).delete()
+        db.commit()
+        return {"success": True, "message": "Removed"}
+    except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

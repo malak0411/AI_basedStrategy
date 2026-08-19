@@ -80,16 +80,20 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/{id}/edit', [TaskController::class, 'edit'])->name('edit');
         Route::put('/{id}', [TaskController::class, 'update'])->name('update');
     });
-    
+    Route::get('/operational/assign/{majorTaskId}', [OperationalTaskController::class, 'assignEmployees'])->name('operational.assign');
+    Route::post('/api/tasks/{taskId}/assign', [OperationalTaskController::class, 'assignTaskToEmployee']);
+    Route::delete('/api/tasks/{taskId}/assign/{employeeId}', [OperationalTaskController::class, 'removeTaskAssignment']);
+
     Route::get('/operational/kanban', [OperationalTaskController::class, 'kanbanBoard'])->name('operational.kanban');
+    Route::get('/operational/kanban/{id}', [OperationalTaskController::class, 'showKanbanTask'])->name('operational.kanban');
     Route::put('/operational/update-status/{id}', [OperationalTaskController::class, 'updateTaskStatus'])->name('operational.update-status');
     Route::get('/operational/task/{id}', [OperationalTaskController::class, 'showoperationalTask'])->name('operational.task-detail');
     Route::prefix('operational')->name('operational.')->group(function () {
         Route::get('/major-tasks', [OperationalTaskController::class, 'majorTasks'])->name('major-tasks');
         Route::get('/major-task/{id}', [OperationalTaskController::class, 'showMajorTask'])->name('show-major-task');
-        Route::post('/store', [OperationalTaskController::class, 'storeOperational'])->name('store');
-        Route::put('/update/{id}', [OperationalTaskController::class, 'updateOperational'])->name('update');
-        Route::delete('/destroy/{id}', [OperationalTaskController::class, 'destroyOperational'])->name('destroy');
+        Route::post('/store', [OperationalTaskController::class, 'store'])->name('store');
+        Route::put('/update/{id}', [OperationalTaskController::class, 'update'])->name('update');
+        Route::delete('/destroy/{id}', [OperationalTaskController::class, 'destroy'])->name('destroy');
         Route::get('/generate/{majorTaskId}', [OperationalTaskController::class, 'generate'])->name('generate');
         Route::post('/start-generation', [OperationalTaskController::class, 'startGeneration'])->name('start-generation');
         Route::get('/waiting', [OperationalTaskController::class, 'waiting'])->name('waiting');
