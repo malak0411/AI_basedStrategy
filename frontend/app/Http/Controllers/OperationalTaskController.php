@@ -33,34 +33,28 @@ class OperationalTaskController extends Controller
     private function getDepartmentId(): int
     {
         $departmentId = session('user_department_id');
-
         if ($departmentId && (int) $departmentId > 0) {
             return (int) $departmentId;
         }
 
         $token = session('jwt_token');
-
-        if (!$token) {
-            return 0;
-        }
+        if (!$token) return 0;
 
         try {
             $response = $this->apiClient->get('/api/auth/me', $token);
-
             $data = $response['data'] ?? $response;
-
             $departmentId = $data['department_id'] ?? 0;
-
             if ((int) $departmentId > 0) {
                 session(['user_department_id' => (int) $departmentId]);
             }
-
             return (int) $departmentId;
         } catch (\Exception $e) {
             Log::error('Error getting department ID: ' . $e->getMessage());
             return 0;
         }
     }
+
+
 
     public function majorTasks()
     {
@@ -73,7 +67,7 @@ class OperationalTaskController extends Controller
         $token = session('jwt_token');
 
         $response = $this->apiClient->get(
-            '/api/tasks/major-tasks/by-department',
+            '/api/tasks/major-tasks/by-department/' . $this->getDepartmentId(),
             $token
         );
 
@@ -82,6 +76,7 @@ class OperationalTaskController extends Controller
         return view('operational.major-tasks', compact('tasks'));
     }
 
+    
     public function showMajorTask($id)
     {
         if (!$this->isManager()) {
@@ -141,17 +136,48 @@ class OperationalTaskController extends Controller
             []
         );
 
-        return view('operational.show-major-task', compact(
-            'majorTask',
-            'operationalTasks',
-            'departments',
-            'employees',
-            'roleTypes',
-            'priorities',
-            'departmentId'
-        ));
+        $initiativeId = $majorTask['initiative_id'] ?? $majorTask['initiative']['id'] ?? 0;
+        $initiativeStart = null;
+        $initiativeEnd = null;
+        $initiativeName = $majorTask['initiative_name'] ?? $majorTask['initiative']['name'] ?? 'غير محدد';
+
+        if ($initiativeId > 0) {
+            $initiativeResponse = $this->apiClient->get(
+                "/api/initiatives/{$initiativeId}",
+                $token
+            );
+            
+            if ($initiativeResponse['success'] ?? false) {
+                $initiative = $initiativeResponse['data'] ?? [];
+                $initiativeStart = $initiative['start_date'] ?? null;
+                $initiativeEnd = $initiative['end_date'] ?? null;
+                $initiativeName = $initiative['name'] ?? $initiative['title'] ?? 'غير محدد';
+            }
+        }
+
+        return view('operational.show-major-task', [
+            'majorTask' => $majorTask,
+            'operationalTasks' => $operationalTasks,
+            'departments' => $departments,
+            'employees' => $employees,
+            'roleTypes' => $roleTypes,
+            'priorities' => $priorities,
+            'departmentId' => $departmentId,
+            'initiativeStart' => $initiativeStart,
+            'initiativeEnd' => $initiativeEnd,
+            'initiativeName' => $initiativeName,
+            'tid' => $majorTask['id'] ?? 0,
+            'taskEndDate' => $majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days')),
+            'isActive' => $majorTask['is_active'] ?? true,
+            'taskTitle' => $majorTask['name'] ?? $majorTask['title'] ?? 'غير محدد',
+            'taskDescription' => $majorTask['description'] ?? '',
+            'estimatedDays' => $majorTask['estimated_duration_days'] ?? $majorTask['expected_days'] ?? 0,
+            'isCrossDept' => $majorTask['is_cross_department'] ?? false,
+            'departmentsList' => $majorTask['departments'] ?? []
+        ]);
     }
 
+    
     public function storeOperational(Request $request)
     {
         if (!$this->isManager()) {
@@ -358,108 +384,108 @@ class OperationalTaskController extends Controller
         return $this->destroyOperational($id);
     }
 
-    public function assignEmployees($majorTaskId)
+    public function assignEmployees($taskId)
     {
         if (!$this->isManager()) {
-            return redirect()
-                ->route('dashboard.employee')
-                ->with('error', 'غير مصرح');
+            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
         }
 
         $token = session('jwt_token');
         $departmentId = $this->getDepartmentId();
 
         if ($departmentId <= 0) {
-            return back()->with(
-                'error',
-                'لم يتم تحديد القسم الخاص بالمستخدم'
-            );
+            return back()->with('error', 'لم يتم تحديد القسم الخاص بالمستخدم');
         }
 
-        $majorTask = $this->apiClient->get(
-            "/api/tasks/major-tasks/{$majorTaskId}/details",
-            $token
-        );
+        $taskResponse = $this->apiClient->get("/api/tasks/{$taskId}", $token);
+        $task = $taskResponse['data'] ?? [];
 
-        $tasks = $this->apiClient->get(
-            "/api/tasks/by-major-task/{$majorTaskId}",
-            $token
-        );
+        if (empty($task)) {
+            return back()->with('error', 'المهمة غير موجودة');
+        }
 
-        $employees = $this->apiClient->get(
+        $employeesResponse = $this->apiClient->get(
             "/api/employees/department/{$departmentId}",
             $token
         );
+        $allEmployees = $employeesResponse['data'] ?? [];
 
-        $roleTypes = $this->apiClient->get(
-            '/api/dict/role-types',
+        $assignmentsResponse = $this->apiClient->get(
+            "/api/tasks/{$taskId}/assignments",
             $token
         );
+        $currentAssignments = $assignmentsResponse['data'] ?? [];
+
+        $responsibleAssignments = [];
+        $memberAssignments = [];
+        $assignedEmployeeIds = [];
+
+        foreach ($currentAssignments as $assign) {
+            $assignedEmployeeIds[] = $assign['employee_id'];
+            if ($assign['role_type_id'] == 2) {
+                $responsibleAssignments[] = $assign;
+            } else {
+                $memberAssignments[] = $assign;
+            }
+        }
+
+        $unassignedEmployees = [];
+        foreach ($allEmployees as $emp) {
+            if (!in_array($emp['employee_id'], $assignedEmployeeIds)) {
+                $empId = $emp['employee_id'];
+                $statsResponse = $this->apiClient->get(
+                    "/api/employees/{$empId}/task-stats",
+                    $token
+                );
+                $stats = $statsResponse['data'] ?? [];
+                $emp['total_tasks'] = $stats['total_tasks'] ?? 0;
+                $emp['total_hours'] = $stats['total_hours'] ?? 0;
+                $emp['current_tasks'] = $stats['current_tasks'] ?? 0;
+                $emp['current_hours'] = $stats['current_hours'] ?? 0;
+                $unassignedEmployees[] = $emp;
+            }
+        }
+
+        foreach ($responsibleAssignments as &$assign) {
+            if (isset($assign['employee'])) {
+                $empId = $assign['employee']['employee_id'] ?? $assign['employee_id'];
+                $statsResponse = $this->apiClient->get(
+                    "/api/employees/{$empId}/task-stats",
+                    $token
+                );
+                $stats = $statsResponse['data'] ?? [];
+                $assign['employee']['total_tasks'] = $stats['total_tasks'] ?? 0;
+                $assign['employee']['total_hours'] = $stats['total_hours'] ?? 0;
+            }
+        }
+
+        foreach ($memberAssignments as &$assign) {
+            if (isset($assign['employee'])) {
+                $empId = $assign['employee']['employee_id'] ?? $assign['employee_id'];
+                $statsResponse = $this->apiClient->get(
+                    "/api/employees/{$empId}/task-stats",
+                    $token
+                );
+                $stats = $statsResponse['data'] ?? [];
+                $assign['employee']['total_tasks'] = $stats['total_tasks'] ?? 0;
+                $assign['employee']['total_hours'] = $stats['total_hours'] ?? 0;
+            }
+        }
+
+        $roleTypes = $this->apiClient->get('/api/dict/role-types', $token);
 
         return view('operational.assign', [
-            'majorTask' => $majorTask['data'] ?? [],
-            'tasks' => $tasks['data'] ?? [],
-            'employees' => $employees['data'] ?? [],
+            'task' => $task,
+            'unassignedEmployees' => $unassignedEmployees,
+            'responsibleAssignments' => $responsibleAssignments,
+            'memberAssignments' => $memberAssignments,
+            'currentAssignments' => $currentAssignments,
             'roleTypes' => $roleTypes['data'] ?? [],
             'departmentId' => $departmentId
         ]);
     }
 
-    public function assignTaskToEmployee(Request $request)
-    {
-        if (!$this->isManager()) {
-            return response()->json([
-                'success' => false,
-                'error' => 'غير مصرح'
-            ], 403);
-        }
-
-        $request->validate([
-            'task_id' => 'required|integer',
-            'employee_id' => 'required|integer',
-            'role_type_id' => 'nullable|integer'
-        ]);
-
-        $token = session('jwt_token');
-
-        $response = $this->apiClient->post(
-            "/api/tasks/{$request->task_id}/assign",
-            [
-                'employee_id' => (int) $request->employee_id,
-                'role_type_id' => (int) (
-                    $request->role_type_id ?? 1
-                )
-            ],
-            $token
-        );
-
-        return response()->json($response);
-    }
-
-    public function removeTaskAssignment(Request $request)
-    {
-        if (!$this->isManager()) {
-            return response()->json([
-                'success' => false,
-                'error' => 'غير مصرح'
-            ], 403);
-        }
-
-        $request->validate([
-            'task_id' => 'required|integer',
-            'employee_id' => 'required|integer'
-        ]);
-
-        $token = session('jwt_token');
-
-        $response = $this->apiClient->delete(
-            "/api/tasks/{$request->task_id}/assign/{$request->employee_id}",
-            $token
-        );
-
-        return response()->json($response);
-    }
-
+    
     public function generate($majorTaskId)
     {
         if (!$this->isManager()) {
@@ -617,6 +643,81 @@ class OperationalTaskController extends Controller
             ?? 'فشل الاعتماد'
         );
     }
+
+
+    
+    public function assignTaskToEmployee(Request $request)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+        $request->validate([
+            'task_id' => 'required|integer',
+            'employee_id' => 'required|integer',
+            'role_type_id' => 'required|integer',
+            'estimated_hours' => 'nullable|numeric|min:1|max:720'
+        ]);
+
+        $token = session('jwt_token');
+
+        $response = $this->apiClient->post(
+            "/api/tasks/{$request->task_id}/assign",
+            [
+                'employee_id' => (int) $request->employee_id,
+                'role_type_id' => (int) $request->role_type_id,
+                'estimated_hours' => (float) ($request->estimated_hours ?? 40)
+            ],
+            $token
+        );
+
+        return response()->json($response);
+    }
+
+    public function updateAssignmentHours(Request $request)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+        $request->validate([
+            'assignment_id' => 'required|integer',
+            'estimated_hours' => 'required|numeric|min:1|max:720'
+        ]);
+
+        $token = session('jwt_token');
+
+        $response = $this->apiClient->put(
+            "/api/tasks/assignments/{$request->assignment_id}/hours",
+            [
+                'estimated_hours' => (float) $request->estimated_hours
+            ],
+            $token
+        );
+
+        return response()->json($response);
+    }
+
+    public function removeTaskAssignment(Request $request)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+        $request->validate([
+            'assignment_id' => 'required|integer'
+        ]);
+
+        $token = session('jwt_token');
+
+        $response = $this->apiClient->delete(
+            "/api/tasks/assignments/{$request->assignment_id}",
+            $token
+        );
+
+        return response()->json($response);
+    }
+
 
     public function kanbanBoard()
     {

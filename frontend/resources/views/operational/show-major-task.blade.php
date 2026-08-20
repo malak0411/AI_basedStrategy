@@ -4,20 +4,93 @@
 
 @push('styles')
 <style>
-    .task-card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid #e2e8f0; transition: all 0.2s; }
-    .task-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .empty-state { text-align: center; padding: 60px 20px; }
-    .empty-state i { font-size: 64px; color: #cbd5e0; margin-bottom: 16px; }
-    .dept-badge { display: inline-block; padding: 3px 10px; border-radius: 14px; font-size: 11px; margin: 2px; font-weight: 600; }
-    .dept-lead { background: #d4af37; color: #1a1a2e; }
-    .dept-support { background: #e2e8f0; color: #4a5568; }
-    .employee-checkbox-item { cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; }
-    .employee-checkbox-item:hover { background: #e9ecef !important; border-color: #dee2e6; }
-    .employee-checkbox-item.bg-primary.bg-opacity-10 { border-color: #0d6efd; }
-    .employee-checkbox-item .employee-name { font-size: 14px; font-weight: 500; }
-    .employee-checkbox-item .employee-title { font-size: 11px; }
-    .modal-dialog-scrollable .modal-body { max-height: calc(100vh - 200px); }
-    #durationInfo .alert { background: #f0f4ff; border-color: #cfe2ff; }
+    .task-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        border: 1px solid #e2e8f0;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    .task-card:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        transform: translateY(-2px);
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+    .empty-state i {
+        font-size: 64px;
+        color: #cbd5e0;
+        margin-bottom: 16px;
+    }
+    .dept-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 14px;
+        font-size: 11px;
+        margin: 2px;
+        font-weight: 600;
+    }
+    .dept-lead {
+        background: #d4af37;
+        color: #1a1a2e;
+    }
+    .dept-support {
+        background: #e2e8f0;
+        color: #4a5568;
+    }
+    .employee-checkbox-item {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+    .employee-checkbox-item:hover {
+        background: #e9ecef !important;
+        border-color: #dee2e6;
+    }
+    .employee-checkbox-item.bg-primary.bg-opacity-10 {
+        border-color: #0d6efd;
+    }
+    .employee-checkbox-item .employee-name {
+        font-size: 14px;
+        font-weight: 500;
+    }
+    .employee-checkbox-item .employee-title {
+        font-size: 11px;
+    }
+    .modal-dialog-scrollable .modal-body {
+        max-height: calc(100vh - 200px);
+    }
+    #durationInfo .alert {
+        background: #f0f4ff;
+        border-color: #cfe2ff;
+    }
+    .error-feedback {
+        display: none;
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+    .error-feedback.show {
+        display: block;
+    }
+    .is-invalid {
+        border-color: #dc3545;
+    }
+    .is-valid {
+        border-color: #28a745;
+    }
+    .task-card .task-actions {
+        display: flex;
+        gap: 5px;
+    }
+    .task-card .task-actions .btn {
+        z-index: 2;
+        position: relative;
+    }
 </style>
 @endpush
 
@@ -27,19 +100,24 @@
         <i class="fas fa-arrow-right"></i> العودة للمهام الرئيسية
     </a>
 
-    @if(session('success')) <div class="alert alert-success">{{ session('success') }}</div> @endif
-    @if(session('error')) <div class="alert alert-danger">{{ session('error') }}</div> @endif
+    @if(session('success')) 
+        <div class="alert alert-success">{{ session('success') }}</div> 
+    @endif
+    
+    @if(session('error')) 
+        <div class="alert alert-danger">{{ session('error') }}</div> 
+    @endif
 
     @php
-        $tid = is_array($majorTask) ? ($majorTask['id'] ?? 0) : ($majorTask->id ?? 0);
-        $taskEndDate = is_array($majorTask) ? ($majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days'))) : ($majorTask->end_date ?? date('Y-m-d', strtotime('+30 days')));
-        $isActive = is_array($majorTask) ? ($majorTask['is_active'] ?? true) : ($majorTask->is_active ?? true);
-        $taskTitle = is_array($majorTask) ? ($majorTask['name'] ?? $majorTask['title'] ?? 'غير محدد') : ($majorTask->name ?? $majorTask->title ?? 'غير محدد');
-        $taskDescription = is_array($majorTask) ? ($majorTask['description'] ?? '') : ($majorTask->description ?? '');
-        $estimatedDays = is_array($majorTask) ? ($majorTask['estimated_duration_days'] ?? 0) : ($majorTask->estimated_duration_days ?? 0);
-        $isCrossDept = is_array($majorTask) ? ($majorTask['is_cross_department'] ?? false) : ($majorTask->is_cross_department ?? false);
-        $initiativeName = is_array($majorTask) ? ($majorTask['initiative_name'] ?? 'غير محدد') : ($majorTask->initiative_name ?? 'غير محدد');
-        $departments = is_array($majorTask) ? ($majorTask['departments'] ?? []) : ($majorTask->departments ?? []);
+        $tid = $majorTask['id'] ?? 0;
+        $taskEndDate = $majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days'));
+        $isActive = $majorTask['is_active'] ?? true;
+        $taskTitle = $majorTask['name'] ?? $majorTask['title'] ?? 'غير محدد';
+        $taskDescription = $majorTask['description'] ?? '';
+        $estimatedDays = $majorTask['estimated_duration_days'] ?? $majorTask['expected_days'] ?? 0;
+        $isCrossDept = $majorTask['is_cross_department'] ?? false;
+        $initiativeName = $initiativeName ?? $majorTask['initiative_name'] ?? 'غير محدد';
+        $departmentsList = $majorTask['departments'] ?? [];
     @endphp
 
     <div class="card-custom mb-4">
@@ -70,14 +148,14 @@
                 <div><strong>{{ $initiativeName }}</strong></div>
             </div>
         </div>
-        @if(!empty($departments))
+        @if(!empty($departmentsList))
         <div class="mt-3">
             <small class="text-muted">الإدارات المشاركة:</small>
             <div class="mt-1">
-                @foreach($departments as $dept)
+                @foreach($departmentsList as $dept)
                 <span class="dept-badge {{ ($dept['responsibility_type'] ?? '') == 'LEAD' ? 'dept-lead' : 'dept-support' }}">
                     {{ ($dept['responsibility_type'] ?? '') == 'LEAD' ? 'رئيسية' : 'مساندة' }} -
-                    {{ $dept['department_name'] ?? '' }}
+                    {{ $dept['department_name'] ?? $dept['name'] ?? '' }}
                 </span>
                 @endforeach
             </div>
@@ -105,21 +183,20 @@
     </div>
     @else
     @foreach($operationalTasks as $task)
-    <div class="task-card">
+    <div class="task-card" onclick="window.location='{{ route('operational.assign', $task['id']) }}'">
         <div class="d-flex justify-content-between align-items-start">
             <div class="flex-grow-1">
                 <h6>{{ $task['task_name'] ?? $task['title'] ?? '' }}</h6>
                 <p class="text-muted small mb-2">{{ Str::limit($task['description'] ?? '', 150) }}</p>
                 <div class="d-flex gap-3 flex-wrap align-items-center">
                     <small><i class="far fa-clock ml-1"></i> {{ $task['end_date'] ?? 'غير محدد' }}</small>
-                    <small><i class="fas fa-user ml-1"></i> {{ $task['assigned_to_name'] ?? 'غير معين' }}</small>
                 </div>
             </div>
-            <div class="d-flex gap-1">
+            <div class="task-actions" onclick="event.stopPropagation();">
                 <button class="btn btn-sm btn-outline-primary" onclick="editTask({{ json_encode($task) }})" title="تعديل">
                     <i class="fas fa-edit"></i>
                 </button>
-                <form action="{{ route('operational.destroy', $task['id']) }}" method="POST" onsubmit="return confirm('متأكد من حذف هذه المهمة؟')">
+                <form action="{{ route('operational.destroy', $task['id']) }}" method="POST" onsubmit="return confirm('متأكد من حذف هذه المهمة؟')" style="display:inline;">
                     @csrf @method('DELETE')
                     <button class="btn btn-sm btn-outline-danger" title="حذف"><i class="fas fa-trash"></i></button>
                 </form>
@@ -139,48 +216,26 @@
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-               
+
                 <form id="addOperationalForm" method="POST" action="{{ route('operational.store') }}">
                     @csrf
-                   
-                    @php
-                        $majorTaskId = is_array($majorTask) ? ($majorTask['id'] ?? 0) : ($majorTask->id ?? 0);
-                        $departmentId = is_array($majorTask) ? ($majorTask['department_id'] ?? 0) : ($majorTask->department_id ?? 0);
-                        $initiativeStart = is_array($initiative ?? null) ? ($initiative['start_date'] ?? '') : ($initiative->start_date ?? '');
-                        $initiativeEnd = is_array($initiative ?? null) ? ($initiative['end_date'] ?? '') : ($initiative->end_date ?? '');
-                        $expectedDays = is_array($majorTask) ? ($majorTask['expected_days'] ?? 30) : ($majorTask->expected_days ?? 30);
-                        $majorTaskTitle = is_array($majorTask) ? ($majorTask['title'] ?? 'غير محدد') : ($majorTask->title ?? 'غير محدد');
-                        $departmentName = is_array($majorTask) ? ($majorTask['department']['name_ar'] ?? 'غير محدد') : ($majorTask->department->name_ar ?? 'غير محدد');
-                        $majorTaskStartDate = is_array($majorTask) ? ($majorTask['start_date'] ?? '') : ($majorTask->start_date ?? '');
-                        $majorTaskEndDate = is_array($majorTask) ? ($majorTask['end_date'] ?? '') : ($majorTask->end_date ?? '');
-                    @endphp
-                   
-                    <input type="hidden" name="major_task_id" value="{{ $majorTaskId }}">
-                    <input type="hidden" name="department_id" value="{{ $departmentId }}">
+
+                    <input type="hidden" name="major_task_id" value="{{ $tid }}">
+                    <input type="hidden" name="department_id" value="{{ $departmentId ?? 0 }}">
                     <input type="hidden" name="created_by" value="{{ auth()->user()->employee_id ?? 0 }}">
                     <input type="hidden" name="status_id" value="16">
-                   
-                    <input type="hidden" id="initiativeStartDate" value="{{ $initiativeStart }}">
-                    <input type="hidden" id="initiativeEndDate" value="{{ $initiativeEnd }}">
-                    <input type="hidden" id="majorTaskExpectedDays" value="{{ $expectedDays }}">
-                   
+
+                    <input type="hidden" id="initiativeStartDate" value="{{ $initiativeStart ?? '' }}">
+                    <input type="hidden" id="initiativeEndDate" value="{{ $initiativeEnd ?? '' }}">
+                    <input type="hidden" id="majorTaskExpectedDays" value="{{ $estimatedDays }}">
+
                     <div class="modal-body">
                         <div class="alert alert-info alert-dismissible fade show">
                             <div class="d-flex align-items-center">
                                 <i class="fas fa-info-circle fa-2x ml-3"></i>
                                 <div>
-                                    <strong>المهمة الرئيسية:</strong> {{ $majorTaskTitle }}
+                                    <strong>المهمة الرئيسية:</strong> {{ $taskTitle }}
                                     <br>
-                                    <small>
-                                        <i class="fas fa-building"></i> {{ $departmentName }} |
-                                        <i class="fas fa-calendar-alt"></i>
-                                        {{ $majorTaskStartDate ? \Carbon\Carbon::parse($majorTaskStartDate)->format('Y-m-d') : 'غير محدد' }}
-                                        →
-                                        {{ $majorTaskEndDate ? \Carbon\Carbon::parse($majorTaskEndDate)->format('Y-m-d') : 'غير محدد' }}
-                                        @if($expectedDays)
-                                            | <i class="fas fa-clock"></i> المدة المتوقعة: {{ $expectedDays }} يوم
-                                        @endif
-                                    </small>
                                 </div>
                             </div>
                         </div>
@@ -208,7 +263,7 @@
                         </div>
 
                         <div class="row">
-                            <div class="col-md-4 form-group">
+                            <div class="col-md-6 form-group">
                                 <label class="fw-bold">
                                     الأولوية <span class="text-danger">*</span>
                                 </label>
@@ -224,7 +279,7 @@
                                 <div class="error-feedback" id="priorityFeedback">الرجاء اختيار الأولوية</div>
                             </div>
 
-                            <div class="col-md-4 form-group">
+                            <div class="col-md-6 form-group">
                                 <label class="fw-bold">
                                     الساعات المقدرة <span class="text-danger">*</span>
                                 </label>
@@ -233,11 +288,6 @@
                                        min="1" max="720" required>
                                 <small class="text-muted">(1-720 ساعة)</small>
                                 <div class="error-feedback" id="hoursFeedback"></div>
-                            </div>
-
-                            <div class="col-md-4 form-group">
-                                <label class="fw-bold">الحالة</label>
-                                <input type="text" class="form-control bg-light text-muted" value="معلق مؤقتاً" disabled>
                             </div>
                         </div>
 
@@ -340,61 +390,88 @@
 <script>
 $(document).ready(function() {
     initializeDates();
-   
+
     $('#taskTitle').on('input', function() {
-        const count = $(this).val().length;
+        var count = $(this).val().length;
         $('#titleCount').text(count + '/255');
         validateTitle();
     });
-   
+
     $('#taskDescription').on('input', function() {
-        const count = $(this).val().length;
+        var count = $(this).val().length;
         $('#descCount').text(count + '/1000');
         validateDescription();
     });
-   
+
     $('#taskPriority').on('change', function() {
         validatePriority();
     });
-   
+
     $('#estimatedHours').on('input', function() {
         validateHours();
-        validateDates();
+        calculateDuration();
     });
-   
+
     $('#startDate, #endDate').on('change', function() {
         validateDates();
+        calculateDuration();
+        updateEstimatedHours();
+    });
+
+    $('#addOperationalModal').on('shown.bs.modal', function() {
+        initializeDates();
+        validateDates();
+        calculateDuration();
+        updateEstimatedHours();
     });
 });
 
 function initializeDates() {
-    const initiativeStart = $('#initiativeStartDate').val();
-    const initiativeEnd = $('#initiativeEndDate').val();
-    const today = new Date().toISOString().split('T')[0];
-    const minStart = initiativeStart || today;
-   
+    var initiativeStart = $('#initiativeStartDate').val();
+    var initiativeEnd = $('#initiativeEndDate').val();
+    var today = new Date().toISOString().split('T')[0];
+    
+    console.log('initiativeStart:', initiativeStart);
+    console.log('initiativeEnd:', initiativeEnd);
+
+    var minStart = initiativeStart || today;
+
     $('#startDate').attr('min', minStart);
-    $('#startDate').val(minStart);
+    
+    if (!$('#startDate').val()) {
+        $('#startDate').val(minStart);
+    }
+    
     $('#minStartDate').text(minStart || 'غير محدد');
-   
+
     if (initiativeEnd) {
         $('#endDate').attr('max', initiativeEnd);
         $('#maxEndDate').text(initiativeEnd);
     }
-   
-    const startDate = new Date(minStart);
-    startDate.setDate(startDate.getDate() + 7);
-    $('#endDate').val(startDate.toISOString().split('T')[0]);
-   
+
+    if (!$('#endDate').val()) {
+        var startDate = new Date(minStart);
+        startDate.setDate(startDate.getDate() + 7);
+        var defaultEnd = startDate.toISOString().split('T')[0];
+        $('#endDate').val(defaultEnd);
+        $('#endDate').attr('min', minStart);
+        
+        if (initiativeEnd && defaultEnd > initiativeEnd) {
+            $('#endDate').val(initiativeEnd);
+        }
+    }
+
     setTimeout(function() {
         validateDates();
-    }, 100);
+        calculateDuration();
+        updateEstimatedHours();
+    }, 200);
 }
 
 function validateTitle() {
-    const value = $('#taskTitle').val().trim();
-    const feedback = $('#titleFeedback');
-   
+    var value = $('#taskTitle').val().trim();
+    var feedback = $('#titleFeedback');
+
     if (value.length < 3) {
         $('#taskTitle').addClass('is-invalid').removeClass('is-valid');
         feedback.text('العنوان يجب أن يكون 3 أحرف على الأقل').addClass('show');
@@ -406,12 +483,12 @@ function validateTitle() {
 }
 
 function validateDescription() {
-    const value = $('#taskDescription').val().trim();
-    const feedback = $('#descFeedback');
-   
+    var value = $('#taskDescription').val().trim();
+    var feedback = $('#descFeedback');
+
     if (value.length === 0) {
         $('#taskDescription').addClass('is-invalid').removeClass('is-valid');
-        feedback.text('الرجاء إدخال وصف للمهمة').addClass('show');
+        feedback.addClass('show');
         return false;
     }
     $('#taskDescription').removeClass('is-invalid').addClass('is-valid');
@@ -420,9 +497,9 @@ function validateDescription() {
 }
 
 function validatePriority() {
-    const value = $('#taskPriority').val();
-    const feedback = $('#priorityFeedback');
-   
+    var value = $('#taskPriority').val();
+    var feedback = $('#priorityFeedback');
+
     if (!value) {
         $('#taskPriority').addClass('is-invalid').removeClass('is-valid');
         feedback.addClass('show');
@@ -434,69 +511,68 @@ function validatePriority() {
 }
 
 function validateHours() {
-    const hours = parseInt($('#estimatedHours').val());
-    const feedback = $('#hoursFeedback');
-   
+    var hours = parseInt($('#estimatedHours').val());
+    var feedback = $('#hoursFeedback');
+    var startDate = $('#startDate').val();
+    var endDate = $('#endDate').val();
+
     if (isNaN(hours) || hours < 1) {
         $('#estimatedHours').addClass('is-invalid').removeClass('is-valid');
         feedback.text('الرجاء إدخال عدد ساعات صحيح (1-720)').addClass('show');
         return false;
     }
-   
+
     if (hours > 720) {
         $('#estimatedHours').addClass('is-invalid').removeClass('is-valid');
         feedback.text('الحد الأقصى للساعات هو 720').addClass('show');
         return false;
     }
-   
-    const startDate = $('#startDate').val();
-    const endDate = $('#endDate').val();
-   
+
     if (startDate && endDate) {
-        const days = calculateWorkingDays(startDate, endDate);
-        const maxHours = days * 8;
-       
+        var days = calculateWorkingDays(startDate, endDate);
+        var maxHours = days * 8;
+
         if (hours > maxHours) {
             $('#estimatedHours').addClass('is-invalid').removeClass('is-valid');
-            feedback.text(`الساعات المقدرة (${hours}) تتجاوز الحد الأقصى (${maxHours} ساعة) للفترة المحددة`).addClass('show');
+            feedback.text('الساعات المقدرة (' + hours + ') تتجاوز الحد الأقصى (' + maxHours + ' ساعة) للفترة المحددة').addClass('show');
             return false;
         }
     }
-   
+
     $('#estimatedHours').removeClass('is-invalid').addClass('is-valid');
     feedback.removeClass('show');
     return true;
 }
 
 function validateDates() {
-    const startDate = $('#startDate').val();
-    const endDate = $('#endDate').val();
-    const initiativeStart = $('#initiativeStartDate').val();
-    const initiativeEnd = $('#initiativeEndDate').val();
-    const expectedDays = parseInt($('#majorTaskExpectedDays').val()) || 30;
-   
-    const startFeedback = $('#startDateFeedback');
-    const endFeedback = $('#endDateFeedback');
-   
-    let isValid = true;
-   
+    var startDate = $('#startDate').val();
+    var endDate = $('#endDate').val();
+    var initiativeStart = $('#initiativeStartDate').val();
+    var initiativeEnd = $('#initiativeEndDate').val();
+    var expectedDays = parseInt($('#majorTaskExpectedDays').val()) || 30;
+
+    var startFeedback = $('#startDateFeedback');
+    var endFeedback = $('#endDateFeedback');
+
+    var isValid = true;
+
     $('#startDate').removeClass('is-invalid is-valid');
     $('#endDate').removeClass('is-invalid is-valid');
     startFeedback.removeClass('show');
     endFeedback.removeClass('show');
-   
+
     if (!startDate) {
         $('#startDate').addClass('is-invalid');
         startFeedback.text('الرجاء تحديد تاريخ البداية').addClass('show');
         isValid = false;
     } else if (initiativeStart && startDate < initiativeStart) {
         $('#startDate').addClass('is-invalid');
-        startFeedback.text(`تاريخ البداية (${startDate}) يجب أن يكون بعد أو يساوي بداية المبادرة (${initiativeStart})`).addClass('show');
+        startFeedback.text('تاريخ البداية (' + startDate + ') يجب أن يكون بعد أو يساوي بداية المبادرة (' + initiativeStart + ')').addClass('show');
         isValid = false;
-    } else if (startDate) {
+    } else {
         $('#startDate').addClass('is-valid');
     }
-   
+
     if (!endDate) {
         $('#endDate').addClass('is-invalid');
         endFeedback.text('الرجاء تحديد تاريخ التسليم').addClass('show');
@@ -507,54 +583,58 @@ function validateDates() {
         isValid = false;
     } else if (initiativeEnd && endDate > initiativeEnd) {
         $('#endDate').addClass('is-invalid');
-        endFeedback.text(`تاريخ التسليم (${endDate}) يجب أن يكون قبل أو يساوي نهاية المبادرة (${initiativeEnd})`).addClass('show');
+        endFeedback.text('تاريخ التسليم (' + endDate + ') يجب أن يكون قبل أو يساوي نهاية المبادرة (' + initiativeEnd + ')').addClass('show');
         isValid = false;
-    } else if (endDate) {
+    } else {
         $('#endDate').addClass('is-valid');
     }
-   
+
     if (startDate && endDate && isValid) {
-        const days = calculateWorkingDays(startDate, endDate);
-       
+        var days = calculateWorkingDays(startDate, endDate);
+
         if (days > expectedDays) {
             $('#endDate').addClass('is-invalid').removeClass('is-valid');
-            endFeedback.text(`المدة المختارة (${days} يوم) تتجاوز المدة المتوقعة للمهمة الرئيسية (${expectedDays} يوم)`).addClass('show');
+            endFeedback.text('المدة المختارة (' + days + ' يوم) تتجاوز المدة المتوقعة للمهمة الرئيسية (' + expectedDays + ' يوم)').addClass('show');
             isValid = false;
-        } else {
-            showDurationInfo(days, expectedDays);
         }
     }
-   
-    if (isValid) {
-        updateExpectedHours(startDate, endDate);
-        validateHours();
-    }
-   
+
     return isValid;
 }
 
 function calculateWorkingDays(startDate, endDate) {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    let workingDays = 0;
-   
+    var start = new Date(startDate);
+    var end = new Date(endDate);
+    var workingDays = 0;
+
     while (start <= end) {
-        const dayOfWeek = start.getDay();
+        var dayOfWeek = start.getDay();
         if (dayOfWeek !== 5 && dayOfWeek !== 6) {
             workingDays++;
         }
         start.setDate(start.getDate() + 1);
     }
-   
+
     return workingDays;
 }
 
-function showDurationInfo(selectedDays, expectedDays) {
+function calculateDuration() {
+    var startDate = $('#startDate').val();
+    var endDate = $('#endDate').val();
+    var expectedDays = parseInt($('#majorTaskExpectedDays').val()) || 30;
+
+    if (!startDate || !endDate) {
+        $('#durationInfo').hide();
+        return;
+    }
+
+    var days = calculateWorkingDays(startDate, endDate);
+
     $('#durationInfo').show();
     $('#expectedDaysDisplay').text(expectedDays + ' يوم');
-    $('#selectedDaysDisplay').text(selectedDays + ' يوم');
-   
-    const remaining = expectedDays - selectedDays;
+    $('#selectedDaysDisplay').text(days + ' يوم');
+
+    var remaining = expectedDays - days;
     if (remaining >= 0) {
         $('#remainingDaysDisplay').text(remaining + ' يوم');
         $('#remainingDaysDisplay').removeClass('bg-danger').addClass('bg-success');
@@ -564,31 +644,60 @@ function showDurationInfo(selectedDays, expectedDays) {
     }
 }
 
-function updateExpectedHours(startDate, endDate) {
+function updateEstimatedHours() {
+    var startDate = $('#startDate').val();
+    var endDate = $('#endDate').val();
+
     if (!startDate || !endDate) return;
-   
-    const days = calculateWorkingDays(startDate, endDate);
-    const maxHours = days * 8;
-   
-    const hoursInput = $('#estimatedHours');
-    const currentHours = parseInt(hoursInput.val()) || 0;
-   
+
+    var days = calculateWorkingDays(startDate, endDate);
+    var maxHours = days * 8;
+
+    var hoursInput = $('#estimatedHours');
+    var currentHours = parseInt(hoursInput.val()) || 0;
+
     hoursInput.attr('max', maxHours);
-   
+
     if (currentHours > maxHours) {
         hoursInput.val(maxHours);
-        validateHours();
     }
+
+    validateHours();
 }
 
 function validateForm() {
-    const isTitleValid = validateTitle();
-    const isDescValid = validateDescription();
-    const isPriorityValid = validatePriority();
-    const isHoursValid = validateHours();
-    const isDatesValid = validateDates();
-   
-    return isTitleValid && isDescValid && isPriorityValid && isHoursValid && isDatesValid;
+    var isTitleValid = validateTitle();
+    var isDescValid = validateDescription();
+    var isPriorityValid = validatePriority();
+    var isHoursValid = validateHours();
+    var isDatesValid = validateDates();
+
+    if (!isTitleValid) {
+        $('#taskTitle').focus();
+        return false;
+    }
+    if (!isDescValid) {
+        $('#taskDescription').focus();
+        return false;
+    }
+    if (!isPriorityValid) {
+        $('#taskPriority').focus();
+        return false;
+    }
+    if (!isHoursValid) {
+        $('#estimatedHours').focus();
+        return false;
+    }
+    if (!isDatesValid) {
+        if ($('#startDate').hasClass('is-invalid')) {
+            $('#startDate').focus();
+        } else {
+            $('#endDate').focus();
+        }
+        return false;
+    }
+
+    return true;
 }
 
 function editTask(task) {
@@ -600,34 +709,38 @@ function editTask(task) {
     $('#editModal').modal('show');
 }
 
-function showToast(message, type) {
-    if (typeof toastr !== 'undefined') {
-        toastr[type](message);
-    } else {
-        alert(message);
-    }
-}
-
 $('#addOperationalForm').on('submit', function(e) {
     if (!validateForm()) {
         e.preventDefault();
-        showToast('الرجاء تصحيح جميع الأخطاء في النموذج', 'error');
+        if (typeof toastr !== 'undefined') {
+            toastr.error('الرجاء تصحيح جميع الأخطاء في النموذج');
+        }
         return false;
     }
 });
 
 @if(session('success'))
-    $(document).ready(function() { showToast('{{ session('success') }}', 'success'); });
+    $(document).ready(function() {
+        if (typeof toastr !== 'undefined') {
+            toastr.success('{{ session('success') }}');
+        }
+    });
 @endif
 
 @if(session('error'))
-    $(document).ready(function() { showToast('{{ session('error') }}', 'error'); });
+    $(document).ready(function() {
+        if (typeof toastr !== 'undefined') {
+            toastr.error('{{ session('error') }}');
+        }
+    });
 @endif
 
 @if($errors->any())
     $(document).ready(function() {
         @foreach($errors->all() as $error)
-            showToast('{{ $error }}', 'error');
+            if (typeof toastr !== 'undefined') {
+                toastr.error('{{ $error }}');
+            }
         @endforeach
     });
 @endif

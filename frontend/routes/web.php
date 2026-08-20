@@ -80,9 +80,15 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/{id}/edit', [TaskController::class, 'edit'])->name('edit');
         Route::put('/{id}', [TaskController::class, 'update'])->name('update');
     });
-    Route::get('/operational/assign/{majorTaskId}', [OperationalTaskController::class, 'assignEmployees'])->name('operational.assign');
-    Route::post('/api/tasks/{taskId}/assign', [OperationalTaskController::class, 'assignTaskToEmployee']);
-    Route::delete('/api/tasks/{taskId}/assign/{employeeId}', [OperationalTaskController::class, 'removeTaskAssignment']);
+    
+    Route::middleware(['web', 'check.jwt'])->group(function () {
+    
+        Route::get('/operational/assign/{taskId}', [OperationalTaskController::class, 'assignEmployees'])->name('operational.assign');
+        Route::post('/operational/assign-task-to-employee', [OperationalTaskController::class, 'assignTaskToEmployee'])->name('operational.assign-task-to-employee');
+        Route::delete('/operational/remove-assignment', [OperationalTaskController::class, 'removeTaskAssignment'])->name('operational.remove-assignment');
+        Route::put('/operational/update-assignment-hours', [OperationalTaskController::class, 'updateAssignmentHours'])->name('operational.update-assignment-hours');
+        Route::get('/operational/major-task/{id}', [OperationalTaskController::class, 'showMajorTask'])->name('operational.show-major-task');
+    });
 
     Route::get('/operational/kanban', [OperationalTaskController::class, 'kanbanBoard'])->name('operational.kanban');
     Route::get('/operational/kanban/{id}', [OperationalTaskController::class, 'showKanbanTask'])->name('operational.kanban');
