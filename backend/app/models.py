@@ -359,19 +359,19 @@ class TaskAssignment(Base):
 
 class TaskProgressLog(Base):
     __tablename__ = "task_progress_logs"
-
+    
     log_id = Column(Integer, primary_key=True, autoincrement=True)
     task_id = Column(Integer, ForeignKey("operational_tasks.task_id"), nullable=False)
     employee_id = Column(Integer, ForeignKey("employees.employee_id"), nullable=False)
-    progress_percent = Column(Integer)
+    progress_percent = Column(Integer, default=0)
     status_old = Column(Integer, ForeignKey("dict_statuses.status_id"))
-    status_new = Column(Integer, ForeignKey("dict_statuses.status_id"))
+    status_new = Column(Integer, ForeignKey("dict_statuses.status_id"), nullable=False)
     notes = Column(Text)
     log_time = Column(DateTime, server_default=func.now())
-
-    # العلاقات
+    
     task = relationship("OperationalTask", back_populates="progress_logs")
     employee = relationship("Employee")
+
 
 
 class TaskDependency(Base):

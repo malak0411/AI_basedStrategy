@@ -349,52 +349,6 @@ class StatusUpdateRequest(BaseModel):
     status_id: int
     comment: Optional[str] = ""
 
-@router.put("/{task_id}/update-status")
-async def update_task_status(
-    task_id: int,
-    data: StatusUpdateRequest,
-    db: Session = Depends(get_db)
-):
-    try:
-        task = db.query(OperationalTask).filter(OperationalTask.task_id == task_id).first()
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        
-        assignment = db.query(TaskAssignment).filter(TaskAssignment.task_id == task_id).first()
-        responsible_employee_id = assignment.employee_id if assignment else task.created_by or 1
-        
-        old_status = task.status_id
-        task.status_id = data.status_id
-        task.updated_at = datetime.now()
-        
-        progress_map = {16: 0, 5: 0, 6: 30, 7: 20, 8: 80, 4: 100, 10: 100}
-        progress_percent = progress_map.get(data.status_id, 0)
-        
-        log = TaskProgressLog(
-            task_id=task_id,
-            employee_id=responsible_employee_id,
-            progress_percent=progress_percent,
-            status_old=old_status,
-            status_new=data.status_id,
-            notes=data.comment or "",
-            log_time=datetime.now()
-        )
-        db.add(log)
-        
-        db.commit()
-        return {
-            "success": True,
-            "message": "Status updated",
-            "task_id": task_id,
-            "responsible_employee_id": responsible_employee_id,
-            "progress_percent": progress_percent
-        }
-    except Exception as e:
-        db.rollback()
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
-
 @router.get("/by-department/{department_id}")
 async def tasks_by_department(department_id: int, db: Session = Depends(get_db)):
     try:
@@ -482,7 +436,6 @@ async def major_tasks_by_department_id(department_id: int, db: Session = Depends
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.get("/{task_id}")
 async def get_task(
     task_id: int,
@@ -529,7 +482,7 @@ async def get_task(
 @router.get("/{task_id}/assignments")
 async def get_task_assignments(
     task_id: int,
-    current_user: int = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_employee),
     db: Session = Depends(get_db)
 ):
     assignments = db.query(TaskAssignment).filter(
@@ -554,6 +507,7 @@ async def get_task_assignments(
             "role_type_id": a.role_type_id,
             "role_type_name": role_type.name_ar if role_type else None,
             "acceptance_status": a.acceptance_status,
+            "rejection_reason": a.rejection_reason,
             "estimated_hours": a.estimated_hours,
             "assigned_by": a.assigned_by,
             "assigned_at": a.assigned_at.isoformat() if a.assigned_at else None,
@@ -572,7 +526,7 @@ async def get_task_assignments(
 async def assign_employee_to_task(
     task_id: int,
     data: dict,
-    current_user: int = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_employee),
     db: Session = Depends(get_db)
 ):
     employee_id = data.get("employee_id")
@@ -608,7 +562,7 @@ async def assign_employee_to_task(
         if existing_responsible:
             raise HTTPException(400, "يوجد مسؤول نهائي لهذه المهمة بالفعل")
     
-    # التحقق من وجود توزيع سابق
+    # التحقق من وجود توزيع نشط لنفس الموظف والمهمة
     existing = db.query(TaskAssignment).filter(
         TaskAssignment.task_id == task_id,
         TaskAssignment.employee_id == employee_id,
@@ -618,16 +572,42 @@ async def assign_employee_to_task(
     if existing:
         existing.role_type_id = role_type_id
         existing.estimated_hours = estimated_hours
-        existing.assigned_by = current_user.employee_id
+        existing.assigned_by = current_user
         existing.assigned_at = datetime.now()
+        existing.acceptance_status = "pending"
+        existing.rejection_reason = None
         db.commit()
         db.refresh(existing)
         return {
             "success": True,
-            "message": "تم تحديث دور الموظف",
+            "message": "تم تحديث توزيع الموظف",
             "data": {"assignment_id": existing.assignment_id}
         }
     
+    # التحقق من وجود توزيع غير نشط لنفس الموظف والمهمة (إعادة تفعيل)
+    inactive = db.query(TaskAssignment).filter(
+        TaskAssignment.task_id == task_id,
+        TaskAssignment.employee_id == employee_id,
+        TaskAssignment.is_active == False
+    ).first()
+    
+    if inactive:
+        inactive.is_active = True
+        inactive.role_type_id = role_type_id
+        inactive.estimated_hours = estimated_hours
+        inactive.assigned_by = current_user
+        inactive.assigned_at = datetime.now()
+        inactive.acceptance_status = "pending"
+        inactive.rejection_reason = None
+        db.commit()
+        db.refresh(inactive)
+        return {
+            "success": True,
+            "message": "تم إعادة تفعيل توزيع الموظف",
+            "data": {"assignment_id": inactive.assignment_id}
+        }
+    
+    # إنشاء توزيع جديد
     assignment = TaskAssignment(
         task_id=task_id,
         employee_id=employee_id,
@@ -649,11 +629,30 @@ async def assign_employee_to_task(
         "data": {"assignment_id": assignment.assignment_id}
     }
 
+@router.delete("/assignments/{assignment_id}")
+async def remove_task_assignment(
+    assignment_id: int,
+    current_user: Employee = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    assignment = db.query(TaskAssignment).filter(
+        TaskAssignment.assignment_id == assignment_id
+    ).first()
+    
+    if not assignment:
+        raise HTTPException(404, "التوزيع غير موجود")
+    
+    assignment.is_active = False
+    db.commit()
+    
+    return {"success": True, "message": "تم إلغاء التوزيع"}
+
+
 @router.put("/assignments/{assignment_id}/hours")
 async def update_assignment_hours(
     assignment_id: int,
     data: dict,
-    current_user: int =  Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_employee),
     db: Session = Depends(get_db)
 ):
     estimated_hours = data.get("estimated_hours")
@@ -674,24 +673,151 @@ async def update_assignment_hours(
     
     return {"success": True, "message": "تم تحديث الساعات المقدرة"}
 
-@router.delete("/assignments/{assignment_id}")
-async def remove_task_assignment(
-    assignment_id: int,
-    current_user: int =  Depends(get_current_employee),
+@router.put("/{task_id}/update-status")
+async def update_task_status(
+    task_id: int,
+    data: dict,
+    current_user: Employee = Depends(get_current_employee),
     db: Session = Depends(get_db)
 ):
-    assignment = db.query(TaskAssignment).filter(
-        TaskAssignment.assignment_id == assignment_id,
-        TaskAssignment.is_active == True
+    status_id = data.get("status_id")
+    comment = data.get("comment", "")
+    
+    if not status_id:
+        raise HTTPException(400, "الحالة مطلوبة")
+    
+    task = db.query(OperationalTask).filter(
+        OperationalTask.task_id == task_id,
+        OperationalTask.is_active == True
     ).first()
     
-    if not assignment:
-        raise HTTPException(404, "التوزيع غير موجود")
+    if not task:
+        raise HTTPException(404, "المهمة غير موجودة")
     
-    assignment.is_active = False
+    old_status = task.status_id
+    
+    can_move, error = can_move_task(task.status_id, status_id)
+    if not can_move:
+        raise HTTPException(400, error)
+    
+    if status_id in [5, 8, 19, 20] and not comment:
+        raise HTTPException(400, "التعليق مطلوب لهذه الحالة")
+    
+    if old_status == 5 and status_id == 6 and not comment:
+        raise HTTPException(400, "التعليق مطلوب لإعادة المهمة للعمل")
+    
+    task.status_id = status_id
+    
+    existing_log = db.query(TaskProgressLog).filter(
+        TaskProgressLog.task_id == task.task_id,
+        TaskProgressLog.status_old == old_status,
+        TaskProgressLog.status_new == status_id
+    ).first()
+    
+    if not existing_log:
+        progress_log = TaskProgressLog(
+            task_id=task.task_id,
+            employee_id=current_user,
+            progress_percent=0,
+            status_old=old_status,
+            status_new=status_id,
+            notes=comment
+        )
+        db.add(progress_log)
+    
     db.commit()
     
-    return {"success": True, "message": "تم إلغاء التوزيع بنجاح"}
+    return {
+        "success": True,
+        "message": "تم تحديث حالة المهمة بنجاح",
+        "data": {
+            "task_id": task.task_id,
+            "old_status": old_status,
+            "new_status": status_id
+        }
+    }
+
+
+def can_move_task(from_status, to_status):
+    if from_status == 16:
+        return False, "المهام غير الموزعة لا يمكن نقلها"
+    
+    if from_status in [19, 20]:
+        return False, "لا يمكن نقل المهام المقبولة أو المرفوضة"
+    
+    rules = {
+        26: [6],
+        6: [5, 8],
+        5: [6],
+        8: [6, 19, 20],
+        19: [],
+        20: []
+    }
+    
+    allowed = rules.get(from_status, [])
+    if to_status not in allowed:
+        return False, "لا يمكن نقل المهمة إلى هذه الحالة"
+    
+    return True, None
+
+
+
+@router.post("/{task_id}/finalize")
+async def finalize_task_assignments(
+    task_id: int,
+    current_user: Employee = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    task = db.query(OperationalTask).filter(
+        OperationalTask.task_id == task_id,
+        OperationalTask.is_active == True
+    ).first()
+    
+    if not task:
+        raise HTTPException(404, "المهمة غير موجودة")
+    
+    pending_assignments = db.query(TaskAssignment).filter(
+        TaskAssignment.task_id == task_id,
+        TaskAssignment.is_active == True,
+        TaskAssignment.acceptance_status == "pending"
+    ).count()
+    
+    if pending_assignments > 0:
+        raise HTTPException(400, f"يوجد {pending_assignments} توزيع(ات) في حالة انتظار")
+    
+    responsible_count = db.query(TaskAssignment).filter(
+        TaskAssignment.task_id == task_id,
+        TaskAssignment.is_active == True,
+        TaskAssignment.role_type_id == 2
+    ).count()
+    
+    if responsible_count == 0:
+        raise HTTPException(400, "يجب تعيين مسؤول نهائي للمهمة قبل إنهاء التوزيع")
+    
+    old_status = task.status_id
+    new_status = 26
+    task.status_id = new_status
+    
+    existing_log = db.query(TaskProgressLog).filter(
+        TaskProgressLog.task_id == task.task_id,
+        TaskProgressLog.status_old == old_status,
+        TaskProgressLog.status_new == new_status
+    ).first()
+    
+    if not existing_log:
+        progress_log = TaskProgressLog(
+            task_id=task.task_id,
+            employee_id=current_user,
+            progress_percent=100,
+            status_old=old_status,
+            status_new=new_status,
+            notes="تم إنهاء توزيع المهمة وجاهزة للتنفيذ"
+        )
+        db.add(progress_log)
+    
+    db.commit()
+    
+    return {"success": True, "message": "تم إنهاء توزيع المهمة بنجاح"}
 
 @router.get("/by-major-task/{major_task_id}")
 async def get_tasks_by_major_task(
@@ -714,16 +840,28 @@ async def get_tasks_by_major_task(
             DictPriority.priority_id == task.priority_id
         ).first()
         
+        assigned_to_name = None
+        if task.assigned_to:
+            employee = db.query(Employee).filter(
+                Employee.employee_id == task.assigned_to
+            ).first()
+            if employee:
+                assigned_to_name = employee.full_name
+        
         result.append({
             "task_id": task.task_id,
+            "id": task.task_id,
+            "major_task_id": task.major_task_id,
             "title": task.title,
             "description": task.description,
             "status_id": task.status_id,
             "status_name": status.name_ar if status else None,
-            "priority_id": task.priority_id,
+            "priority": priority.code if priority else "medium",
             "priority_name": priority.name_ar if priority else None,
+            "start_date": task.start_date.isoformat() if task.start_date else None,
             "end_date": task.end_date.isoformat() if task.end_date else None,
-            "estimated_hours": task.estimated_hours
+            "estimated_hours": task.estimated_hours,
+            "assigned_to_name": assigned_to_name
         })
     
     db.commit()
