@@ -383,7 +383,7 @@ class TaskDependency(Base):
     dependency_type = Column(Enum('FS', 'SS', 'FF', 'SF'), default='FS')
     lag_days = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())
-
+    task = relationship("OperationalTask", foreign_keys=[task_id], backref="dependencies")
 
 class TaskComment(Base):
     __tablename__ = "task_comments"

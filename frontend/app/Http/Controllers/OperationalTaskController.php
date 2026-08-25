@@ -915,4 +915,177 @@ public function kanbanBoard($majorTaskId = null)
         'allTasks' => $filteredTasks,
     ]);
 }
+
+private function isLeadDepartment($majorTaskId): bool
+    {
+        $token = session('jwt_token');
+        $currentDepartmentId = $this->getDepartmentId();
+
+        $response = $this->apiClient->get("/api/tasks/major-tasks/{$majorTaskId}/details", $token);
+        $majorTask = $response['data'] ?? [];
+
+        $departmentsList = $majorTask['departments'] ?? [];
+        foreach ($departmentsList as $dept) {
+            if (isset($dept['department_id']) &&
+                (int)$dept['department_id'] === (int)$currentDepartmentId &&
+                ($dept['responsibility_type'] ?? '') === 'LEAD') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    public function dependencies($majorTaskId)
+    {
+        if (!$this->isManager()) {
+            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+        }
+
+        if (!$this->isLeadDepartment($majorTaskId)) {
+            return redirect()
+                ->route('operational.show-major-task', $majorTaskId)
+                ->with('error', 'إدارتك ليست المسؤولة الرئيسية عن هذه المهمة');
+        }
+
+        $token = session('jwt_token');
+
+        $majorTaskResponse = $this->apiClient->get("/api/tasks/major-tasks/{$majorTaskId}/details", $token);
+        $majorTask = $majorTaskResponse['data'] ?? [];
+
+        $tasksResponse = $this->apiClient->get("/api/tasks/major/{$majorTaskId}/dependencies", $token);
+        $tasks = $tasksResponse['data'] ?? [];
+
+        $dependencyTypes = [
+            ['value' => 'FS', 'label' => 'Finish to Start (انتهاء → بدء)'],
+            ['value' => 'SS', 'label' => 'Start to Start (بدء → بدء)'],
+            ['value' => 'FF', 'label' => 'Finish to Finish (انتهاء → انتهاء)'],
+            ['value' => 'SF', 'label' => 'Start to Finish (بدء → انتهاء)']
+        ];
+
+        return view('operational.dependencies', [
+            'majorTaskId' => $majorTaskId,
+            'majorTaskTitle' => $majorTask['name'] ?? $majorTask['title'] ?? 'المهمة الرئيسية',
+            'tasks' => $tasks,
+            'taskCount' => count($tasks),
+            'dependencyTypes' => $dependencyTypes
+        ]);
+    }
+
+    public function getDependenciesData($majorTaskId)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+        $token = session('jwt_token');
+        $response = $this->apiClient->get("/api/tasks/major/{$majorTaskId}/dependencies", $token);
+
+        return response()->json($response);
+    }
+
+    public function addDependency(Request $request)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+        $request->validate([
+            'task_id' => 'required|integer',
+            'depends_on_task_id' => 'required|integer',
+            'dependency_type' => 'required|string|in:FS,SS,FF,SF',
+            'lag_days' => 'nullable|integer|min:0'
+        ]);
+
+        $token = session('jwt_token');
+
+        $response = $this->apiClient->post(
+            "/api/tasks/dependencies",
+            [
+                'task_id' => (int) $request->task_id,
+                'depends_on_task_id' => (int) $request->depends_on_task_id,
+                'dependency_type' => $request->dependency_type,
+                'lag_days' => (int) ($request->lag_days ?? 0)
+            ],
+            $token
+        );
+
+        return response()->json($response);
+    }
+
+    public function updateDependency(Request $request, $id)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+        $request->validate([
+            'dependency_type' => 'nullable|string|in:FS,SS,FF,SF',
+            'lag_days' => 'nullable|integer|min:0'
+        ]);
+
+        $token = session('jwt_token');
+
+        $data = [];
+        if ($request->filled('dependency_type')) {
+            $data['dependency_type'] = $request->dependency_type;
+        }
+        if ($request->filled('lag_days')) {
+            $data['lag_days'] = (int) $request->lag_days;
+        }
+
+        if (empty($data)) {
+            return response()->json(['success' => false, 'message' => 'لا توجد بيانات للتحديث'], 400);
+        }
+
+        $response = $this->apiClient->put(
+            "/api/tasks/dependencies/{$id}",
+            $data,
+            $token
+        );
+
+        return response()->json($response);
+    }
+
+    public function deleteDependency($id)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+        $token = session('jwt_token');
+
+        $response = $this->apiClient->delete(
+            "/api/tasks/dependencies/{$id}",
+            $token
+        );
+
+        return response()->json($response);
+    }
+
+    public function checkCycle(Request $request)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+        $request->validate([
+            'task_id' => 'required|integer',
+            'depends_on_task_id' => 'required|integer'
+        ]);
+
+        $token = session('jwt_token');
+
+        $response = $this->apiClient->post(
+            "/api/tasks/dependencies/check-cycle",
+            [
+                'task_id' => (int) $request->task_id,
+                'depends_on_task_id' => (int) $request->depends_on_task_id
+            ],
+            $token
+        );
+
+        return response()->json($response);
+    }
 }
+

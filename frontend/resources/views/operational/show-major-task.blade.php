@@ -140,6 +140,14 @@
                 <i class="fas fa-arrow-right"></i> العودة للمهام الرئيسية
             </a>
         </div>
+        @if($isLeadDepartment ?? true)
+<div class="mt-2">
+    <a href="{{ route('operational.dependencies', $tid) }}" class="btn btn-outline-info btn-sm">
+        <i class="fas fa-sitemap"></i> إدارة تبعيات المهام
+    </a>
+</div>
+@endif
+
         <div>
             <a href="{{ route('operational.kanban', $tid ?? 0) }}" class="btn-kanban">
                 <i class="fas fa-columns"></i> لوحة ادارة المهام
@@ -263,7 +271,14 @@
                 </div>
             </div>
             <div class="task-actions" onclick="event.stopPropagation();">
-                <button class="btn btn-sm btn-outline-primary" onclick="editTask({{ json_encode($task) }})" title="تعديل">
+                <button class="btn btn-sm btn-outline-primary" 
+        data-bs-toggle="modal" 
+        data-bs-target="#editModal"
+        onclick="fillEditForm({{ json_encode($task) }})" 
+        title="تعديل">
+    <i class="fas fa-edit"></i>
+</button>
+
                     <i class="fas fa-edit"></i>
                 </button>
                 <form action="{{ route('operational.destroy', $task['id'] ?? 0) }}" method="POST" onsubmit="return confirm('متأكد من حذف هذه المهمة؟')" style="display:inline;">
@@ -444,26 +459,176 @@
     </div>
 
     {{-- مودال تعديل مهمة --}}
-    <div class="modal fade" id="editModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-warning">
-                    <h5 class="modal-title"><i class="fas fa-edit ml-2"></i>تعديل مهمة تشغيلية</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form id="editForm" method="POST">
-                    @csrf @method('PUT')
-                    <div class="modal-body">
-                        <div class="form-group"><label class="fw-bold">اسم المهمة</label><input type="text" name="title" id="e_title" class="form-control" required></div>
-                        <div class="form-group"><label class="fw-bold">الوصف</label><textarea name="description" id="e_desc" class="form-control" rows="2" required></textarea></div>
-                        <div class="form-group"><label class="fw-bold">الحالة</label><select name="status_id" id="e_status" class="form-control"><option value="16">معلق مؤقتاً</option><option value="5">معلق</option><option value="6">جاري العمل</option><option value="8">مكتمل</option><option value="7">متأخر</option></select></div>
-                        <div class="form-group"><label class="fw-bold">تاريخ التسليم</label><input type="date" name="end_date" id="e_end" class="form-control"></div>
-                    </div>
-                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button><button type="submit" class="btn btn-warning">حفظ التعديلات</button></div>
-                </form>
+    <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit ml-2"></i>
+                    تعديل مهمة تشغيلية
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
+
+            <form id="editForm" method="POST" action="" onsubmit="return validateEditForm()">
+                @csrf
+                @method('PUT')
+
+                <input type="hidden" name="task_id" id="e_task_id">
+                <input type="hidden" name="major_task_id" value="{{ $tid }}">
+                <input type="hidden" name="department_id" value="{{ $departmentId ?? 0 }}">
+                <input type="hidden" name="updated_by" value="{{ auth()->user()->employee_id ?? 0 }}">
+
+                <input type="hidden" id="e_initiativeStartDate" value="{{ $initiativeStart ?? '' }}">
+                <input type="hidden" id="e_initiativeEndDate" value="{{ $initiativeEnd ?? '' }}">
+                <input type="hidden" id="e_majorTaskExpectedDays" value="{{ $estimatedDays }}">
+
+                <div class="modal-body">
+                    <div class="alert alert-info alert-dismissible fade show">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-info-circle fa-2x ml-3"></i>
+                            <div>
+                                <strong>المهمة الرئيسية:</strong> {{ $taskTitle }}
+                                <br>
+                                <small>
+                                    <i class="fas fa-calendar-alt"></i>
+                                    بداية المبادرة: {{ $initiativeStart ? \Carbon\Carbon::parse($initiativeStart)->format('Y-m-d') : 'غير محدد' }}
+                                    <i class="fas fa-arrow-left mx-2"></i>
+                                    نهاية المبادرة: {{ $initiativeEnd ? \Carbon\Carbon::parse($initiativeEnd)->format('Y-m-d') : 'غير محدد' }}
+                                    @if($estimatedDays)
+                                        | <i class="fas fa-clock"></i> المدة المتوقعة: {{ $estimatedDays }} يوم
+                                    @endif
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="fw-bold">
+                            عنوان المهمة <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" name="title" id="e_title" class="form-control form-control-lg"
+                               placeholder="أدخل عنوان المهمة التشغيلية..."
+                               maxlength="255" required
+                               oninput="validateEditTitle()">
+                        <div class="error-feedback" id="e_titleFeedback">الرجاء إدخال عنوان المهمة (3 أحرف على الأقل)</div>
+                        <small class="text-muted" id="e_titleCount">0/255 حرف</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="fw-bold">
+                            الوصف <span class="text-danger">*</span>
+                        </label>
+                        <textarea name="description" id="e_description" class="form-control" rows="3"
+                                  placeholder="أدخل وصفاً تفصيلياً للمهمة..."
+                                  maxlength="1000" required
+                                  oninput="validateEditDescription()"></textarea>
+                        <div class="error-feedback" id="e_descFeedback">الرجاء إدخال وصف للمهمة</div>
+                        <small class="text-muted" id="e_descCount">0/1000 حرف</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 form-group">
+                            <label class="fw-bold">
+                                الأولوية <span class="text-danger">*</span>
+                            </label>
+                            <select name="priority_id" id="e_priority" class="form-select" required>
+                                <option value="">-- اختر الأولوية --</option>
+                                @foreach($priorities as $p)
+                                    <option value="{{ $p['priority_id'] }}"
+                                        {{ ($p['level'] ?? 0) == 2 ? 'selected' : '' }}>
+                                        {{ $p['name_ar'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="error-feedback" id="e_priorityFeedback">الرجاء اختيار الأولوية</div>
+                        </div>
+
+                        <div class="col-md-6 form-group">
+                            <label class="fw-bold">
+                                الساعات المقدرة <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" name="estimated_hours" id="e_estimatedHours"
+                                   class="form-control" value="40"
+                                   min="1" max="720" required
+                                   oninput="validateEditHours()">
+                            <small class="text-muted">(1-720 ساعة)</small>
+                            <div class="error-feedback" id="e_hoursFeedback"></div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 form-group">
+                            <label class="fw-bold">
+                                تاريخ البداية <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" name="start_date" id="e_startDate"
+                                   class="form-control" required
+                                   onchange="validateEditDates()">
+                            <small class="text-muted" id="e_startDateHelp">
+                                <i class="fas fa-info-circle"></i>
+                                الحد الأدنى: <span id="e_minStartDate">{{ $initiativeStart ?? 'غير محدد' }}</span>
+                            </small>
+                            <div class="error-feedback" id="e_startDateFeedback"></div>
+                        </div>
+
+                        <div class="col-md-6 form-group">
+                            <label class="fw-bold">
+                                تاريخ التسليم <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" name="end_date" id="e_endDate"
+                                   class="form-control" required
+                                   onchange="validateEditDates()">
+                            <small class="text-muted" id="e_endDateHelp">
+                                <i class="fas fa-info-circle"></i>
+                                الحد الأعلى: <span id="e_maxEndDate">{{ $initiativeEnd ?? 'غير محدد' }}</span>
+                            </small>
+                            <div class="error-feedback" id="e_endDateFeedback"></div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3" id="e_durationInfo" style="display:none;">
+                        <div class="col-12">
+                            <div class="alert alert-secondary">
+                                <div class="row text-center">
+                                    <div class="col-md-4">
+                                        <h6>المدة المتوقعة</h6>
+                                        <span id="e_expectedDaysDisplay" class="badge bg-info">0 يوم</span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h6>المدة المختارة</h6>
+                                        <span id="e_selectedDaysDisplay" class="badge bg-primary">0 يوم</span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h6>المتبقي</h6>
+                                        <span id="e_remainingDaysDisplay" class="badge bg-success">0 يوم</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6 text-md-end">
+                            <small class="text-muted">
+                                <i class="fas fa-clock"></i>
+                                تاريخ التحديث: <strong>{{ now()->format('Y-m-d H:i') }}</strong>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> إلغاء
+                    </button>
+                    <button type="submit" class="btn btn-warning" id="e_submitBtn">
+                        <i class="fas fa-save"></i> تحديث المهمة
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
+</div>
 </div>
 @endsection
 
@@ -779,13 +944,281 @@ function validateForm() {
 }
 
 function editTask(task) {
-    $('#editForm').attr('action', '/operational/tasks/' + task.id);
+    console.log('Edit Task Called:', task);
+
+    if ($('#editModal').length === 0) {
+        alert('مودال التعديل غير موجود في الصفحة');
+        return;
+    }
+
+    $('#editForm').attr('action', '/operational/tasks/' + (task.id || task.task_id || 0));
+    $('#e_task_id').val(task.id || task.task_id || 0);
     $('#e_title').val(task.title || task.task_name || '');
-    $('#e_desc').val(task.description || '');
+    $('#e_description').val(task.description || '');
+    $('#e_priority').val(task.priority_id || task.priority || '');
+    $('#e_estimatedHours').val(task.estimated_hours || 40);
+    $('#e_startDate').val(task.start_date || '');
+    $('#e_endDate').val(task.end_date || '');
     $('#e_status').val(task.status_id || task.status || 16);
-    $('#e_end').val(task.end_date || '');
+
+    $('#e_titleCount').text(($('#e_title').val().length || 0) + '/255');
+    $('#e_descCount').text(($('#e_description').val().length || 0) + '/1000');
+
     $('#editModal').modal('show');
+
+    setTimeout(function() {
+        if (typeof validateEditTitle === 'function') validateEditTitle();
+        if (typeof validateEditDescription === 'function') validateEditDescription();
+        if (typeof validateEditPriority === 'function') validateEditPriority();
+        if (typeof validateEditHours === 'function') validateEditHours();
+        if (typeof validateEditDates === 'function') validateEditDates();
+        if (typeof calculateEditDuration === 'function') calculateEditDuration();
+        if (typeof updateEditEstimatedHours === 'function') updateEditEstimatedHours();
+    }, 300);
 }
+
+function validateEditTitle() {
+    var value = $('#e_title').val().trim();
+    var feedback = $('#e_titleFeedback');
+    if (value.length < 3) {
+        $('#e_title').addClass('is-invalid').removeClass('is-valid');
+        feedback.text('العنوان يجب أن يكون 3 أحرف على الأقل').addClass('show');
+        return false;
+    }
+    $('#e_title').removeClass('is-invalid').addClass('is-valid');
+    feedback.removeClass('show');
+    return true;
+}
+
+function validateEditDescription() {
+    var value = $('#e_description').val().trim();
+    var feedback = $('#e_descFeedback');
+    if (value.length === 0) {
+        $('#e_description').addClass('is-invalid').removeClass('is-valid');
+        feedback.addClass('show');
+        return false;
+    }
+    $('#e_description').removeClass('is-invalid').addClass('is-valid');
+    feedback.removeClass('show');
+    return true;
+}
+
+function validateEditPriority() {
+    var value = $('#e_priority').val();
+    var feedback = $('#e_priorityFeedback');
+    if (!value) {
+        $('#e_priority').addClass('is-invalid').removeClass('is-valid');
+        feedback.addClass('show');
+        return false;
+    }
+    $('#e_priority').removeClass('is-invalid').addClass('is-valid');
+    feedback.removeClass('show');
+    return true;
+}
+
+function validateEditHours() {
+    var hours = parseInt($('#e_estimatedHours').val());
+    var feedback = $('#e_hoursFeedback');
+    var startDate = $('#e_startDate').val();
+    var endDate = $('#e_endDate').val();
+
+    if (isNaN(hours) || hours < 1) {
+        $('#e_estimatedHours').addClass('is-invalid').removeClass('is-valid');
+        feedback.text('الرجاء إدخال عدد ساعات صحيح (1-720)').addClass('show');
+        return false;
+    }
+
+    if (hours > 720) {
+        $('#e_estimatedHours').addClass('is-invalid').removeClass('is-valid');
+        feedback.text('الحد الأقصى للساعات هو 720').addClass('show');
+        return false;
+    }
+
+    if (startDate && endDate) {
+        var days = calculateWorkingDays(startDate, endDate);
+        var maxHours = days * 8;
+        if (hours > maxHours) {
+            $('#e_estimatedHours').addClass('is-invalid').removeClass('is-valid');
+            feedback.text('الساعات المقدرة (' + hours + ') تتجاوز الحد الأقصى (' + maxHours + ' ساعة) للفترة المحددة').addClass('show');
+            return false;
+        }
+    }
+
+    $('#e_estimatedHours').removeClass('is-invalid').addClass('is-valid');
+    feedback.removeClass('show');
+    return true;
+}
+
+function validateEditDates() {
+    var startDate = $('#e_startDate').val();
+    var endDate = $('#e_endDate').val();
+    var initiativeStart = $('#e_initiativeStartDate').val();
+    var initiativeEnd = $('#e_initiativeEndDate').val();
+    var expectedDays = parseInt($('#e_majorTaskExpectedDays').val()) || 30;
+
+    var startFeedback = $('#e_startDateFeedback');
+    var endFeedback = $('#e_endDateFeedback');
+    var isValid = true;
+
+    $('#e_startDate').removeClass('is-invalid is-valid');
+    $('#e_endDate').removeClass('is-invalid is-valid');
+    startFeedback.removeClass('show');
+    endFeedback.removeClass('show');
+
+    if (!startDate) {
+        $('#e_startDate').addClass('is-invalid');
+        startFeedback.text('الرجاء تحديد تاريخ البداية').addClass('show');
+        isValid = false;
+    } else if (initiativeStart && startDate < initiativeStart) {
+        $('#e_startDate').addClass('is-invalid');
+        startFeedback.text('تاريخ البداية يجب أن يكون بعد أو يساوي بداية المبادرة').addClass('show');
+        isValid = false;
+    } else {
+        $('#e_startDate').addClass('is-valid');
+    }
+
+    if (!endDate) {
+        $('#e_endDate').addClass('is-invalid');
+        endFeedback.text('الرجاء تحديد تاريخ التسليم').addClass('show');
+        isValid = false;
+    } else if (startDate && endDate < startDate) {
+        $('#e_endDate').addClass('is-invalid');
+        endFeedback.text('تاريخ التسليم يجب أن يكون بعد تاريخ البداية').addClass('show');
+        isValid = false;
+    } else if (initiativeEnd && endDate > initiativeEnd) {
+        $('#e_endDate').addClass('is-invalid');
+        endFeedback.text('تاريخ التسليم يجب أن يكون قبل أو يساوي نهاية المبادرة').addClass('show');
+        isValid = false;
+    } else {
+        $('#e_endDate').addClass('is-valid');
+    }
+
+    if (startDate && endDate && isValid) {
+        var days = calculateWorkingDays(startDate, endDate);
+        if (days > expectedDays) {
+            $('#e_endDate').addClass('is-invalid').removeClass('is-valid');
+            endFeedback.text('المدة المختارة (' + days + ' يوم) تتجاوز المدة المتوقعة (' + expectedDays + ' يوم)').addClass('show');
+            isValid = false;
+        }
+    }
+
+    if (isValid) {
+        calculateEditDuration();
+        updateEditEstimatedHours();
+    }
+
+    return isValid;
+}
+
+function calculateEditDuration() {
+    var startDate = $('#e_startDate').val();
+    var endDate = $('#e_endDate').val();
+    var expectedDays = parseInt($('#e_majorTaskExpectedDays').val()) || 30;
+
+    if (!startDate || !endDate) {
+        $('#e_durationInfo').hide();
+        return;
+    }
+
+    var days = calculateWorkingDays(startDate, endDate);
+    $('#e_durationInfo').show();
+    $('#e_expectedDaysDisplay').text(expectedDays + ' يوم');
+    $('#e_selectedDaysDisplay').text(days + ' يوم');
+
+    var remaining = expectedDays - days;
+    if (remaining >= 0) {
+        $('#e_remainingDaysDisplay').text(remaining + ' يوم');
+        $('#e_remainingDaysDisplay').removeClass('bg-danger').addClass('bg-success');
+    } else {
+        $('#e_remainingDaysDisplay').text(Math.abs(remaining) + ' يوم (زيادة)');
+        $('#e_remainingDaysDisplay').removeClass('bg-success').addClass('bg-danger');
+    }
+}
+
+function updateEditEstimatedHours() {
+    var startDate = $('#e_startDate').val();
+    var endDate = $('#e_endDate').val();
+    if (!startDate || !endDate) return;
+
+    var days = calculateWorkingDays(startDate, endDate);
+    var maxHours = days * 8;
+    var hoursInput = $('#e_estimatedHours');
+    var currentHours = parseInt(hoursInput.val()) || 0;
+    hoursInput.attr('max', maxHours);
+
+    if (currentHours > maxHours) {
+        hoursInput.val(maxHours);
+    }
+    validateEditHours();
+}
+
+function validateEditForm() {
+    var isTitleValid = validateEditTitle();
+    var isDescValid = validateEditDescription();
+    var isPriorityValid = validateEditPriority();
+    var isHoursValid = validateEditHours();
+    var isDatesValid = validateEditDates();
+
+    if (!isTitleValid) { $('#e_title').focus(); return false; }
+    if (!isDescValid) { $('#e_description').focus(); return false; }
+    if (!isPriorityValid) { $('#e_priority').focus(); return false; }
+    if (!isHoursValid) { $('#e_estimatedHours').focus(); return false; }
+    if (!isDatesValid) {
+        if ($('#e_startDate').hasClass('is-invalid')) {
+            $('#e_startDate').focus();
+        } else {
+            $('#e_endDate').focus();
+        }
+        return false;
+    }
+    return true;
+}
+
+$('#e_title').on('input', function() {
+    var count = $(this).val().length;
+    $('#e_titleCount').text(count + '/255');
+    validateEditTitle();
+});
+
+$('#e_description').on('input', function() {
+    var count = $(this).val().length;
+    $('#e_descCount').text(count + '/1000');
+    validateEditDescription();
+});
+
+$('#e_priority').on('change', validateEditPriority);
+$('#e_estimatedHours').on('input', function() {
+    validateEditHours();
+    calculateEditDuration();
+});
+$('#e_startDate, #e_endDate').on('change', function() {
+    validateEditDates();
+    calculateEditDuration();
+    updateEditEstimatedHours();
+});
+
+$('#editForm').on('submit', function(e) {
+    if (!validateEditForm()) {
+        e.preventDefault();
+        if (typeof toastr !== 'undefined') {
+            toastr.error('الرجاء تصحيح جميع الأخطاء في النموذج');
+        }
+        return false;
+    }
+});
+
+$('#editModal').on('shown.bs.modal', function() {
+    $('#e_title').focus();
+});
+
+$('#editModal').on('hidden.bs.modal', function() {
+    $('#editForm')[0].reset();
+    $('.is-invalid').removeClass('is-invalid');
+    $('.is-valid').removeClass('is-valid');
+    $('.error-feedback').removeClass('show');
+    $('#e_durationInfo').hide();
+});
+
 
 $('#addOperationalForm').on('submit', function(e) {
     if (!validateForm()) {

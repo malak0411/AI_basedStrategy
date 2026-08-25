@@ -80,19 +80,81 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/{id}/edit', [TaskController::class, 'edit'])->name('edit');
         Route::put('/{id}', [TaskController::class, 'update'])->name('update');
     });
-    
+
+
     Route::middleware(['web', 'check.jwt'])->group(function () {
-    
-        Route::get('/operational/assign/{taskId}', [OperationalTaskController::class, 'assignEmployees'])->name('operational.assign');
-        Route::post('/operational/assign-task-to-employee', [OperationalTaskController::class, 'assignTaskToEmployee'])->name('operational.assign-task-to-employee');
-        Route::put('/operational/update-assignment-hours', [OperationalTaskController::class, 'updateAssignmentHours'])->name('operational.update-assignment-hours');
-        Route::delete('/operational/remove-assignment', [OperationalTaskController::class, 'removeTaskAssignment'])->name('operational.remove-assignment');
-        Route::post('/operational/finalize-task', [OperationalTaskController::class, 'finalizeTask'])->name('operational.finalize-task');
-        Route::get('/operational/major-task/{id}', [OperationalTaskController::class, 'showMajorTask'])->name('operational.show-major-task');
-        Route::get('/operational/kanban/{majorTaskId?}', [OperationalTaskController::class, 'kanbanBoard'])->name('operational.kanban');
-        Route::put('/operational/update-status', [OperationalTaskController::class, 'updateTaskStatus'])->name('operational.update-status');
-        
-    });
+
+    Route::get('/operational/major-tasks', [OperationalTaskController::class, 'majorTasks'])->name('operational.major-tasks');
+
+    Route::get('/operational/major-task/{id}', [OperationalTaskController::class, 'showMajorTask'])->name('operational.show-major-task');
+
+    Route::get('/operational/dependencies/{majorTaskId}', [OperationalTaskController::class, 'dependencies'])->name('operational.dependencies');
+
+    Route::get('/operational/dependencies/data/{majorTaskId}', [OperationalTaskController::class, 'getDependenciesData'])->name('operational.dependencies-data');
+
+    Route::post('/operational/dependencies/add', [OperationalTaskController::class, 'addDependency'])
+        ->name('operational.add-dependency');
+
+    Route::put('/operational/dependencies/{id}', [OperationalTaskController::class, 'updateDependency'])
+        ->name('operational.update-dependency');
+
+    Route::delete('/operational/dependencies/{id}', [OperationalTaskController::class, 'deleteDependency'])
+        ->name('operational.delete-dependency');
+
+    Route::post('/operational/dependencies/check-cycle', [OperationalTaskController::class, 'checkCycle'])
+        ->name('operational.check-cycle');
+
+    Route::post('/operational/store', [OperationalTaskController::class, 'store'])
+        ->name('operational.store');
+
+    Route::put('/operational/tasks/{id}', [OperationalTaskController::class, 'update'])
+        ->name('operational.update');
+
+    Route::delete('/operational/tasks/{id}', [OperationalTaskController::class, 'destroy'])
+        ->name('operational.destroy');
+
+    Route::get('/operational/assign/{taskId}', [OperationalTaskController::class, 'assignEmployees'])
+        ->name('operational.assign');
+
+    Route::post('/operational/assign-task-to-employee', [OperationalTaskController::class, 'assignTaskToEmployee'])
+        ->name('operational.assign-task-to-employee');
+
+    Route::put('/operational/update-assignment-hours', [OperationalTaskController::class, 'updateAssignmentHours'])
+        ->name('operational.update-assignment-hours');
+
+    Route::delete('/operational/remove-assignment', [OperationalTaskController::class, 'removeTaskAssignment'])
+        ->name('operational.remove-assignment');
+
+    Route::post('/operational/finalize-task', [OperationalTaskController::class, 'finalizeTask'])
+        ->name('operational.finalize-task');
+
+    Route::get('/operational/kanban/{majorTaskId?}', [OperationalTaskController::class, 'kanbanBoard'])
+        ->name('operational.kanban');
+
+    Route::put('/operational/update-status', [OperationalTaskController::class, 'updateTaskStatus'])
+        ->name('operational.update-status');
+
+    Route::get('/operational/generate/{id}', [OperationalTaskController::class, 'generate'])
+        ->name('operational.generate');
+
+    Route::post('/operational/start-generation', [OperationalTaskController::class, 'startGeneration'])
+        ->name('operational.start-generation');
+
+    Route::get('/operational/waiting', [OperationalTaskController::class, 'waiting'])
+        ->name('operational.waiting');
+
+    Route::get('/operational/review', [OperationalTaskController::class, 'review'])
+        ->name('operational.review');
+
+    Route::post('/operational/edit-with-prompt', [OperationalTaskController::class, 'editWithPrompt'])
+        ->name('operational.edit-with-prompt');
+
+    Route::post('/operational/approve', [OperationalTaskController::class, 'approve'])
+        ->name('operational.approve');
+
+    Route::get('/operational/task/{id}', [OperationalTaskController::class, 'showOperationalTask'])
+        ->name('operational.task-detail');
+});
 
 
     Route::get('/operational/kanban', [OperationalTaskController::class, 'kanbanBoard'])->name('operational.kanban');
@@ -111,7 +173,7 @@ Route::middleware('check.jwt')->group(function () {
         Route::post('/edit-prompt', [OperationalTaskController::class, 'editWithPrompt'])->name('edit-prompt');
         Route::post('/approve', [OperationalTaskController::class, 'approve'])->name('approve');
         Route::get('/api/employees/department/{id}', [OperationalTaskController::class, 'getDepartmentEmployees']);
-        Route::get('/api/employees/initiative/{id}', [OperationalTaskController::class, 'getInitiativeEmployees']);
+        
     });
 
     Route::prefix('strategic')->name('strategic.')->group(function () {

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
-from app.models import DictRoleType, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority, TaskComment , TaskProgressLog 
+from app.models import DictRoleType, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority, TaskComment, TaskDependency , TaskProgressLog 
 from pydantic import BaseModel
 from datetime import date as date_type, datetime
 from typing import Optional
@@ -38,6 +38,46 @@ def format_task(task, db: Session, assigned_name=None, department_name=None):
         "assigned_to_name": assigned_name,
         "department_name": department_name
     }
+
+def check_dependency_rules(task, new_status, db):
+    dependencies = db.query(TaskDependency).filter(
+        TaskDependency.task_id == task.task_id
+    ).all()
+    
+    if not dependencies:
+        return None
+    
+    dep_task_ids = [dep.depends_on_task_id for dep in dependencies]
+    dep_tasks = db.query(OperationalTask).filter(
+        OperationalTask.task_id.in_(dep_task_ids),
+        OperationalTask.is_active == True
+    ).all()
+    dep_status_map = {t.task_id: t.status_id for t in dep_tasks}
+    dep_title_map = {t.task_id: t.title for t in dep_tasks}
+    
+    for dep in dependencies:
+        dep_status = dep_status_map.get(dep.depends_on_task_id)
+        dep_title = dep_title_map.get(dep.depends_on_task_id, 'مهمة غير موجودة')
+        
+        if dep_status is None:
+            return f"المهمة المعتمد عليها '{dep_title}' غير موجودة أو غير نشطة"
+        
+        dep_type = dep.dependency_type
+        
+        if dep_type == "FS":
+            if new_status in [6, 8] and dep_status != 19:
+                return f"لا يمكن بدء المهمة لأنها تعتمد على انتهاء مهمة '{dep_title}'"
+        elif dep_type == "SS":
+            if new_status in [6, 8] and dep_status not in [6, 8, 19]:
+                return f"لا يمكن بدء المهمة لأن المهمة المعتمد عليها '{dep_title}' لم تبدأ بعد"
+        elif dep_type == "FF":
+            if new_status == 19 and dep_status != 19:
+                return f"لا يمكن إنهاء المهمة لأن المهمة المعتمد عليها '{dep_title}' لم تنته بعد"
+        elif dep_type == "SF":
+            if new_status == 19 and dep_status not in [6, 8, 19]:
+                return f"لا يمكن إنهاء المهمة لأن المهمة المعتمد عليها '{dep_title}' لم تبدأ بعد"
+    
+    return None
 
 class TaskCreate(BaseModel):
     major_task_id: int
@@ -723,6 +763,10 @@ async def update_task_status(
     if not can_move:
         raise HTTPException(400, error)
     
+    dep_error = check_dependency_rules(task, status_id, db)
+    if dep_error:
+        raise HTTPException(400, dep_error)
+    
     if status_id in [5, 8, 19, 20] and not comment:
         raise HTTPException(400, "التعليق مطلوب لهذه الحالة")
     
@@ -740,7 +784,7 @@ async def update_task_status(
     if not existing_log:
         progress_log = TaskProgressLog(
             task_id=task.task_id,
-            employee_id=current_user,
+            employee_id=current_user.employee_id,
             progress_percent=0,
             status_old=old_status,
             status_new=status_id,
@@ -759,6 +803,7 @@ async def update_task_status(
             "new_status": status_id
         }
     }
+
 
 
 def can_move_task(from_status, to_status):
@@ -782,6 +827,7 @@ def can_move_task(from_status, to_status):
         return False, "لا يمكن نقل المهمة إلى هذه الحالة"
     
     return True, None
+
 
 
 
@@ -887,5 +933,286 @@ async def get_tasks_by_major_task(
             "assigned_to_name": assigned_to_name
         })
     
+    db.commit()
+    return {"success": True, "data": result}
+
+class DependencyCreate(BaseModel):
+    task_id: int
+    depends_on_task_id: int
+    dependency_type: str = "FS"
+    lag_days: int = 0
+
+class DependencyUpdate(BaseModel):
+    dependency_type: Optional[str] = None
+    lag_days: Optional[int] = None
+
+@router.get("/major/{major_task_id}/dependencies")
+async def get_major_task_dependencies(
+    major_task_id: int,
+    current_user: Employee = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    tasks = db.query(OperationalTask).filter(
+        OperationalTask.major_task_id == major_task_id,
+        OperationalTask.is_active == True
+    ).all()
+
+    if not tasks:
+        return {"success": True, "data": []}
+
+    task_ids = [t.task_id for t in tasks]
+
+    dependencies = db.query(TaskDependency).filter(
+        TaskDependency.task_id.in_(task_ids)
+    ).all()
+
+    dependency_map = {}
+    reverse_dependency_map = {}
+
+    for dep in dependencies:
+        depends_on_task = db.query(OperationalTask).filter(
+            OperationalTask.task_id == dep.depends_on_task_id
+        ).first()
+
+        if dep.task_id not in dependency_map:
+            dependency_map[dep.task_id] = []
+        dependency_map[dep.task_id].append({
+            "dependency_id": dep.dependency_id,
+            "depends_on_task_id": dep.depends_on_task_id,
+            "depends_on_task_title": depends_on_task.title if depends_on_task else None,
+            "dependency_type": dep.dependency_type,
+            "lag_days": dep.lag_days,
+            "created_at": dep.created_at.isoformat() if dep.created_at else None
+        })
+
+        if dep.depends_on_task_id not in reverse_dependency_map:
+            reverse_dependency_map[dep.depends_on_task_id] = []
+        reverse_dependency_map[dep.depends_on_task_id].append({
+            "dependency_id": dep.dependency_id,
+            "task_id": dep.task_id,
+            "dependency_type": dep.dependency_type,
+            "lag_days": dep.lag_days
+        })
+
+    result = []
+    for task in tasks:
+        status = db.query(DictStatus).filter(
+            DictStatus.status_id == task.status_id
+        ).first()
+
+        priority = db.query(DictPriority).filter(
+            DictPriority.priority_id == task.priority_id
+        ).first()
+
+        # 🔥 جلب الموظف المسند من جدول task_assignments
+        assigned_to_name = None
+        assignment = db.query(TaskAssignment).filter(
+            TaskAssignment.task_id == task.task_id,
+            TaskAssignment.is_active == True
+        ).first()
+        
+        if assignment:
+            emp = db.query(Employee).filter(
+                Employee.employee_id == assignment.employee_id
+            ).first()
+            if emp:
+                assigned_to_name = emp.full_name
+
+        result.append({
+            "task_id": task.task_id,
+            "title": task.title,
+            "description": task.description or "",
+            "status_id": task.status_id,
+            "status_name": status.name_ar if status else None,
+            "priority_id": task.priority_id,
+            "priority_name": priority.name_ar if priority else None,
+            "assigned_to_name": assigned_to_name,
+            "department_id": task.department_id,
+            "end_date": task.end_date.isoformat() if task.end_date else None,
+            "dependencies": dependency_map.get(task.task_id, []),
+            "depended_by": reverse_dependency_map.get(task.task_id, [])
+        })
+
+    db.commit()
+    return {"success": True, "data": result}
+
+@router.post("/dependencies")
+async def create_dependency(
+    data: DependencyCreate,
+    current_user: Employee = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    if data.task_id == data.depends_on_task_id:
+        raise HTTPException(400, "لا يمكن للمهمة أن تعتمد على نفسها")
+
+    task = db.query(OperationalTask).filter(
+        OperationalTask.task_id == data.task_id,
+        OperationalTask.is_active == True
+    ).first()
+    if not task:
+        raise HTTPException(404, "المهمة غير موجودة")
+
+    depends_on = db.query(OperationalTask).filter(
+        OperationalTask.task_id == data.depends_on_task_id,
+        OperationalTask.is_active == True
+    ).first()
+    if not depends_on:
+        raise HTTPException(404, "المهمة المعتمد عليها غير موجودة")
+
+    existing = db.query(TaskDependency).filter(
+        TaskDependency.task_id == data.task_id,
+        TaskDependency.depends_on_task_id == data.depends_on_task_id
+    ).first()
+    if existing:
+        raise HTTPException(400, "هذه التبعية موجودة بالفعل")
+
+    if _would_create_cycle(data.task_id, data.depends_on_task_id, db):
+        raise HTTPException(400, "هذه التبعية ستؤدي إلى دورة مغلقة (loop)")
+
+    dependency = TaskDependency(
+        task_id=data.task_id,
+        depends_on_task_id=data.depends_on_task_id,
+        dependency_type=data.dependency_type,
+        lag_days=data.lag_days or 0,
+        created_at=datetime.now()
+    )
+
+    db.add(dependency)
+    db.commit()
+    db.refresh(dependency)
+
+    return {
+        "success": True,
+        "message": "تم إضافة التبعية بنجاح",
+        "data": {
+            "dependency_id": dependency.dependency_id,
+            "task_id": dependency.task_id,
+            "depends_on_task_id": dependency.depends_on_task_id,
+            "dependency_type": dependency.dependency_type,
+            "lag_days": dependency.lag_days
+        }
+    }
+
+@router.put("/dependencies/{dependency_id}")
+async def update_dependency(
+    dependency_id: int,
+    data: DependencyUpdate,
+    current_user: Employee = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    dependency = db.query(TaskDependency).filter(
+        TaskDependency.dependency_id == dependency_id
+    ).first()
+
+    if not dependency:
+        raise HTTPException(404, "التبعية غير موجودة")
+
+    if data.dependency_type is not None:
+        dependency.dependency_type = data.dependency_type
+    if data.lag_days is not None:
+        dependency.lag_days = data.lag_days
+
+    db.commit()
+    db.refresh(dependency)
+
+    return {
+        "success": True,
+        "message": "تم تحديث التبعية بنجاح",
+        "data": {
+            "dependency_id": dependency.dependency_id,
+            "task_id": dependency.task_id,
+            "depends_on_task_id": dependency.depends_on_task_id,
+            "dependency_type": dependency.dependency_type,
+            "lag_days": dependency.lag_days
+        }
+    }
+
+@router.delete("/dependencies/{dependency_id}")
+async def delete_dependency(
+    dependency_id: int,
+    current_user: Employee = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    dependency = db.query(TaskDependency).filter(
+        TaskDependency.dependency_id == dependency_id
+    ).first()
+
+    if not dependency:
+        raise HTTPException(404, "التبعية غير موجودة")
+
+    db.delete(dependency)
+    db.commit()
+
+    return {"success": True, "message": "تم حذف التبعية بنجاح"}
+
+@router.post("/dependencies/check-cycle")
+async def check_cycle(
+    data: dict,
+    current_user: Employee = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    task_id = data.get("task_id")
+    depends_on_task_id = data.get("depends_on_task_id")
+
+    if not task_id or not depends_on_task_id:
+        raise HTTPException(400, "معرفا المهمة مطلوبان")
+
+    if task_id == depends_on_task_id:
+        return {"success": False, "message": "لا يمكن للمهمة أن تعتمد على نفسها"}
+
+    would_cycle = _would_create_cycle(task_id, depends_on_task_id, db)
+
+    return {
+        "success": True,
+        "would_create_cycle": would_cycle,
+        "message": "سيتم إنشاء دورة مغلقة" if would_cycle else "لا يوجد دورة مغلقة"
+    }
+
+def _would_create_cycle(task_id, depends_on_task_id, db):
+    visited = set()
+    stack = [depends_on_task_id]
+
+    while stack:
+        current = stack.pop()
+        if current in visited:
+            continue
+        visited.add(current)
+
+        if current == task_id:
+            return True
+
+        deps = db.query(TaskDependency).filter(
+            TaskDependency.task_id == current
+        ).all()
+
+        for dep in deps:
+            if dep.depends_on_task_id not in visited:
+                stack.append(dep.depends_on_task_id)
+
+    return False
+
+@router.get("/{task_id}/dependencies")
+async def get_task_dependencies(
+    task_id: int,
+    current_user: Employee = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    deps = db.query(TaskDependency).filter(
+        TaskDependency.task_id == task_id
+    ).all()
+
+    result = []
+    for dep in deps:
+        task = db.query(OperationalTask).filter(
+            OperationalTask.task_id == dep.depends_on_task_id
+        ).first()
+        result.append({
+            "dependency_id": dep.dependency_id,
+            "depends_on_task_id": dep.depends_on_task_id,
+            "depends_on_title": task.title if task else None,
+            "dependency_type": dep.dependency_type,
+            "lag_days": dep.lag_days
+        })
+
     db.commit()
     return {"success": True, "data": result}
