@@ -1,8 +1,6 @@
 @extends('layouts.app')
 
-
 @section('title', 'تفاصيل المهمة الرئيسية')
-
 
 @push('styles')
 <style>
@@ -112,47 +110,67 @@
     .btn-kanban i {
         margin-left: 6px;
     }
+    .btn-gold {
+        background: #d4af37;
+        color: #1a1a2e;
+        border: none;
+        padding: 6px 16px;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s;
+        font-size: 14px;
+    }
+    .btn-gold:hover {
+        background: #c5a234;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+        color: #1a1a2e;
+    }
+    .btn-gold i {
+        margin-left: 6px;
+    }
 </style>
 @endpush
 
-
 @section('content')
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <a href="{{ route('operational.major-tasks') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-right"></i> العودة للمهام الرئيسية
-        </a>
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <a href="{{ route('operational.major-tasks') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-right"></i> العودة للمهام الرئيسية
+            </a>
+        </div>
+        <div>
+            <a href="{{ route('operational.kanban', $tid ?? 0) }}" class="btn-kanban">
+                <i class="fas fa-columns"></i> لوحة ادارة المهام
+            </a>
+        </div>
     </div>
-    <div>
-        <a href="{{ route('operational.kanban', $tid) }}" class="btn-kanban">
-            <i class="fas fa-columns"></i> لوحة كانبان
-        </a>
-    </div>
-</div>
-
-
 
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif
-   
+
     @if(session('error'))
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
 
-
     @php
         $tid = $majorTask['id'] ?? 0;
-        $taskEndDate = $majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days'));
         $isActive = $majorTask['is_active'] ?? true;
         $taskTitle = $majorTask['name'] ?? $majorTask['title'] ?? 'غير محدد';
         $taskDescription = $majorTask['description'] ?? '';
-        $estimatedDays = $majorTask['estimated_duration_days'] ?? $majorTask['expected_days'] ?? 0;
+        $estimatedDays = $estimatedDays ?? 0;
         $isCrossDept = $majorTask['is_cross_department'] ?? false;
-        $initiativeName = $initiativeName ?? $majorTask['initiative_name'] ?? 'غير محدد';
+        $initiativeName = $initiativeName ?? 'غير محدد';
         $departmentsList = $majorTask['departments'] ?? [];
+        $initiativeStart = $initiativeStart ?? null;
+        $initiativeEnd = $initiativeEnd ?? null;
+        $departmentNotes = $departmentNotes ?? null;
+        $operationalTasks = $operationalTasks ?? [];
+        $majorTaskEndDate = $majorTaskEndDate ?? date('Y-m-d', strtotime('+30 days'));
+        $calculatedEnd = $calculatedEnd ?? null;
     @endphp
-
 
     <div class="card-custom mb-4">
         <div class="d-flex justify-content-between align-items-start">
@@ -166,12 +184,12 @@
         </div>
         <div class="row mt-3">
             <div class="col-md-3">
-                <small class="text-muted">المدة</small>
+                <small class="text-muted">المدة المتوقعة</small>
                 <div><strong>{{ $estimatedDays }} يوم</strong></div>
             </div>
             <div class="col-md-3">
-                <small class="text-muted">تاريخ النهاية</small>
-                <div><strong>{{ $taskEndDate }}</strong></div>
+                <small class="text-muted">تاريخ النهاية (محسوب)</small>
+                <div><strong>{{ $majorTaskEndDate }}</strong></div>
             </div>
             <div class="col-md-3">
                 <small class="text-muted">مشتركة بين الإدارات</small>
@@ -180,6 +198,16 @@
             <div class="col-md-3">
                 <small class="text-muted">المبادرة</small>
                 <div><strong>{{ $initiativeName }}</strong></div>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-md-4">
+                <small class="text-muted">بداية المبادرة</small>
+                <div><strong>{{ $initiativeStart ? \Carbon\Carbon::parse($initiativeStart)->format('Y-m-d') : 'غير محدد' }}</strong></div>
+            </div>
+            <div class="col-md-4">
+                <small class="text-muted">نهاية المبادرة</small>
+                <div><strong>{{ $initiativeEnd ? \Carbon\Carbon::parse($initiativeEnd)->format('Y-m-d') : 'غير محدد' }}</strong></div>
             </div>
         </div>
         @if(!empty($departmentsList))
@@ -195,11 +223,16 @@
             </div>
         </div>
         @endif
+        @if(!empty($departmentNotes))
+        <div class="alert alert-info mt-3 mb-0">
+            <i class="fas fa-sticky-note ml-2"></i>
+            <strong>ملاحظة خاصة بإدارتك:</strong> {{ $departmentNotes }}
+        </div>
+        @endif
     </div>
 
-
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5><i class="fas fa-list-check ml-2"></i>المهام التشغيلية ({{ count($operationalTasks ?? []) }})</h5>
+        <h5><i class="fas fa-list-check ml-2"></i>المهام التشغيلية ({{ count($operationalTasks) }})</h5>
         <div class="d-flex gap-2">
             <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addOperationalModal">
                 <i class="fas fa-plus"></i> إضافة مهمة يدوياً
@@ -210,29 +243,30 @@
         </div>
     </div>
 
-
     @if(empty($operationalTasks))
     <div class="empty-state">
         <i class="fas fa-robot"></i>
-        <h5>لا توجد مهام تشغيلية</h5>
+        <h5>لا توجد مهام تشغيلية تابعة لإدارتك</h5>
         <p class="text-muted">يمكنك إضافة المهام يدوياً أو استخدام الذكاء الاصطناعي لتوليدها</p>
     </div>
     @else
     @foreach($operationalTasks as $task)
-    <div class="task-card" onclick="window.location='{{ route('operational.assign', $task['id']) }}'">
+    <div class="task-card" onclick="window.location='{{ route('operational.assign', $task['id'] ?? 0) }}'">
         <div class="d-flex justify-content-between align-items-start">
             <div class="flex-grow-1">
-                <h6>{{ $task['task_name'] ?? $task['title'] ?? '' }}</h6>
+                <h6>{{ $task['title'] ?? '' }}</h6>
                 <p class="text-muted small mb-2">{{ Str::limit($task['description'] ?? '', 150) }}</p>
                 <div class="d-flex gap-3 flex-wrap align-items-center">
-                    <small><i class="far fa-clock ml-1"></i> {{ $task['end_date'] ?? 'غير محدد' }}</small>
+                   @if(!empty($task['assigned_to_name']))
+                    <small><i class="fas fa-user ml-1"></i> {{ $task['assigned_to_name'] }}</small>
+                    @endif
                 </div>
             </div>
             <div class="task-actions" onclick="event.stopPropagation();">
                 <button class="btn btn-sm btn-outline-primary" onclick="editTask({{ json_encode($task) }})" title="تعديل">
                     <i class="fas fa-edit"></i>
                 </button>
-                <form action="{{ route('operational.destroy', $task['id']) }}" method="POST" onsubmit="return confirm('متأكد من حذف هذه المهمة؟')" style="display:inline;">
+                <form action="{{ route('operational.destroy', $task['id'] ?? 0) }}" method="POST" onsubmit="return confirm('متأكد من حذف هذه المهمة؟')" style="display:inline;">
                     @csrf @method('DELETE')
                     <button class="btn btn-sm btn-outline-danger" title="حذف"><i class="fas fa-trash"></i></button>
                 </form>
@@ -242,7 +276,7 @@
     @endforeach
     @endif
 
-
+    {{-- مودال إضافة مهمة --}}
     <div class="modal fade" id="addOperationalModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
@@ -254,21 +288,17 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
 
-
                 <form id="addOperationalForm" method="POST" action="{{ route('operational.store') }}">
                     @csrf
-
 
                     <input type="hidden" name="major_task_id" value="{{ $tid }}">
                     <input type="hidden" name="department_id" value="{{ $departmentId ?? 0 }}">
                     <input type="hidden" name="created_by" value="{{ auth()->user()->employee_id ?? 0 }}">
                     <input type="hidden" name="status_id" value="16">
 
-
                     <input type="hidden" id="initiativeStartDate" value="{{ $initiativeStart ?? '' }}">
                     <input type="hidden" id="initiativeEndDate" value="{{ $initiativeEnd ?? '' }}">
                     <input type="hidden" id="majorTaskExpectedDays" value="{{ $estimatedDays }}">
-
 
                     <div class="modal-body">
                         <div class="alert alert-info alert-dismissible fade show">
@@ -277,10 +307,18 @@
                                 <div>
                                     <strong>المهمة الرئيسية:</strong> {{ $taskTitle }}
                                     <br>
+                                    <small>
+                                        <i class="fas fa-calendar-alt"></i>
+                                        بداية المبادرة: {{ $initiativeStart ? \Carbon\Carbon::parse($initiativeStart)->format('Y-m-d') : 'غير محدد' }}
+                                        <i class="fas fa-arrow-left mx-2"></i>
+                                        نهاية المبادرة: {{ $initiativeEnd ? \Carbon\Carbon::parse($initiativeEnd)->format('Y-m-d') : 'غير محدد' }}
+                                        @if($estimatedDays)
+                                            | <i class="fas fa-clock"></i> المدة المتوقعة: {{ $estimatedDays }} يوم
+                                        @endif
+                                    </small>
                                 </div>
                             </div>
                         </div>
-
 
                         <div class="form-group">
                             <label class="fw-bold">
@@ -293,7 +331,6 @@
                             <small class="text-muted" id="titleCount">0/255 حرف</small>
                         </div>
 
-
                         <div class="form-group">
                             <label class="fw-bold">
                                 الوصف <span class="text-danger">*</span>
@@ -304,7 +341,6 @@
                             <div class="error-feedback" id="descFeedback">الرجاء إدخال وصف للمهمة</div>
                             <small class="text-muted" id="descCount">0/1000 حرف</small>
                         </div>
-
 
                         <div class="row">
                             <div class="col-md-6 form-group">
@@ -323,7 +359,6 @@
                                 <div class="error-feedback" id="priorityFeedback">الرجاء اختيار الأولوية</div>
                             </div>
 
-
                             <div class="col-md-6 form-group">
                                 <label class="fw-bold">
                                     الساعات المقدرة <span class="text-danger">*</span>
@@ -335,7 +370,6 @@
                                 <div class="error-feedback" id="hoursFeedback"></div>
                             </div>
                         </div>
-
 
                         <div class="row">
                             <div class="col-md-6 form-group">
@@ -351,7 +385,6 @@
                                 <div class="error-feedback" id="startDateFeedback"></div>
                             </div>
 
-
                             <div class="col-md-6 form-group">
                                 <label class="fw-bold">
                                     تاريخ التسليم <span class="text-danger">*</span>
@@ -365,7 +398,6 @@
                                 <div class="error-feedback" id="endDateFeedback"></div>
                             </div>
                         </div>
-
 
                         <div class="row mb-3" id="durationInfo" style="display:none;">
                             <div class="col-12">
@@ -388,7 +420,6 @@
                             </div>
                         </div>
 
-
                         <div class="row mt-2">
                             <div class="col-md-6 text-md-end">
                                 <small class="text-muted">
@@ -398,7 +429,6 @@
                             </div>
                         </div>
                     </div>
-
 
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
@@ -413,7 +443,7 @@
         </div>
     </div>
 
-
+    {{-- مودال تعديل مهمة --}}
     <div class="modal fade" id="editModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -437,12 +467,10 @@
 </div>
 @endsection
 
-
 @push('scripts')
 <script>
 $(document).ready(function() {
     initializeDates();
-
 
     $('#taskTitle').on('input', function() {
         var count = $(this).val().length;
@@ -450,31 +478,26 @@ $(document).ready(function() {
         validateTitle();
     });
 
-
     $('#taskDescription').on('input', function() {
         var count = $(this).val().length;
         $('#descCount').text(count + '/1000');
         validateDescription();
     });
 
-
     $('#taskPriority').on('change', function() {
         validatePriority();
     });
-
 
     $('#estimatedHours').on('input', function() {
         validateHours();
         calculateDuration();
     });
 
-
     $('#startDate, #endDate').on('change', function() {
         validateDates();
         calculateDuration();
         updateEstimatedHours();
     });
-
 
     $('#addOperationalModal').on('shown.bs.modal', function() {
         initializeDates();
@@ -484,33 +507,25 @@ $(document).ready(function() {
     });
 });
 
-
 function initializeDates() {
     var initiativeStart = $('#initiativeStartDate').val();
     var initiativeEnd = $('#initiativeEndDate').val();
     var today = new Date().toISOString().split('T')[0];
-   
-    console.log('initiativeStart:', initiativeStart);
-    console.log('initiativeEnd:', initiativeEnd);
-
 
     var minStart = initiativeStart || today;
 
-
     $('#startDate').attr('min', minStart);
-   
+
     if (!$('#startDate').val()) {
         $('#startDate').val(minStart);
     }
-   
-    $('#minStartDate').text(minStart || 'غير محدد');
 
+    $('#minStartDate').text(minStart || 'غير محدد');
 
     if (initiativeEnd) {
         $('#endDate').attr('max', initiativeEnd);
         $('#maxEndDate').text(initiativeEnd);
     }
-
 
     if (!$('#endDate').val()) {
         var startDate = new Date(minStart);
@@ -518,12 +533,11 @@ function initializeDates() {
         var defaultEnd = startDate.toISOString().split('T')[0];
         $('#endDate').val(defaultEnd);
         $('#endDate').attr('min', minStart);
-       
+
         if (initiativeEnd && defaultEnd > initiativeEnd) {
             $('#endDate').val(initiativeEnd);
         }
     }
-
 
     setTimeout(function() {
         validateDates();
@@ -532,11 +546,9 @@ function initializeDates() {
     }, 200);
 }
 
-
 function validateTitle() {
     var value = $('#taskTitle').val().trim();
     var feedback = $('#titleFeedback');
-
 
     if (value.length < 3) {
         $('#taskTitle').addClass('is-invalid').removeClass('is-valid');
@@ -548,11 +560,9 @@ function validateTitle() {
     return true;
 }
 
-
 function validateDescription() {
     var value = $('#taskDescription').val().trim();
     var feedback = $('#descFeedback');
-
 
     if (value.length === 0) {
         $('#taskDescription').addClass('is-invalid').removeClass('is-valid');
@@ -564,11 +574,9 @@ function validateDescription() {
     return true;
 }
 
-
 function validatePriority() {
     var value = $('#taskPriority').val();
     var feedback = $('#priorityFeedback');
-
 
     if (!value) {
         $('#taskPriority').addClass('is-invalid').removeClass('is-valid');
@@ -580,13 +588,11 @@ function validatePriority() {
     return true;
 }
 
-
 function validateHours() {
     var hours = parseInt($('#estimatedHours').val());
     var feedback = $('#hoursFeedback');
     var startDate = $('#startDate').val();
     var endDate = $('#endDate').val();
-
 
     if (isNaN(hours) || hours < 1) {
         $('#estimatedHours').addClass('is-invalid').removeClass('is-valid');
@@ -594,18 +600,15 @@ function validateHours() {
         return false;
     }
 
-
     if (hours > 720) {
         $('#estimatedHours').addClass('is-invalid').removeClass('is-valid');
         feedback.text('الحد الأقصى للساعات هو 720').addClass('show');
         return false;
     }
 
-
     if (startDate && endDate) {
         var days = calculateWorkingDays(startDate, endDate);
         var maxHours = days * 8;
-
 
         if (hours > maxHours) {
             $('#estimatedHours').addClass('is-invalid').removeClass('is-valid');
@@ -614,12 +617,10 @@ function validateHours() {
         }
     }
 
-
     $('#estimatedHours').removeClass('is-invalid').addClass('is-valid');
     feedback.removeClass('show');
     return true;
 }
-
 
 function validateDates() {
     var startDate = $('#startDate').val();
@@ -628,19 +629,15 @@ function validateDates() {
     var initiativeEnd = $('#initiativeEndDate').val();
     var expectedDays = parseInt($('#majorTaskExpectedDays').val()) || 30;
 
-
     var startFeedback = $('#startDateFeedback');
     var endFeedback = $('#endDateFeedback');
 
-
     var isValid = true;
-
 
     $('#startDate').removeClass('is-invalid is-valid');
     $('#endDate').removeClass('is-invalid is-valid');
     startFeedback.removeClass('show');
     endFeedback.removeClass('show');
-
 
     if (!startDate) {
         $('#startDate').addClass('is-invalid');
@@ -653,7 +650,6 @@ function validateDates() {
     } else {
         $('#startDate').addClass('is-valid');
     }
-
 
     if (!endDate) {
         $('#endDate').addClass('is-invalid');
@@ -671,10 +667,8 @@ function validateDates() {
         $('#endDate').addClass('is-valid');
     }
 
-
     if (startDate && endDate && isValid) {
         var days = calculateWorkingDays(startDate, endDate);
-
 
         if (days > expectedDays) {
             $('#endDate').addClass('is-invalid').removeClass('is-valid');
@@ -683,16 +677,13 @@ function validateDates() {
         }
     }
 
-
     return isValid;
 }
-
 
 function calculateWorkingDays(startDate, endDate) {
     var start = new Date(startDate);
     var end = new Date(endDate);
     var workingDays = 0;
-
 
     while (start <= end) {
         var dayOfWeek = start.getDay();
@@ -702,30 +693,24 @@ function calculateWorkingDays(startDate, endDate) {
         start.setDate(start.getDate() + 1);
     }
 
-
     return workingDays;
 }
-
 
 function calculateDuration() {
     var startDate = $('#startDate').val();
     var endDate = $('#endDate').val();
     var expectedDays = parseInt($('#majorTaskExpectedDays').val()) || 30;
 
-
     if (!startDate || !endDate) {
         $('#durationInfo').hide();
         return;
     }
 
-
     var days = calculateWorkingDays(startDate, endDate);
-
 
     $('#durationInfo').show();
     $('#expectedDaysDisplay').text(expectedDays + ' يوم');
     $('#selectedDaysDisplay').text(days + ' يوم');
-
 
     var remaining = expectedDays - days;
     if (remaining >= 0) {
@@ -737,34 +722,26 @@ function calculateDuration() {
     }
 }
 
-
 function updateEstimatedHours() {
     var startDate = $('#startDate').val();
     var endDate = $('#endDate').val();
 
-
     if (!startDate || !endDate) return;
-
 
     var days = calculateWorkingDays(startDate, endDate);
     var maxHours = days * 8;
 
-
     var hoursInput = $('#estimatedHours');
     var currentHours = parseInt(hoursInput.val()) || 0;
 
-
     hoursInput.attr('max', maxHours);
-
 
     if (currentHours > maxHours) {
         hoursInput.val(maxHours);
     }
 
-
     validateHours();
 }
-
 
 function validateForm() {
     var isTitleValid = validateTitle();
@@ -772,7 +749,6 @@ function validateForm() {
     var isPriorityValid = validatePriority();
     var isHoursValid = validateHours();
     var isDatesValid = validateDates();
-
 
     if (!isTitleValid) {
         $('#taskTitle').focus();
@@ -799,10 +775,8 @@ function validateForm() {
         return false;
     }
 
-
     return true;
 }
-
 
 function editTask(task) {
     $('#editForm').attr('action', '/operational/tasks/' + task.id);
@@ -812,7 +786,6 @@ function editTask(task) {
     $('#e_end').val(task.end_date || '');
     $('#editModal').modal('show');
 }
-
 
 $('#addOperationalForm').on('submit', function(e) {
     if (!validateForm()) {
@@ -824,7 +797,6 @@ $('#addOperationalForm').on('submit', function(e) {
     }
 });
 
-
 @if(session('success'))
     $(document).ready(function() {
         if (typeof toastr !== 'undefined') {
@@ -833,7 +805,6 @@ $('#addOperationalForm').on('submit', function(e) {
     });
 @endif
 
-
 @if(session('error'))
     $(document).ready(function() {
         if (typeof toastr !== 'undefined') {
@@ -841,7 +812,6 @@ $('#addOperationalForm').on('submit', function(e) {
         }
     });
 @endif
-
 
 @if($errors->any())
     $(document).ready(function() {

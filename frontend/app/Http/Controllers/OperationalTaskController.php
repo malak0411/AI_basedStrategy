@@ -76,106 +76,92 @@ class OperationalTaskController extends Controller
         return view('operational.major-tasks', compact('tasks'));
     }
 
-    
     public function showMajorTask($id)
-    {
-        if (!$this->isManager()) {
-            return redirect()
-                ->route('dashboard.employee')
-                ->with('error', 'غير مصرح');
-        }
-
-        $token = session('jwt_token');
-
-        $majorTaskResponse = $this->apiClient->get(
-            "/api/tasks/major-tasks/{$id}/details",
-            $token
-        );
-
-        $majorTask = $majorTaskResponse['data'] ?? [];
-
-        $operationalResponse = $this->apiClient->get(
-            "/api/tasks/by-major-task/{$id}",
-            $token
-        );
-
-        $operationalTasks = $operationalResponse['data'] ?? [];
-
-        $departmentId = $this->getDepartmentId();
-
-        if ($departmentId <= 0) {
-            return redirect()
-                ->route('dashboard.employee')
-                ->with('error', 'لم يتم تحديد القسم الخاص بالمستخدم');
-        }
-
-        $employeesResponse = $this->apiClient->get(
-            "/api/employees/department/{$departmentId}",
-            $token
-        );
-
-        $employees = $employeesResponse['data'] ?? [];
-
-        $roleTypesResponse = $this->apiClient->get(
-            '/api/dict/role-types',
-            $token
-        );
-
-        $roleTypes = $roleTypesResponse['data'] ?? [];
-
-        $prioritiesResponse = $this->apiClient->get(
-            '/api/dict/priorities',
-            $token
-        );
-
-        $priorities = $prioritiesResponse['data'] ?? [];
-
-        $departments = $this->apiClient->safeGet(
-            '/api/departments',
-            $token,
-            []
-        );
-
-        $initiativeId = $majorTask['initiative_id'] ?? $majorTask['initiative']['id'] ?? 0;
-        $initiativeStart = null;
-        $initiativeEnd = null;
-        $initiativeName = $majorTask['initiative_name'] ?? $majorTask['initiative']['name'] ?? 'غير محدد';
-
-        if ($initiativeId > 0) {
-            $initiativeResponse = $this->apiClient->get(
-                "/api/initiatives/{$initiativeId}",
-                $token
-            );
-            
-            if ($initiativeResponse['success'] ?? false) {
-                $initiative = $initiativeResponse['data'] ?? [];
-                $initiativeStart = $initiative['start_date'] ?? null;
-                $initiativeEnd = $initiative['end_date'] ?? null;
-                $initiativeName = $initiative['name'] ?? $initiative['title'] ?? 'غير محدد';
-            }
-        }
-
-        return view('operational.show-major-task', [
-            'majorTask' => $majorTask,
-            'operationalTasks' => $operationalTasks,
-            'departments' => $departments,
-            'employees' => $employees,
-            'roleTypes' => $roleTypes,
-            'priorities' => $priorities,
-            'departmentId' => $departmentId,
-            'initiativeStart' => $initiativeStart,
-            'initiativeEnd' => $initiativeEnd,
-            'initiativeName' => $initiativeName,
-            'tid' => $majorTask['id'] ?? 0,
-            'taskEndDate' => $majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days')),
-            'isActive' => $majorTask['is_active'] ?? true,
-            'taskTitle' => $majorTask['name'] ?? $majorTask['title'] ?? 'غير محدد',
-            'taskDescription' => $majorTask['description'] ?? '',
-            'estimatedDays' => $majorTask['estimated_duration_days'] ?? $majorTask['expected_days'] ?? 0,
-            'isCrossDept' => $majorTask['is_cross_department'] ?? false,
-            'departmentsList' => $majorTask['departments'] ?? []
-        ]);
+{
+    if (!$this->isManager()) {
+        return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
     }
+
+    $token = session('jwt_token');
+    $currentDepartmentId = $this->getDepartmentId();
+
+    $majorTaskResponse = $this->apiClient->get("/api/tasks/major-tasks/{$id}/details", $token);
+    $majorTask = $majorTaskResponse['data'] ?? [];
+
+    $initiativeName = $majorTask['initiative_name'] ?? 'غير محدد';
+    $initiativeStart = $majorTask['initiative_start_date'] ?? null;
+    $initiativeEnd = $majorTask['initiative_end_date'] ?? null;
+    $estimatedDays = $majorTask['estimated_duration_days'] ?? 0;
+
+    $majorTaskEndDate = null;
+    if ($initiativeStart && $estimatedDays) {
+        $majorTaskEndDate = \Carbon\Carbon::parse($initiativeStart)->addDays($estimatedDays)->toDateString();
+    } else {
+        $majorTaskEndDate = $majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days'));
+    }
+
+    $allOperationalResponse = $this->apiClient->get("/api/tasks/by-major-task/{$id}", $token);
+    $allOperationalTasks = $allOperationalResponse['data'] ?? [];
+
+    $filteredTasks = array_filter($allOperationalTasks, function($task) use ($currentDepartmentId) {
+        return isset($task['department_id']) && (int)$task['department_id'] === (int)$currentDepartmentId;
+    });
+    $filteredTasks = array_values($filteredTasks);
+
+    $calculatedEnd = null;
+    if ($initiativeStart && $estimatedDays) {
+        $calculatedEnd = \Carbon\Carbon::parse($initiativeStart)->addDays($estimatedDays)->toDateString();
+    }
+    foreach ($filteredTasks as &$task) {
+        $task['calculated_end_date'] = $calculatedEnd;
+        $task['initiative_start'] = $initiativeStart;
+        $task['initiative_end'] = $initiativeEnd;
+    }
+
+    $employeesResponse = $this->apiClient->get("/api/employees/department/{$currentDepartmentId}", $token);
+    $employees = $employeesResponse['data'] ?? [];
+
+    $roleTypesResponse = $this->apiClient->get('/api/dict/role-types', $token);
+    $roleTypes = $roleTypesResponse['data'] ?? [];
+
+    $prioritiesResponse = $this->apiClient->get('/api/dict/priorities', $token);
+    $priorities = $prioritiesResponse['data'] ?? [];
+
+    $departments = $this->apiClient->safeGet('/api/departments', $token, []);
+
+    $departmentsList = $majorTask['departments'] ?? [];
+    $departmentNotes = null;
+    foreach ($departmentsList as $dept) {
+        if (isset($dept['department_id']) && (int)$dept['department_id'] === (int)$currentDepartmentId) {
+            $departmentNotes = $dept['notes'] ?? null;
+            break;
+        }
+    }
+
+    return view('operational.show-major-task', [
+        'majorTask' => $majorTask,
+        'operationalTasks' => $filteredTasks,
+        'departments' => $departments,
+        'employees' => $employees,
+        'roleTypes' => $roleTypes,
+        'priorities' => $priorities,
+        'departmentId' => $currentDepartmentId,
+        'initiativeStart' => $initiativeStart,
+        'initiativeEnd' => $initiativeEnd,
+        'initiativeName' => $initiativeName,
+        'tid' => $majorTask['id'] ?? 0,
+        'majorTaskEndDate' => $majorTaskEndDate,
+        'isActive' => $majorTask['is_active'] ?? true,
+        'taskTitle' => $majorTask['name'] ?? $majorTask['title'] ?? 'غير محدد',
+        'taskDescription' => $majorTask['description'] ?? '',
+        'estimatedDays' => $estimatedDays,
+        'isCrossDept' => $majorTask['is_cross_department'] ?? false,
+        'departmentsList' => $departmentsList,
+        'departmentNotes' => $departmentNotes,
+        'calculatedEnd' => $calculatedEnd,
+    ]);
+}
+
 
     
     public function storeOperational(Request $request)
@@ -805,6 +791,7 @@ public function updateTaskStatus(Request $request)
     return response()->json($response);
 }
 
+
 public function kanbanBoard($majorTaskId = null)
 {
     if (!$this->isManager()) {
@@ -812,6 +799,7 @@ public function kanbanBoard($majorTaskId = null)
     }
 
     $token = session('jwt_token');
+    $currentDepartmentId = $this->getDepartmentId();
 
     if (!$majorTaskId) {
         $majorTaskId = session('current_major_task_id');
@@ -834,17 +822,39 @@ public function kanbanBoard($majorTaskId = null)
         return redirect()->route('operational.major-tasks')->with('error', 'لا توجد مهام رئيسية');
     }
 
-    $majorTaskResponse = $this->apiClient->get(
-        "/api/tasks/major-tasks/{$majorTaskId}/details",
-        $token
-    );
+    $majorTaskResponse = $this->apiClient->get("/api/tasks/major-tasks/{$majorTaskId}/details", $token);
     $majorTask = $majorTaskResponse['data'] ?? [];
 
-    $tasksResponse = $this->apiClient->get(
-        "/api/tasks/by-major-task/{$majorTaskId}",
-        $token
-    );
-    $allTasks = $tasksResponse['data'] ?? [];
+    $initiativeName = $majorTask['initiative_name'] ?? 'غير محدد';
+    $initiativeStart = $majorTask['initiative_start_date'] ?? null;
+    $initiativeEnd = $majorTask['initiative_end_date'] ?? null;
+    $estimatedDays = $majorTask['estimated_duration_days'] ?? 0;
+
+    $majorTaskEndDate = null;
+    if ($initiativeStart && $estimatedDays) {
+        $majorTaskEndDate = \Carbon\Carbon::parse($initiativeStart)->addDays($estimatedDays)->toDateString();
+    } else {
+        $majorTaskEndDate = $majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days'));
+    }
+
+    $allOperationalResponse = $this->apiClient->get("/api/tasks/by-major-task/{$majorTaskId}", $token);
+    $allTasks = $allOperationalResponse['data'] ?? [];
+
+    $filteredTasks = array_filter($allTasks, function($task) use ($currentDepartmentId) {
+        return isset($task['department_id']) && (int)$task['department_id'] === (int)$currentDepartmentId;
+    });
+    $filteredTasks = array_values($filteredTasks);
+
+    $calculatedEnd = null;
+    if ($initiativeStart && $estimatedDays) {
+        $calculatedEnd = \Carbon\Carbon::parse($initiativeStart)->addDays($estimatedDays)->toDateString();
+    }
+
+    foreach ($filteredTasks as &$task) {
+        $task['calculated_end_date'] = $calculatedEnd;
+        $task['initiative_start'] = $initiativeStart;
+        $task['initiative_end'] = $initiativeEnd;
+    }
 
     $unassignedTasks = [];
     $readyTasks = [];
@@ -854,8 +864,7 @@ public function kanbanBoard($majorTaskId = null)
     $acceptedTasks = [];
     $rejectedTasks = [];
 
-    foreach ($allTasks as $task) {
-        // المفتاح في الـ API هو "status" وليس "status_id"
+    foreach ($filteredTasks as $task) {
         $statusId = (int) ($task['status'] ?? 16);
 
         switch ($statusId) {
@@ -889,9 +898,12 @@ public function kanbanBoard($majorTaskId = null)
     return view('operational.kanban', [
         'majorTaskId' => $majorTaskId,
         'majorTaskTitle' => $majorTask['name'] ?? $majorTask['title'] ?? 'المهمة الرئيسية',
-        'majorTaskStartDate' => $majorTask['start_date'] ?? null,
-        'majorTaskEndDate' => $majorTask['end_date'] ?? null,
-        'majorTaskExpectedDays' => $majorTask['estimated_duration_days'] ?? $majorTask['expected_days'] ?? 0,
+        'majorTaskEndDate' => $majorTaskEndDate,
+        'initiativeName' => $initiativeName,
+        'initiativeStart' => $initiativeStart,
+        'initiativeEnd' => $initiativeEnd,
+        'estimatedDays' => $estimatedDays,
+        'calculatedEnd' => $calculatedEnd,
         'majorTaskIsActive' => $majorTask['is_active'] ?? true,
         'unassignedTasks' => $unassignedTasks,
         'readyTasks' => $readyTasks,
@@ -900,8 +912,7 @@ public function kanbanBoard($majorTaskId = null)
         'reviewTasks' => $reviewTasks,
         'acceptedTasks' => $acceptedTasks,
         'rejectedTasks' => $rejectedTasks,
-        'allTasks' => $allTasks
+        'allTasks' => $filteredTasks,
     ]);
 }
-
 }

@@ -117,7 +117,10 @@ async def delayed_tasks(db: Session = Depends(get_db)):
 @router.get("/by-major-task/{major_task_id}")
 async def tasks_by_major_task(major_task_id: int, db: Session = Depends(get_db)):
     try:
-        tasks = db.query(OperationalTask).filter(OperationalTask.major_task_id == major_task_id).all()
+        tasks = db.query(OperationalTask).filter(
+            OperationalTask.major_task_id == major_task_id,
+            OperationalTask.is_active == True
+        ).all()
         result = []
         for task in tasks:
             assignment = db.query(TaskAssignment).filter(TaskAssignment.task_id == task.task_id).first()
@@ -127,10 +130,13 @@ async def tasks_by_major_task(major_task_id: int, db: Session = Depends(get_db))
                 assigned_name = emp.full_name if emp else None
             result.append({
                 "id": task.task_id,
+                "task_id": task.task_id,
                 "task_name": task.title,
                 "title": task.title,
                 "description": task.description or "",
+                "department_id": task.department_id,   # 🔥 تمت إضافة هذا السطر
                 "status": task.status_id,
+                "status_id": task.status_id,
                 "status_name": get_status_map(db).get(task.status_id, str(task.status_id)),
                 "priority": task.priority_id,
                 "priority_name": get_priority_map(db).get(task.priority_id, str(task.priority_id)),
@@ -141,6 +147,7 @@ async def tasks_by_major_task(major_task_id: int, db: Session = Depends(get_db))
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
 
 @router.get("/department-major-tasks")
 async def department_major_tasks(db: Session = Depends(get_db)):
@@ -194,6 +201,7 @@ async def major_tasks_by_department(
                 "is_cross_department": t.is_cross_department,
                 "is_active": t.is_active,
                 "initiative_name": t.initiative.name if t.initiative else ""
+                
             })
         return {"success": True, "data": result}
     except Exception as e:
@@ -205,6 +213,7 @@ async def major_task_details(task_id: int, db: Session = Depends(get_db)):
         t = db.query(MajorTask).filter(MajorTask.major_task_id == task_id).first()
         if not t:
             raise HTTPException(status_code=404, detail="Task not found")
+        
         depts = db.query(MajorTaskDepartment).filter(MajorTaskDepartment.major_task_id == task_id).all()
         dept_list = []
         for d in depts:
@@ -215,6 +224,16 @@ async def major_task_details(task_id: int, db: Session = Depends(get_db)):
                 "responsibility_type": d.responsibility_type,
                 "notes": d.notes or ""
             })
+        
+        initiative_name = ""
+        initiative_start_date = None
+        initiative_end_date = None
+        
+        if t.initiative:
+            initiative_name = t.initiative.name
+            initiative_start_date = t.initiative.start_date.isoformat() if t.initiative.start_date else None
+            initiative_end_date = t.initiative.end_date.isoformat() if t.initiative.end_date else None
+        
         return {
             "success": True,
             "data": {
@@ -225,7 +244,10 @@ async def major_task_details(task_id: int, db: Session = Depends(get_db)):
                 "estimated_duration_days": t.estimated_duration_days,
                 "is_cross_department": t.is_cross_department,
                 "is_active": t.is_active,
-                "initiative_name": t.initiative.name if t.initiative else "",
+                "initiative_id": t.initiative_id,
+                "initiative_name": initiative_name,
+                "initiative_start_date": initiative_start_date,
+                "initiative_end_date": initiative_end_date,
                 "departments": dept_list
             }
         }
@@ -233,6 +255,7 @@ async def major_task_details(task_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/{task_id}")
 async def task_detail(task_id: int, db: Session = Depends(get_db)):

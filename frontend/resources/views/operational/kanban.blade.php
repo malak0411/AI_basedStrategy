@@ -233,23 +233,40 @@
             <div class="task-title">{{ $majorTaskTitle ?? 'المهمة الرئيسية' }}</div>
             <div class="task-meta">
                 <span class="item">
+                    <i class="fas fa-folder-open ml-1"></i> 
+                    المبادرة: 
+                    <strong>{{ $initiativeName ?? 'غير محدد' }}</strong>
+                </span>
+                <span class="item">
                     <i class="far fa-calendar-alt ml-1"></i> 
-                    البداية: 
-                    <strong>{{ isset($majorTaskStartDate) && $majorTaskStartDate ? \Carbon\Carbon::parse($majorTaskStartDate)->format('Y-m-d') : 'غير محدد' }}</strong>
+                    بداية المبادرة: 
+                    <strong>
+                        @if(isset($initiativeStart) && $initiativeStart)
+                            {{ \Carbon\Carbon::parse($initiativeStart)->format('Y-m-d') }}
+                        @else
+                            غير محدد
+                        @endif
+                    </strong>
                 </span>
                 <span class="item">
                     <i class="far fa-calendar-check ml-1"></i> 
-                    التسليم: 
-                    <strong>{{ isset($majorTaskEndDate) && $majorTaskEndDate ? \Carbon\Carbon::parse($majorTaskEndDate)->format('Y-m-d') : 'غير محدد' }}</strong>
+                    نهاية المبادرة: 
+                    <strong>
+                        @if(isset($initiativeEnd) && $initiativeEnd)
+                            {{ \Carbon\Carbon::parse($initiativeEnd)->format('Y-m-d') }}
+                        @else
+                            غير محدد
+                        @endif
+                    </strong>
                 </span>
                 <span class="item">
                     <i class="fas fa-clock ml-1"></i> 
                     المدة المتوقعة: 
-                    <strong>{{ $majorTaskExpectedDays ?? 0 }} يوم</strong>
+                    <strong>{{ $estimatedDays ?? 0 }} يوم</strong>
                 </span>
                 <span class="item">
                     <i class="fas fa-tasks ml-1"></i> 
-                    إجمالي المهام: 
+                    مهام إدارتك: 
                     <strong>{{ count($allTasks ?? []) }}</strong>
                 </span>
             </div>
@@ -261,6 +278,7 @@
         </div>
     </div>
 </div>
+
 
 
     <div class="kanban-container">

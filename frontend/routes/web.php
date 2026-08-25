@@ -91,8 +91,7 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/operational/major-task/{id}', [OperationalTaskController::class, 'showMajorTask'])->name('operational.show-major-task');
         Route::get('/operational/kanban/{majorTaskId?}', [OperationalTaskController::class, 'kanbanBoard'])->name('operational.kanban');
         Route::put('/operational/update-status', [OperationalTaskController::class, 'updateTaskStatus'])->name('operational.update-status');
-
-
+        
     });
 
 
@@ -112,6 +111,7 @@ Route::middleware('check.jwt')->group(function () {
         Route::post('/edit-prompt', [OperationalTaskController::class, 'editWithPrompt'])->name('edit-prompt');
         Route::post('/approve', [OperationalTaskController::class, 'approve'])->name('approve');
         Route::get('/api/employees/department/{id}', [OperationalTaskController::class, 'getDepartmentEmployees']);
+        Route::get('/api/employees/initiative/{id}', [OperationalTaskController::class, 'getInitiativeEmployees']);
     });
 
     Route::prefix('strategic')->name('strategic.')->group(function () {
