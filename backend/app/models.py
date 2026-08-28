@@ -1,9 +1,10 @@
+from pydantic import BaseModel
 from sqlalchemy import Column, Integer, String, Text, Date, DateTime, Boolean, ForeignKey, Enum, Table, DECIMAL
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
-
-
+from datetime import datetime
+from typing import Optional
 # ================================================================
 # جداول الربط (Many-to-Many)
 # ================================================================
@@ -130,6 +131,7 @@ class Employee(Base):
     roles = relationship("Role", secondary=employee_roles, back_populates="employees")
     task_assignments = relationship("TaskAssignment", back_populates="employee", foreign_keys="[TaskAssignment.employee_id]")
     location_logs = relationship("LocationLog", back_populates="employee")
+    task_attachments = relationship("TaskAttachment", back_populates="employee")
 
 
 class Role(Base):
@@ -322,6 +324,8 @@ class OperationalTask(Base):
     progress_logs = relationship("TaskProgressLog", back_populates="task")
     predictions = relationship("AIPrediction", back_populates="task")
     recommendations = relationship("AIRecommendation", back_populates="task")
+    attachments = relationship("TaskAttachment", back_populates="task", cascade="all, delete-orphan")
+
     
     # علاقة خاصة بـ budget_lines (متعدد الأغراض)
     budget_lines = relationship(
@@ -395,24 +399,6 @@ class TaskComment(Base):
     parent_comment_id = Column(Integer, ForeignKey("task_comments.comment_id"))
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
-
-
-class TaskAttachment(Base):
-    __tablename__ = "task_attachments"
-
-    attachment_id = Column(Integer, primary_key=True, autoincrement=True)
-    task_id = Column(Integer, ForeignKey("operational_tasks.task_id"), nullable=False)
-    employee_id = Column(Integer, ForeignKey("employees.employee_id"), nullable=False)
-    file_name = Column(String(255), nullable=False)
-    file_path = Column(String(500), nullable=False)
-    file_type = Column(String(50))
-    file_size = Column(Integer)
-    uploaded_at = Column(DateTime, server_default=func.now())
-
-
-# ================================================================
-# 6. الميزانية والمخاطر
-# ================================================================
 
 class BudgetLine(Base):
     __tablename__ = "budget_lines"
@@ -694,3 +680,44 @@ class AiJob(Base):
     created_by = Column(Integer, ForeignKey("employees.employee_id"))
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
+
+class TaskAttachment(Base):
+    __tablename__ = "task_attachments"
+
+    attachment_id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(Integer, ForeignKey("operational_tasks.task_id"), nullable=False)
+    employee_id = Column(Integer, ForeignKey("employees.employee_id"), nullable=False)
+    file_name = Column(String(255), nullable=False)
+    file_type = Column(String(100))
+    file_extension = Column(String(10))
+    file_size = Column(Integer)
+    file_path = Column(String(500))
+    storage_disk = Column(String(50), default='local')
+    description = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    is_active = Column(Boolean, default=True)
+
+    # العلاقات
+    task = relationship("OperationalTask", back_populates="attachments")
+    employee = relationship("Employee", back_populates="task_attachments")
+
+class AttachmentEmployeeInfo(BaseModel):
+    employee_id: int
+    full_name: str
+
+class TaskAttachmentResponse(BaseModel):
+    attachment_id: int
+    task_id: int
+    file_name: str
+    file_type: str
+    file_extension: Optional[str] = None
+    file_size: int
+    file_path: str
+    storage_disk: Optional[str] = "local"
+    description: Optional[str] = None
+    created_at: datetime
+    uploaded_by: AttachmentEmployeeInfo
+
+    class Config:
+        from_attributes = True

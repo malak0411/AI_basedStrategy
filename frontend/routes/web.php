@@ -49,6 +49,8 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\PerformanceController;
+use App\Http\Controllers\TaskAttachmentController;
+
 
 Route::aliasMiddleware('check.jwt', CheckJwtToken::class);
 
@@ -82,15 +84,20 @@ Route::middleware('check.jwt')->group(function () {
     });
 
 
+
     Route::middleware(['web', 'check.jwt'])->group(function () {
 
-    Route::get('/operational/major-tasks', [OperationalTaskController::class, 'majorTasks'])->name('operational.major-tasks');
+    Route::get('/operational/major-tasks', [OperationalTaskController::class, 'majorTasks'])
+        ->name('operational.major-tasks');
 
-    Route::get('/operational/major-task/{id}', [OperationalTaskController::class, 'showMajorTask'])->name('operational.show-major-task');
+    Route::get('/operational/major-task/{id}', [OperationalTaskController::class, 'showMajorTask'])
+        ->name('operational.show-major-task');
 
-    Route::get('/operational/dependencies/{majorTaskId}', [OperationalTaskController::class, 'dependencies'])->name('operational.dependencies');
+    Route::get('/operational/dependencies/{majorTaskId}', [OperationalTaskController::class, 'dependencies'])
+        ->name('operational.dependencies');
 
-    Route::get('/operational/dependencies/data/{majorTaskId}', [OperationalTaskController::class, 'getDependenciesData'])->name('operational.dependencies-data');
+    Route::get('/operational/dependencies/data/{majorTaskId}', [OperationalTaskController::class, 'getDependenciesData'])
+        ->name('operational.dependencies-data');
 
     Route::post('/operational/dependencies/add', [OperationalTaskController::class, 'addDependency'])
         ->name('operational.add-dependency');
@@ -152,9 +159,22 @@ Route::middleware('check.jwt')->group(function () {
     Route::post('/operational/approve', [OperationalTaskController::class, 'approve'])
         ->name('operational.approve');
 
+    Route::get('/operational-tasks/{taskId}/attachments', [OperationalTaskController::class, 'attachments'])
+    ->name('task.attachments.index');
+
+    Route::get('/attachments/{attachmentId}/download', [OperationalTaskController::class, 'downloadAttachment'])
+    ->name('task.attachments.download');
+
+    Route::delete('/attachments/{attachmentId}', [OperationalTaskController::class, 'deleteAttachment'])
+    ->name('task.attachments.destroy');
+
+    Route::post('/operational-tasks/{taskId}/attachments/upload', [OperationalTaskController::class, 'uploadAttachment'])
+    ->name('task.attachments.upload');
+
     Route::get('/operational/task/{id}', [OperationalTaskController::class, 'showOperationalTask'])
         ->name('operational.task-detail');
 });
+
 
 
     Route::get('/operational/kanban', [OperationalTaskController::class, 'kanbanBoard'])->name('operational.kanban');

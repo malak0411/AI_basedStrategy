@@ -1,12 +1,19 @@
+import uuid
+import os
+import shutil
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
-from app.models import DictRoleType, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority, TaskComment, TaskDependency , TaskProgressLog 
+from app.models import DictRoleType, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority, TaskComment, TaskDependency , TaskProgressLog , TaskAttachment , TaskAttachmentResponse , AttachmentEmployeeInfo
 from pydantic import BaseModel
 from datetime import date as date_type, datetime
-from typing import Optional
-from app.core.dependencies import get_current_employee
+from typing import Optional, List
+from sqlalchemy.orm import joinedload
+from app.core.dependencies import get_current_user
+from fastapi import UploadFile, File, Form
+from fastapi.responses import FileResponse
+
 
 
 router = APIRouter(prefix="/api/tasks", tags=["Tasks"])
@@ -208,7 +215,7 @@ async def department_major_tasks(db: Session = Depends(get_db)):
 @router.get("/major-tasks/by-department")
 async def major_tasks_by_department(
     db: Session = Depends(get_db),
-    employee_id: int = Depends(get_current_employee)
+    employee_id: int = Depends(get_current_user)
 ):
     try:
         employee = db.query(Employee).filter(Employee.employee_id == employee_id).first()
@@ -502,7 +509,7 @@ async def major_tasks_by_department_id(department_id: int, db: Session = Depends
 @router.get("/{task_id}")
 async def get_task(
     task_id: int,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     task = db.query(OperationalTask).filter(
@@ -545,7 +552,7 @@ async def get_task(
 @router.get("/{task_id}/assignments")
 async def get_task_assignments(
     task_id: int,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     assignments = db.query(TaskAssignment).filter(
@@ -589,7 +596,7 @@ async def get_task_assignments(
 async def assign_employee_to_task(
     task_id: int,
     data: dict,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     employee_id = data.get("employee_id")
@@ -695,7 +702,7 @@ async def assign_employee_to_task(
 @router.delete("/assignments/{assignment_id}")
 async def remove_task_assignment(
     assignment_id: int,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     assignment = db.query(TaskAssignment).filter(
@@ -715,7 +722,7 @@ async def remove_task_assignment(
 async def update_assignment_hours(
     assignment_id: int,
     data: dict,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     estimated_hours = data.get("estimated_hours")
@@ -740,7 +747,7 @@ async def update_assignment_hours(
 async def update_task_status(
     task_id: int,
     data: dict,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     status_id = data.get("status_id")
@@ -784,7 +791,7 @@ async def update_task_status(
     if not existing_log:
         progress_log = TaskProgressLog(
             task_id=task.task_id,
-            employee_id=current_user.employee_id,
+            employee_id=current_user,
             progress_percent=0,
             status_old=old_status,
             status_new=status_id,
@@ -834,7 +841,7 @@ def can_move_task(from_status, to_status):
 @router.post("/{task_id}/finalize")
 async def finalize_task_assignments(
     task_id: int,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     task = db.query(OperationalTask).filter(
@@ -891,7 +898,7 @@ async def finalize_task_assignments(
 @router.get("/by-major-task/{major_task_id}")
 async def get_tasks_by_major_task(
     major_task_id: int,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     tasks = db.query(OperationalTask).filter(
@@ -949,7 +956,7 @@ class DependencyUpdate(BaseModel):
 @router.get("/major/{major_task_id}/dependencies")
 async def get_major_task_dependencies(
     major_task_id: int,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     tasks = db.query(OperationalTask).filter(
@@ -1039,7 +1046,7 @@ async def get_major_task_dependencies(
 @router.post("/dependencies")
 async def create_dependency(
     data: DependencyCreate,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     if data.task_id == data.depends_on_task_id:
@@ -1097,7 +1104,7 @@ async def create_dependency(
 async def update_dependency(
     dependency_id: int,
     data: DependencyUpdate,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     dependency = db.query(TaskDependency).filter(
@@ -1130,7 +1137,7 @@ async def update_dependency(
 @router.delete("/dependencies/{dependency_id}")
 async def delete_dependency(
     dependency_id: int,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     dependency = db.query(TaskDependency).filter(
@@ -1148,7 +1155,7 @@ async def delete_dependency(
 @router.post("/dependencies/check-cycle")
 async def check_cycle(
     data: dict,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     task_id = data.get("task_id")
@@ -1194,7 +1201,7 @@ def _would_create_cycle(task_id, depends_on_task_id, db):
 @router.get("/{task_id}/dependencies")
 async def get_task_dependencies(
     task_id: int,
-    current_user: Employee = Depends(get_current_employee),
+    current_user: Employee = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     deps = db.query(TaskDependency).filter(
@@ -1216,3 +1223,173 @@ async def get_task_dependencies(
 
     db.commit()
     return {"success": True, "data": result}
+
+@router.get("/{task_id}/attachments", response_model=List[TaskAttachmentResponse])
+async def get_task_attachments(
+    task_id: int,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    
+    task = db.query(OperationalTask).filter(
+        OperationalTask.task_id == task_id,
+        OperationalTask.is_active == True
+    ).first()
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+
+    attachments = db.query(TaskAttachment).options(
+        joinedload(TaskAttachment.employee)
+    ).filter(
+        TaskAttachment.task_id == task_id,
+        TaskAttachment.is_active == True
+    ).all()
+
+    result = []
+    for att in attachments:
+        result.append({
+            "attachment_id": att.attachment_id,
+            "task_id": att.task_id,
+            "file_name": att.file_name,
+            "file_type": att.file_type,
+            "file_extension": att.file_extension,
+            "file_size": att.file_size,
+            "file_path": att.file_path,
+            "storage_disk": att.storage_disk,
+            "description": att.description,
+            "created_at": att.created_at,
+            "uploaded_by": {
+                "employee_id": att.employee.employee_id,
+                "full_name": att.employee.full_name
+            }
+        })
+    
+    return result
+
+@router.post("/{task_id}/attachments/upload")
+async def upload_task_attachment(
+    task_id: int,
+    file: UploadFile = File(...),
+    description: str = Form(""),
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    
+    task = db.query(OperationalTask).filter(
+        OperationalTask.task_id == task_id,
+        OperationalTask.is_active == True
+    ).first()
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+
+    allowed_extensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx', 'zip', 'rar', '7z']
+    file_extension = file.filename.split('.')[-1].lower()
+    
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"نوع الملف غير مدعوم. الأنواع المدعومة: {', '.join(allowed_extensions)}"
+        )
+
+    file_size = 0
+    content = await file.read()
+    file_size = len(content)
+    
+    if file_size > 10 * 1024 * 1024: 
+        raise HTTPException(status_code=400, detail="حجم الملف يتجاوز 10 ميجابايت")
+    
+    unique_filename = f"{uuid.uuid4()}.{file_extension}"
+    
+    upload_dir = f"uploads/tasks/{task_id}"
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = f"{upload_dir}/{unique_filename}"
+    
+    with open(file_path, "wb") as f:
+        f.write(content)
+    
+    new_attachment = TaskAttachment(
+        task_id=task_id,
+        employee_id=current_user,
+        file_name=file.filename,
+        file_type=file.content_type or "application/octet-stream",
+        file_extension=file_extension,
+        file_size=file_size,
+        file_path=file_path,
+        storage_disk="local",
+        description=description,
+        created_at=datetime.now(),
+        is_active=True
+    )
+    
+    db.add(new_attachment)
+    db.commit()
+    db.refresh(new_attachment)
+    
+    employee = db.query(Employee).filter(Employee.employee_id == current_user).first()
+    
+    return {
+        "attachment_id": new_attachment.attachment_id,
+        "task_id": new_attachment.task_id,
+        "file_name": new_attachment.file_name,
+        "file_type": new_attachment.file_type,
+        "file_extension": new_attachment.file_extension,
+        "file_size": new_attachment.file_size,
+        "file_path": new_attachment.file_path,
+        "storage_disk": new_attachment.storage_disk,
+        "description": new_attachment.description,
+        "created_at": new_attachment.created_at,
+        "uploaded_by": {
+            "employee_id": employee.employee_id,
+            "full_name": employee.full_name
+        }
+    }
+
+@router.get("/attachments/{attachment_id}/download")
+async def download_attachment(
+    attachment_id: int,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    attachment = db.query(TaskAttachment).filter(
+        TaskAttachment.attachment_id == attachment_id,
+        TaskAttachment.is_active == True
+    ).first()
+    
+    if not attachment:
+        raise HTTPException(status_code=404, detail="المرفق غير موجود")
+    
+    if not os.path.exists(attachment.file_path):
+        raise HTTPException(status_code=404, detail="الملف غير موجود على الخادم")
+    
+    return FileResponse(
+        path=attachment.file_path,
+        filename=attachment.file_name,
+        media_type=attachment.file_type or "application/octet-stream"
+    )
+
+@router.delete("/attachments/{attachment_id}")  # ← إزالة /api من هنا
+async def delete_attachment(
+    attachment_id: int,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    attachment = db.query(TaskAttachment).filter(
+        TaskAttachment.attachment_id == attachment_id,
+        TaskAttachment.is_active == True
+    ).first()
+   
+    if not attachment:
+        raise HTTPException(status_code=404, detail="المرفق غير موجود")
+   
+    if os.path.exists(attachment.file_path):
+        try:
+            os.remove(attachment.file_path)
+        except Exception as e:
+            print(f"Error deleting file: {e}")
+   
+    attachment.is_active = False
+    db.commit()
+   
+    return {"message": "تم حذف المرفق بنجاح"}

@@ -676,3 +676,34 @@ class DelayPredictionResponse(BaseModel):
     confidence: float
     suggestion: str
     estimated_completion_days: Optional[float] = None
+
+class TaskAttachmentBase(BaseModel):
+    file_name: str
+    file_type: str
+    file_extension: str
+    file_size: int
+    file_path: str
+    storage_disk: str = "local"
+    description: Optional[str] = None
+
+class TaskAttachmentCreate(BaseModel):
+    description: Optional[str] = None
+
+class TaskAttachmentUpdate(BaseModel):
+    description: Optional[str] = None
+
+class TaskAttachmentResponse(BaseModel):
+    attachment_id: int
+    task_id: int
+    employee_id: int
+    file_name: str
+    file_type: str
+    file_extension: str
+    file_size: int
+    description: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    download_url: str
+
+    class Config:
+        from_attributes = True

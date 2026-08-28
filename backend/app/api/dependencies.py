@@ -8,9 +8,6 @@ from ..database import get_db
 from ..models import Employee
 from ..core.security import decode_access_token
 
-# ================================================================
-# Rate Limiter (مشارك بين جميع الـ APIs)
-# ================================================================
 limiter = Limiter(key_func=get_remote_address)
 
 security = HTTPBearer()

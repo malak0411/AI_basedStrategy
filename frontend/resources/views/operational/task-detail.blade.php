@@ -3,10 +3,12 @@
 @section('title', 'تفاصيل المهمة التشغيلية')
 
 @section('content')
+
 <div class="container-fluid px-4">
     <a href="{{ route('operational.kanban') }}" class="btn btn-outline-secondary mb-3">
         <i class="fas fa-arrow-right"></i> العودة للوحة المهام
     </a>
+    
 
     @if(empty($task))
     <div class="alert alert-info">المهمة غير موجودة</div>
@@ -35,6 +37,16 @@
                     </div>
                 </div>
             </div>
+
+            <div class="mt-3">
+                <a href="{{ route('task.attachments.index', $task['task_id'] ?? $task['id'] ?? 0) }}" class="btn btn-outline-info btn-sm">
+                <i class="fas fa-paperclip"></i> إدارة المرفقات
+                @if(!empty($attachments))
+                    <span class="badge bg-primary ms-1">{{ count($attachments) }}</span>
+                @endif
+                </a>
+            </div>
+                            <br>
 
             <div class="card-custom">
                 <h5><i class="fas fa-history ml-2"></i>سجل التقدم</h5>

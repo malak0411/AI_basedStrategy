@@ -20,49 +20,31 @@ class ApiClient
         ]);
     }
 
-    /**
-     * طلب GET
-     */
     public function get($endpoint, $token = null, $params = [])
     {
         return $this->request('GET', $endpoint, $token, $params);
     }
 
-    /**
-     * طلب POST
-     */
     public function post($endpoint, $data = [], $token = null)
     {
         return $this->request('POST', $endpoint, $token, [], $data);
     }
 
-    /**
-     * طلب PUT
-     */
     public function put($endpoint, $data = [], $token = null)
     {
         return $this->request('PUT', $endpoint, $token, [], $data);
     }
 
-    /**
-     * طلب DELETE
-     */
     public function delete($endpoint, $token = null)
     {
         return $this->request('DELETE', $endpoint, $token);
     }
 
-    /**
-     * طلب PATCH
-     */
     public function patch($endpoint, $data = [], $token = null)
     {
         return $this->request('PATCH', $endpoint, $token, [], $data);
     }
 
-    /**
-     * تنفيذ الطلب مع معالجة الأخطاء
-     */
     private function request($method, $endpoint, $token = null, $params = [], $data = [])
     {
         try {
@@ -73,34 +55,27 @@ class ApiClient
                 ]
             ];
 
-            // إضافة التوكن إذا وجد
             if ($token) {
                 $options['headers']['Authorization'] = 'Bearer ' . $token;
             }
 
-            // إضافة المعاملات إذا وجدت
             if (!empty($params)) {
                 $options['query'] = $params;
             }
 
-            // إضافة البيانات للطرق التي تدعم body
             if (!empty($data) && in_array($method, ['POST', 'PUT', 'PATCH'])) {
                 $options['json'] = $data;
             }
 
-            // تنفيذ الطلب
             $response = $this->client->request($method, $endpoint, $options);
 
-            // معالجة الاستجابة
             $statusCode = $response->getStatusCode();
             $body = json_decode($response->getBody()->getContents(), true);
 
-            // التأكد من أن الاستجابة مصفوفة
             if (!is_array($body)) {
                 $body = ['success' => ($statusCode >= 200 && $statusCode < 300), 'data' => []];
             }
 
-            // إضافة status code للاستجابة
             $body['status'] = $statusCode;
 
             return $body;
@@ -112,12 +87,10 @@ class ApiClient
                 'error' => $e->getMessage()
             ]);
 
-            // معالجة استجابة الخطأ
             if ($e->hasResponse()) {
                 $statusCode = $e->getResponse()->getStatusCode();
                 $body = json_decode($e->getResponse()->getBody()->getContents(), true);
 
-                // إذا كان التوكن منتهي الصلاحية
                 if ($statusCode === 401) {
                     session()->forget(['jwt_token', 'user_role', 'user_name']);
                     return [
@@ -136,7 +109,6 @@ class ApiClient
                 ];
             }
 
-            // خطأ في الاتصال
             return [
                 'success' => false,
                 'status' => 500,
@@ -159,9 +131,6 @@ class ApiClient
         }
     }
 
-    /**
-     * التحقق من حالة الاتصال بالـ API
-     */
     public function healthCheck()
     {
         try {
@@ -172,9 +141,6 @@ class ApiClient
         }
     }
 
-    /**
-     * جلب البيانات مع pagination
-     */
     public function getPaginated($endpoint, $token = null, $page = 1, $perPage = 10)
     {
         return $this->get($endpoint, $token, [
@@ -183,48 +149,6 @@ class ApiClient
         ]);
     }
 
-    /**
-     * رفع ملف
-     */
-    public function uploadFile($endpoint, $filePath, $token = null, $extraData = [])
-    {
-        try {
-            $options = [
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $token,
-                ],
-                'multipart' => [
-                    [
-                        'name' => 'file',
-                        'contents' => fopen($filePath, 'r'),
-                        'filename' => basename($filePath),
-                    ],
-                ],
-            ];
-
-            // إضافة بيانات إضافية
-            foreach ($extraData as $key => $value) {
-                $options['multipart'][] = [
-                    'name' => $key,
-                    'contents' => $value,
-                ];
-            }
-
-            $response = $this->client->post($endpoint, $options);
-            return json_decode($response->getBody()->getContents(), true);
-
-        } catch (\Exception $e) {
-            \Log::error('File Upload Error: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'detail' => 'فشل رفع الملف: ' . $e->getMessage()
-            ];
-        }
-    }
-
-    /**
-     * جلب البيانات مع معالجة آمنة للأخطاء
-     */
     public function safeGet($endpoint, $token = null, $params = [], $default = [])
     {
         try {
@@ -237,4 +161,98 @@ class ApiClient
             return $default;
         }
     }
+
+    public function upload($endpoint, $data, $token = null)
+    {
+        try {
+            $options = [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                ],
+                'multipart' => []
+            ];
+
+            foreach ($data as $key => $value) {
+                if ($value instanceof \Illuminate\Http\UploadedFile) {
+                    $options['multipart'][] = [
+                        'name' => $key,
+                        'contents' => fopen($value->getRealPath(), 'r'),
+                        'filename' => $value->getClientOriginalName()
+                    ];
+                } else {
+                    $options['multipart'][] = [
+                        'name' => $key,
+                        'contents' => $value
+                    ];
+                }
+            }
+
+            $response = $this->client->post($endpoint, $options);
+            $body = json_decode($response->getBody()->getContents(), true);
+
+            if (!is_array($body)) {
+                return ['success' => false, 'message' => 'استجابة غير صالحة من الخادم'];
+            }
+
+            return $body;
+
+        } catch (\Exception $e) {
+            \Log::error('Upload Error: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'فشل رفع الملف: ' . $e->getMessage()];
+        }
+    }
+
+    public function download($endpoint, $token = null)
+    {
+        try {
+            $response = Http::withToken($token)->get($this->baseUrl . $endpoint);
+            if ($response->successful()) {
+                return $response->body();
+            }
+            return null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    public function uploadFile($endpoint, $file, $token = null, $extraData = [])
+{
+    try {
+        $options = [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $token,
+            ],
+            'multipart' => []
+        ];
+
+        if ($file instanceof \Illuminate\Http\UploadedFile) {
+            $options['multipart'][] = [
+                'name' => 'file',
+                'contents' => fopen($file->getRealPath(), 'r'),
+                'filename' => $file->getClientOriginalName()
+            ];
+        }
+
+        foreach ($extraData as $key => $value) {
+            $options['multipart'][] = [
+                'name' => $key,
+                'contents' => $value
+            ];
+        }
+
+        $response = $this->client->post($endpoint, $options);
+        $body = json_decode($response->getBody()->getContents(), true);
+
+        if (!is_array($body)) {
+            return ['success' => false, 'message' => 'استجابة غير صالحة من الخادم'];
+        }
+
+        return $body;
+
+    } catch (\Exception $e) {
+        \Log::error('Upload Error: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'فشل رفع الملف: ' . $e->getMessage()];
+    }
+}
+
 }

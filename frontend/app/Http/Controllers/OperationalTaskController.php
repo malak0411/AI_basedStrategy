@@ -529,28 +529,26 @@ class OperationalTaskController extends Controller
     }
 
     public function showOperationalTask($id)
-    {
-        $token = session('jwt_token');
+{
+    $token = session('jwt_token');
 
-        $taskResponse = $this->apiClient->get(
-            "/api/tasks/{$id}",
-            $token
-        );
+    $taskResponse = $this->apiClient->get("/api/tasks/{$id}", $token);
+    $task = $taskResponse['data'] ?? [];
 
-        $task = $taskResponse['data'] ?? [];
+    $logsResponse = $this->apiClient->get("/api/tasks/{$id}/progress-logs", $token);
+    $logs = $logsResponse['data'] ?? [];
 
-        $logsResponse = $this->apiClient->get(
-            "/api/tasks/{$id}/progress-logs",
-            $token
-        );
+    $attachmentsResponse = $this->apiClient->get("/api/tasks/{$id}/attachments", $token);
+    $attachments = $attachmentsResponse['data'] ?? [];
 
-        $logs = $logsResponse['data'] ?? [];
+    return view('operational.task-detail', [
+        'task' => $task,
+        'logs' => $logs,
+        'attachments' => $attachments
+    ]);
+}
 
-        return view(
-            'operational.task-detail',
-            compact('task', 'logs')
-        );
-    }
+
 
 public function assignEmployees($taskId)
     {
@@ -1087,5 +1085,138 @@ private function isLeadDepartment($majorTaskId): bool
 
         return response()->json($response);
     }
+
+
+public function attachments($taskId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return redirect()->route('login')->with('error', 'الرجاء تسجيل الدخول أولاً');
+        }
+
+        $response = $this->apiClient->get("/api/tasks/{$taskId}/attachments", $token);
+        $attachments = $response['data'] ?? $response;
+
+        $taskResponse = $this->apiClient->get("/api/tasks/{$taskId}", $token);
+        $task = $taskResponse['data'] ?? $taskResponse;
+
+        return view('operational.attachments', compact('attachments', 'task', 'taskId'));
+
+    } catch (\Exception $e) {
+        \Log::error('Error loading attachments: ' . $e->getMessage());
+        return redirect()->back()->with('error', 'حدث خطأ أثناء تحميل المرفقات');
+    }
+}
+
+
+public function downloadAttachment($attachmentId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return redirect()->route('login')->with('error', 'الرجاء تسجيل الدخول أولاً');
+        }
+
+        // استخدام Guzzle مباشرة لتحميل الملف
+        $client = new \GuzzleHttp\Client();
+        $response = $client->get(
+            "http://localhost:8000/api/tasks/attachments/{$attachmentId}/download",
+            [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                ]
+            ]
+        );
+
+        // استخراج اسم الملف من الـ headers
+        $contentDisposition = $response->getHeader('Content-Disposition');
+        $fileName = 'download';
+        if (!empty($contentDisposition)) {
+            preg_match('/filename\*=utf-8\'\'([^;]+)/', $contentDisposition[0], $matches);
+            if (isset($matches[1])) {
+                $fileName = urldecode($matches[1]);
+            } else {
+                preg_match('/filename="([^"]+)"/', $contentDisposition[0], $matches);
+                if (isset($matches[1])) {
+                    $fileName = $matches[1];
+                }
+            }
+        }
+
+        // الحصول على نوع الملف
+        $contentType = $response->getHeader('Content-Type')[0] ?? 'application/octet-stream';
+
+        // إرجاع الملف للمستخدم
+        return response($response->getBody()->getContents())
+            ->header('Content-Type', $contentType)
+            ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"');
+
+    } catch (\Exception $e) {
+        \Log::error('Download error: ' . $e->getMessage());
+        return redirect()->back()->with('error', 'حدث خطأ أثناء تحميل الملف: ' . $e->getMessage());
+    }
+}
+
+
+public function deleteAttachment($attachmentId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return redirect()->route('login')->with('error', 'الرجاء تسجيل الدخول أولاً');
+        }
+
+        $response = $this->apiClient->delete("/api/tasks/attachments/{$attachmentId}", $token);
+        
+        return redirect()->back()->with('success', 'تم حذف المرفق بنجاح');
+
+    } catch (\Exception $e) {
+        \Log::error('Error deleting attachment: ' . $e->getMessage());
+        return back()->with('error', 'حدث خطأ أثناء حذف المرفق');
+    }
+}
+
+public function uploadAttachment(Request $request, $taskId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return redirect()->route('login')->with('error', 'الرجاء تسجيل الدخول أولاً');
+        }
+
+        $request->validate([
+            'file' => 'required|file|max:10240', 
+        ]);
+
+        $file = $request->file('file');
+        $description = $request->input('description', '');
+
+        $allowedExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'ppt', 'pptx', 'zip', 'rar', '7z'];
+        $extension = $file->getClientOriginalExtension();
+        
+        if (!in_array(strtolower($extension), $allowedExtensions)) {
+            return redirect()->back()->with('error', 'نوع الملف غير مدعوم');
+        }
+
+        $response = $this->apiClient->uploadFile(
+            "/api/tasks/{$taskId}/attachments/upload",
+            $file,
+            $token,
+            ['description' => $description]
+        );
+
+        if (isset($response['attachment_id'])) {
+            return redirect()->back()->with('success', 'تم رفع الملف بنجاح');
+        }
+
+        return redirect()->back()->with('error', $response['message'] ?? 'فشل رفع الملف');
+
+    } catch (\Exception $e) {
+        \Log::error('Upload error: ' . $e->getMessage());
+        return redirect()->back()->with('error', 'حدث خطأ أثناء رفع الملف: ' . $e->getMessage());
+    }
+}
+
 }
 
