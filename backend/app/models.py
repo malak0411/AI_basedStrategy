@@ -132,6 +132,8 @@ class Employee(Base):
     task_assignments = relationship("TaskAssignment", back_populates="employee", foreign_keys="[TaskAssignment.employee_id]")
     location_logs = relationship("LocationLog", back_populates="employee")
     task_attachments = relationship("TaskAttachment", back_populates="employee")
+    task_comments = relationship("TaskComment", back_populates="employee") 
+
 
 
 class Role(Base):
@@ -325,6 +327,7 @@ class OperationalTask(Base):
     predictions = relationship("AIPrediction", back_populates="task")
     recommendations = relationship("AIRecommendation", back_populates="task")
     attachments = relationship("TaskAttachment", back_populates="task", cascade="all, delete-orphan")
+    comments = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan")  
 
     
     # علاقة خاصة بـ budget_lines (متعدد الأغراض)
@@ -399,6 +402,25 @@ class TaskComment(Base):
     parent_comment_id = Column(Integer, ForeignKey("task_comments.comment_id"))
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
+
+    # العلاقات
+    task = relationship("OperationalTask", back_populates="comments")
+    employee = relationship("Employee", back_populates="task_comments")
+    parent = relationship("TaskComment", remote_side=[comment_id], backref="replies")
+
+class TaskCommentResponse(BaseModel):
+    comment_id: int
+    task_id: int
+    employee_id: int
+    employee_name: str
+    comment: str
+    parent_comment_id: Optional[int] = None
+    has_children: bool = False
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 class BudgetLine(Base):
     __tablename__ = "budget_lines"

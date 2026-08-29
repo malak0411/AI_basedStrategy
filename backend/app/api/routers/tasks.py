@@ -752,91 +752,109 @@ async def update_task_status(
 ):
     status_id = data.get("status_id")
     comment = data.get("comment", "")
-    
+    progress_percent = data.get("progress_percent", None)
+   
     if not status_id:
         raise HTTPException(400, "الحالة مطلوبة")
-    
+   
+    if not comment:
+        raise HTTPException(400, "التعليق مطلوب لجميع الحالات")
+   
     task = db.query(OperationalTask).filter(
         OperationalTask.task_id == task_id,
         OperationalTask.is_active == True
     ).first()
-    
+   
     if not task:
         raise HTTPException(404, "المهمة غير موجودة")
-    
+   
     old_status = task.status_id
-    
+   
+    last_log = db.query(TaskProgressLog).filter(
+        TaskProgressLog.task_id == task_id
+    ).order_by(TaskProgressLog.log_id.desc()).first()
+   
+    current_progress = last_log.progress_percent if last_log else 0
+   
+    final_progress = current_progress
+   
+    if status_id == 6:
+        if progress_percent is None:
+            final_progress = current_progress
+        else:
+            if progress_percent < 20 or progress_percent > 70:
+                raise HTTPException(400, "نسبة الإنجاز يجب أن تكون بين 20% و 70%")
+            final_progress = progress_percent
+    elif status_id == 8:
+        if progress_percent is None:
+            final_progress = current_progress
+        else:
+            if progress_percent > 85:
+                raise HTTPException(400, "نسبة الإنجاز لا يمكن أن تتجاوز 85% في حالة المراجعة")
+            final_progress = progress_percent
+    elif status_id == 5:
+        final_progress = current_progress
+    elif status_id == 7:
+        final_progress = current_progress
+    elif status_id == 19:
+        final_progress = 100
+    elif status_id == 26:
+        final_progress = 0
+   
     can_move, error = can_move_task(task.status_id, status_id)
     if not can_move:
         raise HTTPException(400, error)
-    
+   
     dep_error = check_dependency_rules(task, status_id, db)
     if dep_error:
         raise HTTPException(400, dep_error)
-    
-    if status_id in [5, 8, 19, 20] and not comment:
-        raise HTTPException(400, "التعليق مطلوب لهذه الحالة")
-    
-    if old_status == 5 and status_id == 6 and not comment:
-        raise HTTPException(400, "التعليق مطلوب لإعادة المهمة للعمل")
-    
+   
     task.status_id = status_id
-    
-    existing_log = db.query(TaskProgressLog).filter(
-        TaskProgressLog.task_id == task.task_id,
-        TaskProgressLog.status_old == old_status,
-        TaskProgressLog.status_new == status_id
-    ).first()
-    
-    if not existing_log:
-        progress_log = TaskProgressLog(
-            task_id=task.task_id,
-            employee_id=current_user,
-            progress_percent=0,
-            status_old=old_status,
-            status_new=status_id,
-            notes=comment
-        )
-        db.add(progress_log)
-    
+   
+    progress_log = TaskProgressLog(
+        task_id=task.task_id,
+        employee_id=current_user,
+        progress_percent=final_progress,
+        status_old=old_status,
+        status_new=status_id,
+        notes=comment
+    )
+    db.add(progress_log)
+   
     db.commit()
-    
+   
     return {
         "success": True,
         "message": "تم تحديث حالة المهمة بنجاح",
         "data": {
             "task_id": task.task_id,
             "old_status": old_status,
-            "new_status": status_id
+            "new_status": status_id,
+            "progress_percent": final_progress
         }
     }
-
-
 
 def can_move_task(from_status, to_status):
     if from_status == 16:
         return False, "المهام غير الموزعة لا يمكن نقلها"
-    
-    if from_status in [19, 20]:
-        return False, "لا يمكن نقل المهام المقبولة أو المرفوضة"
-    
+   
+    if from_status == 19:
+        return False, "المهام المقبولة لا يمكن نقلها"
+   
     rules = {
         26: [6],
-        6: [5, 8],
-        5: [6],
-        8: [6, 19, 20],
+        6: [5, 8, 7],
+        5: [6, 7],
+        7: [6, 8],
+        8: [6, 19, 7],
         19: [],
-        20: []
     }
-    
+   
     allowed = rules.get(from_status, [])
     if to_status not in allowed:
         return False, "لا يمكن نقل المهمة إلى هذه الحالة"
-    
+   
     return True, None
-
-
-
 
 @router.post("/{task_id}/finalize")
 async def finalize_task_assignments(
@@ -848,52 +866,46 @@ async def finalize_task_assignments(
         OperationalTask.task_id == task_id,
         OperationalTask.is_active == True
     ).first()
-    
+   
     if not task:
         raise HTTPException(404, "المهمة غير موجودة")
-    
+   
     pending_assignments = db.query(TaskAssignment).filter(
         TaskAssignment.task_id == task_id,
         TaskAssignment.is_active == True,
         TaskAssignment.acceptance_status == "pending"
     ).count()
-    
+   
     if pending_assignments > 0:
         raise HTTPException(400, f"يوجد {pending_assignments} توزيع(ات) في حالة انتظار")
-    
+   
     responsible_count = db.query(TaskAssignment).filter(
         TaskAssignment.task_id == task_id,
         TaskAssignment.is_active == True,
         TaskAssignment.role_type_id == 2
     ).count()
-    
+   
     if responsible_count == 0:
         raise HTTPException(400, "يجب تعيين مسؤول نهائي للمهمة قبل إنهاء التوزيع")
-    
+   
     old_status = task.status_id
     new_status = 26
     task.status_id = new_status
-    
-    existing_log = db.query(TaskProgressLog).filter(
-        TaskProgressLog.task_id == task.task_id,
-        TaskProgressLog.status_old == old_status,
-        TaskProgressLog.status_new == new_status
-    ).first()
-    
-    if not existing_log:
-        progress_log = TaskProgressLog(
-            task_id=task.task_id,
-            employee_id=current_user,
-            progress_percent=100,
-            status_old=old_status,
-            status_new=new_status,
-            notes="تم إنهاء توزيع المهمة وجاهزة للتنفيذ"
-        )
-        db.add(progress_log)
-    
+   
+    progress_log = TaskProgressLog(
+        task_id=task.task_id,
+        employee_id=current_user,
+        progress_percent=0,
+        status_old=old_status,
+        status_new=new_status,
+        notes="تم إنهاء توزيع المهمة وجاهزة للتنفيذ"
+    )
+    db.add(progress_log)
+   
     db.commit()
-    
+   
     return {"success": True, "message": "تم إنهاء توزيع المهمة بنجاح"}
+
 
 @router.get("/by-major-task/{major_task_id}")
 async def get_tasks_by_major_task(
@@ -1393,3 +1405,164 @@ async def delete_attachment(
     db.commit()
    
     return {"message": "تم حذف المرفق بنجاح"}
+
+@router.get("/attachments/{attachment_id}/data")
+async def get_attachment_data(
+    attachment_id: int,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    attachment = db.query(TaskAttachment).filter(
+        TaskAttachment.attachment_id == attachment_id,
+        TaskAttachment.is_active == True
+    ).first()
+   
+    if not attachment:
+        raise HTTPException(status_code=404, detail="المرفق غير موجود")
+   
+    employee = db.query(Employee).filter(Employee.employee_id == attachment.employee_id).first()
+   
+    return {
+        "attachment_id": attachment.attachment_id,
+        "task_id": attachment.task_id,
+        "file_name": attachment.file_name,
+        "file_type": attachment.file_type,
+        "file_extension": attachment.file_extension,
+        "file_size": attachment.file_size,
+        "file_path": attachment.file_path,
+        "storage_disk": attachment.storage_disk,
+        "description": attachment.description,
+        "created_at": attachment.created_at,
+        "uploaded_by": {
+            "employee_id": employee.employee_id if employee else None,
+            "full_name": employee.full_name if employee else "غير معروف"
+        }
+    }
+
+
+
+@router.get("/{task_id}/comments")
+async def get_task_comments(
+    task_id: int,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    comments = db.query(TaskComment).filter(
+        TaskComment.task_id == task_id
+    ).order_by(TaskComment.created_at.asc()).all()
+    
+    result = []
+    comment_map = {}
+    
+    for comment in comments:
+        employee = db.query(Employee).filter(
+            Employee.employee_id == comment.employee_id
+        ).first()
+        
+        employee_name = employee.full_name if employee else 'غير معروف'
+        
+        comment_data = {
+            "comment_id": comment.comment_id,
+            "task_id": comment.task_id,
+            "employee_id": comment.employee_id,
+            "employee_name": employee_name,
+            "comment": comment.comment,
+            "parent_comment_id": comment.parent_comment_id,
+            "created_at": comment.created_at.isoformat() if comment.created_at else None,
+            "replies": []
+        }
+        
+        comment_map[comment.comment_id] = comment_data
+        
+        if comment.parent_comment_id is None:
+            result.append(comment_data)
+        else:
+            if comment.parent_comment_id in comment_map:
+                comment_map[comment.parent_comment_id]["replies"].append(comment_data)
+    
+    return result
+
+
+@router.post("/{task_id}/comments")
+async def add_task_comment(
+    task_id: int,
+    data: dict,
+    current_user: int = Depends(get_current_user),  # ← int
+    db: Session = Depends(get_db)
+):
+    comment_text = data.get("comment")
+    parent_comment_id = data.get("parent_comment_id")
+    
+    if not comment_text:
+        raise HTTPException(400, "التعليق مطلوب")
+    
+    task = db.query(OperationalTask).filter(
+        OperationalTask.task_id == task_id,
+        OperationalTask.is_active == True
+    ).first()
+    
+    if not task:
+        raise HTTPException(404, "المهمة غير موجودة")
+    
+    if parent_comment_id:
+        parent = db.query(TaskComment).filter(
+            TaskComment.comment_id == parent_comment_id
+        ).first()
+        if not parent:
+            raise HTTPException(404, "التعليق الأصلي غير موجود")
+    
+    new_comment = TaskComment(
+        task_id=task_id,
+        employee_id=current_user,  # ← current_user هو int
+        comment=comment_text,
+        parent_comment_id=parent_comment_id
+    )
+    
+    db.add(new_comment)
+    db.commit()
+    db.refresh(new_comment)
+    
+    employee = db.query(Employee).filter(
+        Employee.employee_id == current_user
+    ).first()
+    
+    employee_name = employee.full_name if employee else 'غير معروف'
+    
+    return {
+        "comment_id": new_comment.comment_id,
+        "task_id": new_comment.task_id,
+        "employee_id": current_user,
+        "employee_name": employee_name,
+        "comment": new_comment.comment,
+        "parent_comment_id": new_comment.parent_comment_id,
+        "has_children": False,
+        "created_at": new_comment.created_at.isoformat() if new_comment.created_at else None
+    }
+
+@router.delete("/comments/{comment_id}")  # ← هذا المسار يعمل (200 OK)
+async def delete_task_comment(
+    comment_id: int,
+    current_user: int = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    comment = db.query(TaskComment).filter(
+        TaskComment.comment_id == comment_id
+    ).first()
+    
+    if not comment:
+        raise HTTPException(status_code=404, detail="التعليق غير موجود")
+    
+    if comment.employee_id != current_user:
+        raise HTTPException(status_code=403, detail="لا يمكنك حذف تعليق ليس لك")
+    
+    has_children = db.query(TaskComment).filter(
+        TaskComment.parent_comment_id == comment_id
+    ).count() > 0
+    
+    if has_children:
+        raise HTTPException(status_code=400, detail="لا يمكن حذف تعليق يحتوي على ردود")
+    
+    db.delete(comment)
+    db.commit()
+    
+    return {"message": "تم حذف التعليق بنجอด"}

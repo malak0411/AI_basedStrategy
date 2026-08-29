@@ -530,145 +530,176 @@ class OperationalTaskController extends Controller
 
     public function showOperationalTask($id)
 {
-    $token = session('jwt_token');
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return redirect()->route('login')->with('error', 'الرجاء تسجيل الدخول أولاً');
+        }
 
-    $taskResponse = $this->apiClient->get("/api/tasks/{$id}", $token);
-    $task = $taskResponse['data'] ?? [];
+        $taskResponse = $this->apiClient->get("/api/tasks/{$id}", $token);
+        $task = $taskResponse['data'] ?? [];
 
-    $logsResponse = $this->apiClient->get("/api/tasks/{$id}/progress-logs", $token);
-    $logs = $logsResponse['data'] ?? [];
+        $logsResponse = $this->apiClient->get("/api/tasks/{$id}/progress-logs", $token);
+        $logs = $logsResponse['data'] ?? [];
 
-    $attachmentsResponse = $this->apiClient->get("/api/tasks/{$id}/attachments", $token);
-    $attachments = $attachmentsResponse['data'] ?? [];
+        $attachmentsResponse = $this->apiClient->get("/api/tasks/{$id}/attachments", $token);
+        $attachments = $attachmentsResponse['data'] ?? [];
 
-    return view('operational.task-detail', [
-        'task' => $task,
-        'logs' => $logs,
-        'attachments' => $attachments
-    ]);
+        $commentsResponse = $this->apiClient->get("/api/tasks/{$id}/comments", $token);
+        
+        if (isset($commentsResponse['data']) && is_array($commentsResponse['data'])) {
+            $comments = $commentsResponse['data'];
+        } elseif (is_array($commentsResponse)) {
+            $comments = $commentsResponse;
+        } else {
+            $comments = [];
+        }
+
+        \Log::info('Task Detail - Comments loaded: ' . count($comments));
+
+        return view('operational.task-detail', [
+            'task' => $task,
+            'logs' => $logs,
+            'attachments' => $attachments,
+            'comments' => $comments
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Task detail error: ' . $e->getMessage());
+        return back()->with('error', 'حدث خطأ أثناء تحميل بيانات المهمة');
+    }
 }
 
 
-
 public function assignEmployees($taskId)
-    {
-        if (!$this->isManager()) {
-            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
-        }
-
-        $token = session('jwt_token');
-        $departmentId = $this->getDepartmentId();
-
-        if ($departmentId <= 0) {
-            return back()->with('error', 'لم يتم تحديد القسم الخاص بالمستخدم');
-        }
-
-        $taskResponse = $this->apiClient->get("/api/tasks/{$taskId}", $token);
-        $task = $taskResponse['data'] ?? [];
-
-        if (empty($task)) {
-            return back()->with('error', 'المهمة غير موجودة');
-        }
-
-        $employeesResponse = $this->apiClient->get(
-            "/api/employees/department/{$departmentId}",
-            $token
-        );
-        $allEmployees = $employeesResponse['data'] ?? [];
-
-        $assignmentsResponse = $this->apiClient->get(
-            "/api/tasks/{$taskId}/assignments",
-            $token
-        );
-        $currentAssignments = $assignmentsResponse['data'] ?? [];
-
-        $responsibleAssignments = [];
-        $memberAssignments = [];
-        $rejectedAssignments = [];
-        $pendingAssignments = [];
-        $assignedEmployeeIds = [];
-
-        foreach ($currentAssignments as $assign) {
-            if ($assign['is_active'] == false) continue;
-            
-            $assignedEmployeeIds[] = $assign['employee_id'];
-            
-            if ($assign['acceptance_status'] == 'rejected') {
-                $rejectedAssignments[] = $assign;
-                continue;
-            }
-            
-            if ($assign['role_type_id'] == 2) {
-                $responsibleAssignments[] = $assign;
-            } else {
-                $memberAssignments[] = $assign;
-            }
-            
-            if ($assign['acceptance_status'] == 'pending') {
-                $pendingAssignments[] = $assign;
-            }
-        }
-
-        $unassignedEmployees = [];
-        foreach ($allEmployees as $emp) {
-            if (!in_array($emp['employee_id'], $assignedEmployeeIds)) {
-                $empId = $emp['employee_id'];
-                $statsResponse = $this->apiClient->get(
-                    "/api/employees/{$empId}/task-stats",
-                    $token
-                );
-                $stats = $statsResponse['data'] ?? [];
-                $emp['total_tasks'] = $stats['total_tasks'] ?? 0;
-                $emp['total_hours'] = $stats['total_hours'] ?? 0;
-                $emp['current_tasks'] = $stats['current_tasks'] ?? 0;
-                $emp['current_hours'] = $stats['current_hours'] ?? 0;
-                $unassignedEmployees[] = $emp;
-            }
-        }
-
-        foreach ($responsibleAssignments as &$assign) {
-            if (isset($assign['employee'])) {
-                $empId = $assign['employee']['employee_id'] ?? $assign['employee_id'];
-                $statsResponse = $this->apiClient->get(
-                    "/api/employees/{$empId}/task-stats",
-                    $token
-                );
-                $stats = $statsResponse['data'] ?? [];
-                $assign['employee']['total_tasks'] = $stats['total_tasks'] ?? 0;
-                $assign['employee']['total_hours'] = $stats['total_hours'] ?? 0;
-            }
-        }
-
-        foreach ($memberAssignments as &$assign) {
-            if (isset($assign['employee'])) {
-                $empId = $assign['employee']['employee_id'] ?? $assign['employee_id'];
-                $statsResponse = $this->apiClient->get(
-                    "/api/employees/{$empId}/task-stats",
-                    $token
-                );
-                $stats = $statsResponse['data'] ?? [];
-                $assign['employee']['total_tasks'] = $stats['total_tasks'] ?? 0;
-                $assign['employee']['total_hours'] = $stats['total_hours'] ?? 0;
-            }
-        }
-
-        $roleTypes = $this->apiClient->get('/api/dict/role-types', $token);
-
-        $hasResponsible = count($responsibleAssignments) > 0;
-
-        return view('operational.assign', [
-            'task' => $task,
-            'unassignedEmployees' => $unassignedEmployees,
-            'responsibleAssignments' => $responsibleAssignments,
-            'memberAssignments' => $memberAssignments,
-            'rejectedAssignments' => $rejectedAssignments,
-            'pendingAssignments' => $pendingAssignments,
-            'currentAssignments' => $currentAssignments,
-            'roleTypes' => $roleTypes['data'] ?? [],
-            'departmentId' => $departmentId,
-            'hasResponsible' => $hasResponsible,
-        ]);
+{
+    if (!$this->isManager()) {
+        return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
     }
+
+    $token = session('jwt_token');
+    $departmentId = $this->getDepartmentId();
+
+    if ($departmentId <= 0) {
+        return back()->with('error', 'لم يتم تحديد القسم الخاص بالمستخدم');
+    }
+
+    $taskResponse = $this->apiClient->get("/api/tasks/{$taskId}", $token);
+    $task = $taskResponse['data'] ?? [];
+    $majorTaskId = $task['major_task_id'] ?? 0;
+
+    if (empty($task)) {
+        return back()->with('error', 'المهمة غير موجودة');
+    }
+
+    $majorTask = null;
+    if ($majorTaskId > 0) {
+        $majorTaskResponse = $this->apiClient->get("/api/major-tasks/{$majorTaskId}", $token);
+        $majorTask = $majorTaskResponse['data'] ?? $majorTaskResponse;
+    }
+
+    $employeesResponse = $this->apiClient->get(
+        "/api/employees/department/{$departmentId}",
+        $token
+    );
+    $allEmployees = $employeesResponse['data'] ?? [];
+
+    $assignmentsResponse = $this->apiClient->get(
+        "/api/tasks/{$taskId}/assignments",
+        $token
+    );
+    $currentAssignments = $assignmentsResponse['data'] ?? [];
+
+    $responsibleAssignments = [];
+    $memberAssignments = [];
+    $rejectedAssignments = [];
+    $pendingAssignments = [];
+    $assignedEmployeeIds = [];
+
+    foreach ($currentAssignments as $assign) {
+        if ($assign['is_active'] == false) continue;
+        
+        $assignedEmployeeIds[] = $assign['employee_id'];
+        
+        if ($assign['acceptance_status'] == 'rejected') {
+            $rejectedAssignments[] = $assign;
+            continue;
+        }
+        
+        if ($assign['role_type_id'] == 2) {
+            $responsibleAssignments[] = $assign;
+        } else {
+            $memberAssignments[] = $assign;
+        }
+        
+        if ($assign['acceptance_status'] == 'pending') {
+            $pendingAssignments[] = $assign;
+        }
+    }
+
+    $unassignedEmployees = [];
+    foreach ($allEmployees as $emp) {
+        if (!in_array($emp['employee_id'], $assignedEmployeeIds)) {
+            $empId = $emp['employee_id'];
+            $statsResponse = $this->apiClient->get(
+                "/api/employees/{$empId}/task-stats",
+                $token
+            );
+            $stats = $statsResponse['data'] ?? [];
+            $emp['total_tasks'] = $stats['total_tasks'] ?? 0;
+            $emp['total_hours'] = $stats['total_hours'] ?? 0;
+            $emp['current_tasks'] = $stats['current_tasks'] ?? 0;
+            $emp['current_hours'] = $stats['current_hours'] ?? 0;
+            $unassignedEmployees[] = $emp;
+        }
+    }
+
+    foreach ($responsibleAssignments as &$assign) {
+        if (isset($assign['employee'])) {
+            $empId = $assign['employee']['employee_id'] ?? $assign['employee_id'];
+            $statsResponse = $this->apiClient->get(
+                "/api/employees/{$empId}/task-stats",
+                $token
+            );
+            $stats = $statsResponse['data'] ?? [];
+            $assign['employee']['total_tasks'] = $stats['total_tasks'] ?? 0;
+            $assign['employee']['total_hours'] = $stats['total_hours'] ?? 0;
+        }
+    }
+
+    foreach ($memberAssignments as &$assign) {
+        if (isset($assign['employee'])) {
+            $empId = $assign['employee']['employee_id'] ?? $assign['employee_id'];
+            $statsResponse = $this->apiClient->get(
+                "/api/employees/{$empId}/task-stats",
+                $token
+            );
+            $stats = $statsResponse['data'] ?? [];
+            $assign['employee']['total_tasks'] = $stats['total_tasks'] ?? 0;
+            $assign['employee']['total_hours'] = $stats['total_hours'] ?? 0;
+        }
+    }
+
+    $roleTypes = $this->apiClient->get('/api/dict/role-types', $token);
+
+    $hasResponsible = count($responsibleAssignments) > 0;
+
+    return view('operational.assign', [
+        'task' => $task,
+        'taskId' => $taskId,                   
+        'majorTaskId' => $majorTaskId,         
+        'majorTask' => $majorTask,              
+        'unassignedEmployees' => $unassignedEmployees,
+        'responsibleAssignments' => $responsibleAssignments,
+        'memberAssignments' => $memberAssignments,
+        'rejectedAssignments' => $rejectedAssignments,
+        'pendingAssignments' => $pendingAssignments,
+        'currentAssignments' => $currentAssignments,
+        'roleTypes' => $roleTypes['data'] ?? [],
+        'departmentId' => $departmentId,
+        'hasResponsible' => $hasResponsible,
+    ]);
+}
 
     public function assignTaskToEmployee(Request $request)
     {
@@ -771,8 +802,9 @@ public function updateTaskStatus(Request $request)
 
     $request->validate([
         'task_id' => 'required|integer',
-        'status_id' => 'required|integer',
-        'comment' => 'nullable|string|max:2000'
+        'status_id' => 'required|integer|in:5,6,7,8,19,26',
+        'comment' => 'required|string|max:2000',
+        'progress_percent' => 'nullable|integer|min:0|max:100'
     ]);
 
     $token = session('jwt_token');
@@ -781,14 +813,14 @@ public function updateTaskStatus(Request $request)
         "/api/tasks/{$request->task_id}/update-status",
         [
             'status_id' => (int) $request->status_id,
-            'comment' => $request->comment ?? ''
+            'comment' => $request->comment,
+            'progress_percent' => $request->progress_percent ?? null
         ],
         $token
     );
 
     return response()->json($response);
 }
-
 
 public function kanbanBoard($majorTaskId = null)
 {
@@ -860,7 +892,6 @@ public function kanbanBoard($majorTaskId = null)
     $holdTasks = [];
     $reviewTasks = [];
     $acceptedTasks = [];
-    $rejectedTasks = [];
 
     foreach ($filteredTasks as $task) {
         $statusId = (int) ($task['status'] ?? 16);
@@ -884,9 +915,6 @@ public function kanbanBoard($majorTaskId = null)
             case 19:
                 $acceptedTasks[] = $task;
                 break;
-            case 20:
-                $rejectedTasks[] = $task;
-                break;
             default:
                 $unassignedTasks[] = $task;
                 break;
@@ -909,7 +937,6 @@ public function kanbanBoard($majorTaskId = null)
         'holdTasks' => $holdTasks,
         'reviewTasks' => $reviewTasks,
         'acceptedTasks' => $acceptedTasks,
-        'rejectedTasks' => $rejectedTasks,
         'allTasks' => $filteredTasks,
     ]);
 }
@@ -1118,46 +1145,91 @@ public function downloadAttachment($attachmentId)
             return redirect()->route('login')->with('error', 'الرجاء تسجيل الدخول أولاً');
         }
 
-        // استخدام Guzzle مباشرة لتحميل الملف
+        $attachmentData = $this->apiClient->get("/api/tasks/attachments/{$attachmentId}/data", $token);
+        
+        if (!isset($attachmentData['file_path']) || !isset($attachmentData['file_name'])) {
+            return redirect()->back()->with('error', 'بيانات الملف غير موجودة');
+        }
+
+        $filePath = $attachmentData['file_path'];
+        $fileName = $attachmentData['file_name'];
+        $fileType = $attachmentData['file_type'] ?? 'application/octet-stream';
+
+        $fullLocalPath = public_path($filePath);
+        
+        if (!file_exists($fullLocalPath)) {
+            $this->downloadFileFromAPI($attachmentId, $filePath);
+        }
+
+        $imageTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/gif', 'image/svg+xml', 'image/webp', 'image/bmp'];
+        if (in_array($fileType, $imageTypes)) {
+            return response()->file($fullLocalPath);
+        }
+
+        $previewTypes = ['application/pdf', 'text/plain', 'text/html', 'application/json'];
+        if (in_array($fileType, $previewTypes) || str_contains($fileType, 'image')) {
+            return response()->file($fullLocalPath, [
+                'Content-Type' => $fileType,
+                'Content-Disposition' => 'inline; filename="' . $fileName . '"'
+            ]);
+        }
+
+        $officeTypes = [
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/msword',
+            'application/vnd.ms-excel',
+            'application/vnd.ms-powerpoint'
+        ];
+
+        if (in_array($fileType, $officeTypes)) {
+            return response()->file($fullLocalPath, [
+                'Content-Type' => $fileType,
+                'Content-Disposition' => 'inline; filename="' . $fileName . '"'
+            ]);
+        }
+
+        return response()->download($fullLocalPath, $fileName);
+
+    } catch (\Exception $e) {
+        \Log::error('Download/Preview error: ' . $e->getMessage());
+        return redirect()->back()->with('error', 'حدث خطأ: ' . $e->getMessage());
+    }
+}
+
+private function downloadFileFromAPI($attachmentId, $filePath)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return false;
+        }
+
         $client = new \GuzzleHttp\Client();
         $response = $client->get(
             "http://localhost:8000/api/tasks/attachments/{$attachmentId}/download",
             [
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $token,
-                ]
+                'headers' => ['Authorization' => 'Bearer ' . $token],
+                'stream' => true
             ]
         );
 
-        // استخراج اسم الملف من الـ headers
-        $contentDisposition = $response->getHeader('Content-Disposition');
-        $fileName = 'download';
-        if (!empty($contentDisposition)) {
-            preg_match('/filename\*=utf-8\'\'([^;]+)/', $contentDisposition[0], $matches);
-            if (isset($matches[1])) {
-                $fileName = urldecode($matches[1]);
-            } else {
-                preg_match('/filename="([^"]+)"/', $contentDisposition[0], $matches);
-                if (isset($matches[1])) {
-                    $fileName = $matches[1];
-                }
-            }
+        $fullPath = public_path($filePath);
+        $directory = dirname($fullPath);
+        if (!file_exists($directory)) {
+            mkdir($directory, 0755, true);
         }
 
-        // الحصول على نوع الملف
-        $contentType = $response->getHeader('Content-Type')[0] ?? 'application/octet-stream';
+        file_put_contents($fullPath, $response->getBody()->getContents());
 
-        // إرجاع الملف للمستخدم
-        return response($response->getBody()->getContents())
-            ->header('Content-Type', $contentType)
-            ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"');
+        return true;
 
     } catch (\Exception $e) {
-        \Log::error('Download error: ' . $e->getMessage());
-        return redirect()->back()->with('error', 'حدث خطأ أثناء تحميل الملف: ' . $e->getMessage());
+        \Log::error('Failed to download file from API: ' . $e->getMessage());
+        return false;
     }
 }
-
 
 public function deleteAttachment($attachmentId)
 {
@@ -1217,6 +1289,120 @@ public function uploadAttachment(Request $request, $taskId)
         return redirect()->back()->with('error', 'حدث خطأ أثناء رفع الملف: ' . $e->getMessage());
     }
 }
+public function previewAttachment($attachmentId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return redirect()->route('login')->with('error', 'الرجاء تسجيل الدخول أولاً');
+        }
+
+        $attachmentData = $this->apiClient->get("/api/tasks/attachments/{$attachmentId}/data", $token);
+        
+        if (!isset($attachmentData['file_path'])) {
+            return redirect()->back()->with('error', 'بيانات الملف غير موجودة');
+        }
+
+        $filePath = $attachmentData['file_path'];
+        $fileName = $attachmentData['file_name'];
+        $fileType = $attachmentData['file_type'] ?? 'application/octet-stream';
+
+        $fullLocalPath = public_path($filePath);
+        if (!file_exists($fullLocalPath)) {
+            $this->downloadFileFromAPI($attachmentId, $filePath);
+        }
+
+        $browserViewable = [
+            'image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp',
+            'application/pdf',
+            'text/plain', 'text/html', 'text/css', 'text/javascript', 'application/json'
+        ];
+
+        if (in_array($fileType, $browserViewable)) {
+            return response()->file($fullLocalPath, [
+                'Content-Type' => $fileType,
+                'Content-Disposition' => 'inline; filename="' . $fileName . '"'
+            ]);
+        }
+
+        $fileUrl = asset($filePath);
+        $googleViewerUrl = "https://docs.google.com/gview?embedded=true&url=" . urlencode($fileUrl);
+        
+        return view('operational.preview', [
+            'fileUrl' => $fileUrl,
+            'googleViewerUrl' => $googleViewerUrl,
+            'fileName' => $fileName,
+            'fileType' => $fileType
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Preview error: ' . $e->getMessage());
+        return redirect()->back()->with('error', 'حدث خطأ أثناء معاينة الملف: ' . $e->getMessage());
+    }
+}
+
+public function addComment(Request $request, $taskId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
+        }
+
+        $request->validate([
+            'comment' => 'required|string|max:2000',
+            'parent_comment_id' => 'nullable|integer'
+        ]);
+
+        $response = $this->apiClient->post(
+            "/api/tasks/{$taskId}/comments",
+            [
+                'comment' => $request->comment,
+                'parent_comment_id' => $request->parent_comment_id
+            ],
+            $token
+        );
+
+        if (isset($response['comment_id'])) {
+            return response()->json(['success' => true, 'data' => $response]);
+        }
+
+        return response()->json(['success' => false, 'error' => 'فشل إضافة التعليق'], 500);
+
+    } catch (\Exception $e) {
+        \Log::error('Add comment error: ' . $e->getMessage());
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
+
+public function deleteComment($commentId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
+        }
+
+        // جرب هذا المسار أولاً
+        $endpoint = "/api/tasks/comments/{$commentId}";
+        \Log::info('Deleting comment with endpoint: ' . $endpoint);
+        
+        $response = $this->apiClient->delete($endpoint, $token);
+        
+        \Log::info('Delete response:', $response);
+
+        if (isset($response['message']) || isset($response['success'])) {
+            return response()->json(['success' => true]);
+        }
+
+        return response()->json(['success' => false, 'error' => $response['detail'] ?? 'فشل حذف التعليق'], 500);
+
+    } catch (\Exception $e) {
+        \Log::error('Delete comment error: ' . $e->getMessage());
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
+
 
 }
 

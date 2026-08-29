@@ -320,9 +320,10 @@
             <button class="btn-finalize" onclick="finalizeTask()" id="finalizeBtn" {{ $disableFinalize ? 'disabled' : '' }}>
                 <i class="fas fa-check-circle"></i> إنهاء التوزيع
             </button>
-            <a href="{{ route('operational.show-major-task', $majorTaskId ?? 0) }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-right"></i> العودة
-            </a>
+           <a href="javascript:history.back()" class="btn btn-outline-secondary">
+    <i class="fas fa-arrow-right"></i> العودة
+</a>
+
         </div>
     </div>
 

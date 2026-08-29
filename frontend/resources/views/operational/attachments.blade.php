@@ -196,33 +196,40 @@
                                     <small class="text-muted">{{ $formattedDate }}</small>
                                 </td>
                                 <td>
-                                    <div class="d-flex justify-content-center gap-1 flex-wrap">
-                                        <a href="{{ route('task.attachments.download', $attachmentId) }}"
-                                           class="btn btn-sm btn-outline-success"
-                                           title="تحميل الملف">
-                                            <i class="fas fa-download"></i>
-                                        </a>
-                                        <a href="{{ asset('/' . $att['file_path'] ?? '') }}"
-                                           target="_blank"
-                                           class="btn btn-sm btn-outline-primary"
-                                           title="معاينة الملف">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-danger"
-                                                onclick="confirmDelete('{{ $attachmentId }}', '{{ addslashes($fileName) }}')"
-                                                title="حذف المرفق">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                        <form id="delete-form-{{ $attachmentId }}"
-                                              action="{{ route('task.attachments.destroy', $attachmentId) }}"
-                                              method="POST"
-                                              style="display:none;">
-                                            @csrf
-                                            @method('DELETE')
-                                        </form>
-                                    </div>
-                                </td>
+    <div class="d-flex justify-content-center gap-1 flex-wrap">
+        {{-- زر المعاينة --}}
+        <a href="{{ route('task.attachments.preview', $attachmentId) }}"
+           class="btn btn-sm btn-primary"
+           target="_blank"
+           title="معاينة الملف">
+            <i class="fas fa-eye"></i>
+        </a>
+        
+        {{-- زر التحميل --}}
+        <a href="{{ route('task.attachments.download', $attachmentId) }}"
+           class="btn btn-sm btn-success"
+           title="تحميل الملف">
+            <i class="fas fa-download"></i>
+        </a>
+        
+        {{-- زر الحذف --}}
+        <button type="button"
+                class="btn btn-sm btn-outline-danger"
+                onclick="confirmDelete('{{ $attachmentId }}', '{{ addslashes($fileName) }}')"
+                title="حذف المرفق">
+            <i class="fas fa-trash"></i>
+        </button>
+        
+        <form id="delete-form-{{ $attachmentId }}"
+              action="{{ route('task.attachments.destroy', $attachmentId) }}"
+              method="POST"
+              style="display:none;">
+            @csrf
+            @method('DELETE')
+        </form>
+    </div>
+</td>
+
                             </tr>
                             @endforeach
                         </tbody>

@@ -255,4 +255,10 @@ class ApiClient
     }
 }
 
+public function getAttachmentData($attachmentId, $token = null)
+{
+    return $this->get("/api/tasks/attachments/{$attachmentId}/data", $token);
+}
+
+
 }

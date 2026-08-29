@@ -171,8 +171,18 @@ Route::middleware('check.jwt')->group(function () {
     Route::post('/operational-tasks/{taskId}/attachments/upload', [OperationalTaskController::class, 'uploadAttachment'])
     ->name('task.attachments.upload');
 
+    Route::get('/attachments/{attachmentId}/preview', [OperationalTaskController::class, 'previewAttachment'])
+    ->name('task.attachments.preview');
+
     Route::get('/operational/task/{id}', [OperationalTaskController::class, 'showOperationalTask'])
         ->name('operational.task-detail');
+    
+    Route::post('/operational/task/{taskId}/comment', [OperationalTaskController::class, 'addComment'])
+    ->name('operational.add-comment');
+
+    Route::delete('/operational/comment/{commentId}', [OperationalTaskController::class, 'deleteComment'])
+        ->name('operational.delete-comment');
+
 });
 
 
