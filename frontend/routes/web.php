@@ -183,6 +183,48 @@ Route::middleware('check.jwt')->group(function () {
     Route::delete('/operational/comment/{commentId}', [OperationalTaskController::class, 'deleteComment'])
         ->name('operational.delete-comment');
 
+    Route::get('/kpis', [KpiController::class, 'index'])->name('kpis.index');
+    Route::get('/kpis/create', [KpiController::class, 'create'])->name('kpis.create');
+    Route::post('/kpis', [KpiController::class, 'store'])->name('kpis.store');
+    Route::get('/kpis/{id}', [KpiController::class, 'show'])->name('kpis.show');
+    Route::get('/kpis/{id}/edit', [KpiController::class, 'edit'])->name('kpis.edit');
+    Route::put('/kpis/{id}', [KpiController::class, 'update'])->name('kpis.update');
+    Route::delete('/kpis/{id}', [KpiController::class, 'destroy'])->name('kpis.destroy');
+
+    Route::get('/kpis/{id}/measurements', [KpiController::class, 'measurements'])->name('kpis.measurements');
+    Route::get('/kpis/{id}/measurements/create', [KpiController::class, 'createMeasurement'])->name('kpis.measurements.create');
+    Route::post('/kpis/{id}/measurements', [KpiController::class, 'storeMeasurement'])->name('kpis.measurements.store');
+    Route::delete('/kpis/measurements/{measurementId}', [KpiController::class, 'destroyMeasurement'])->name('kpis.measurements.destroy');
+
+    Route::get('/budget', [BudgetController::class, 'index'])->name('budget.index');
+    Route::get('/budget/create', [BudgetController::class, 'create'])->name('budget.create');
+    Route::post('/budget', [BudgetController::class, 'store'])->name('budget.store');
+    Route::get('/budget/{id}', [BudgetController::class, 'show'])->name('budget.show');
+    Route::get('/budget/{id}/edit', [BudgetController::class, 'edit'])->name('budget.edit');
+    Route::put('/budget/{id}', [BudgetController::class, 'update'])->name('budget.update');
+    Route::delete('/budget/{id}', [BudgetController::class, 'destroy'])->name('budget.destroy');
+
+    Route::get('/budget/{id}/transactions', [BudgetController::class, 'transactions'])->name('budget.transactions');
+    Route::get('/budget/{id}/transactions/create', [BudgetController::class, 'createTransaction'])->name('budget.transactions.create');
+    Route::post('/budget/{id}/transactions', [BudgetController::class, 'storeTransaction'])->name('budget.transactions.store');
+    Route::get('/budget/transactions/{transactionId}', [BudgetController::class, 'showTransaction'])->name('budget.transactions.show');
+    Route::delete('/budget/transactions/{transactionId}', [BudgetController::class, 'destroyTransaction'])->name('budget.transactions.destroy');
+    
+    Route::get('/risks', [RiskController::class, 'index'])->name('risks.index');
+    Route::get('/risks/create', [RiskController::class, 'create'])->name('risks.create');
+    Route::post('/risks', [RiskController::class, 'store'])->name('risks.store');
+    Route::get('/risks/{id}', [RiskController::class, 'show'])->name('risks.show');
+    Route::get('/risks/{id}/edit', [RiskController::class, 'edit'])->name('risks.edit');
+    Route::put('/risks/{id}', [RiskController::class, 'update'])->name('risks.update');
+    Route::delete('/risks/{id}', [RiskController::class, 'destroy'])->name('risks.destroy');
+
+    Route::get('/risks/{id}/mitigations', [RiskController::class, 'mitigations'])->name('risks.mitigations');
+    Route::get('/risks/{id}/mitigations/create', [RiskController::class, 'createMitigation'])->name('risks.mitigations.create');
+    Route::post('/risks/{id}/mitigations', [RiskController::class, 'storeMitigation'])->name('risks.mitigations.store');
+    Route::get('/risks/mitigations/{mitigationId}/edit', [RiskController::class, 'editMitigation'])->name('risks.mitigations.edit');
+    Route::put('/risks/mitigations/{mitigationId}', [RiskController::class, 'updateMitigation'])->name('risks.mitigations.update');
+    Route::delete('/risks/mitigations/{mitigationId}', [RiskController::class, 'destroyMitigation'])->name('risks.mitigations.destroy');
+
 });
 
 
@@ -247,44 +289,6 @@ Route::middleware('check.jwt')->group(function () {
         Route::get('/pestel', [PestelController::class, 'index'])->name('pestel.index');
         Route::get('/pestel/edit', [PestelController::class, 'edit'])->name('pestel.edit');
         Route::put('/pestel', [PestelController::class, 'update'])->name('pestel.update');
-    });
-
-    Route::prefix('kpis')->name('kpis.')->group(function () {
-        Route::get('/', [KpiController::class, 'index'])->name('index');
-        Route::get('/create', [KpiController::class, 'create'])->name('create');
-        Route::post('/', [KpiController::class, 'store'])->name('store');
-        Route::get('/{id}', [KpiController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [KpiController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [KpiController::class, 'update'])->name('update');
-        Route::delete('/{id}', [KpiController::class, 'destroy'])->name('destroy');
-        Route::get('/{id}/measurements', [KpiController::class, 'measurements'])->name('measurements');
-        Route::get('/{id}/measurements/create', [KpiController::class, 'createMeasurement'])->name('measurements.create');
-        Route::post('/{id}/measurements', [KpiController::class, 'storeMeasurement'])->name('measurements.store');
-    });
-
-    Route::prefix('budget')->name('budget.')->group(function () {
-        Route::get('/', [BudgetController::class, 'index'])->name('index');
-        Route::get('/create', [BudgetController::class, 'create'])->name('create');
-        Route::post('/', [BudgetController::class, 'store'])->name('store');
-        Route::get('/{id}', [BudgetController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [BudgetController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [BudgetController::class, 'update'])->name('update');
-        Route::get('/transactions', [BudgetController::class, 'transactions'])->name('transactions');
-        Route::get('/transactions/create', [BudgetController::class, 'createTransaction'])->name('transactions.create');
-        Route::post('/transactions', [BudgetController::class, 'storeTransaction'])->name('transactions.store');
-        Route::get('/transactions/{id}', [BudgetController::class, 'showTransaction'])->name('transactions.show');
-    });
-
-    Route::prefix('risks')->name('risks.')->group(function () {
-        Route::get('/', [RiskController::class, 'index'])->name('index');
-        Route::get('/create', [RiskController::class, 'create'])->name('create');
-        Route::post('/', [RiskController::class, 'store'])->name('store');
-        Route::get('/{id}', [RiskController::class, 'show'])->name('show');
-        Route::get('/{id}/edit', [RiskController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [RiskController::class, 'update'])->name('update');
-        Route::get('/{id}/mitigations', [RiskController::class, 'mitigations'])->name('mitigations');
-        Route::get('/{id}/mitigations/create', [RiskController::class, 'createMitigation'])->name('mitigations.create');
-        Route::post('/{id}/mitigations', [RiskController::class, 'storeMitigation'])->name('mitigations.store');
     });
 
     Route::prefix('ai')->name('ai.')->group(function () {

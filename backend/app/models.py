@@ -3,11 +3,8 @@ from sqlalchemy import Column, Integer, String, Text, Date, DateTime, Boolean, F
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
-from datetime import datetime
-from typing import Optional
-# ================================================================
-# جداول الربط (Many-to-Many)
-# ================================================================
+from datetime import datetime, date
+from typing import Optional, List
 
 employee_roles = Table(
     'employee_roles',
@@ -23,9 +20,6 @@ role_permissions = Table(
     Column('permission_id', Integer, ForeignKey('permissions.permission_id'), primary_key=True)
 )
 
-# ================================================================
-# 1. القواميس الأساسية (Dictionaries)
-# ================================================================
 
 class DictStatus(Base):
     __tablename__ = "dict_statuses"
@@ -82,9 +76,6 @@ class DictTransactionType(Base):
     name_en = Column(String(100), nullable=False)
     sign = Column(Integer, nullable=False)
 
-# ================================================================
-# 2. الطبقة التنظيمية (Organization)
-# ================================================================
 
 class Department(Base):
     __tablename__ = "departments"
@@ -100,7 +91,6 @@ class Department(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
 
-    # العلاقات
     parent = relationship("Department", remote_side=[department_id])
     employees = relationship("Employee", back_populates="department", foreign_keys="[Employee.department_id]")
 
@@ -125,7 +115,6 @@ class Employee(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
 
-    # العلاقات
     department = relationship("Department", back_populates="employees", foreign_keys=[department_id])
     employment_status = relationship("DictStatus", foreign_keys=[employment_status_id])
     roles = relationship("Role", secondary=employee_roles, back_populates="employees")
@@ -146,7 +135,6 @@ class Role(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
 
-    # العلاقات
     employees = relationship("Employee", secondary=employee_roles, back_populates="roles")
     permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
 
@@ -160,13 +148,9 @@ class Permission(Base):
     action = Column(String(50))
     description = Column(Text)
 
-    # العلاقات
     roles = relationship("Role", secondary=role_permissions, back_populates="permissions")
 
 
-# ================================================================
-# 3. الطبقة الاستراتيجية (Strategic)
-# ================================================================
 
 class StrategicVision(Base):
     __tablename__ = "strategic_visions"
@@ -195,7 +179,6 @@ class StrategicPillar(Base):
     updated_at = Column(DateTime, onupdate=func.now())
     is_active = Column(Boolean, default=True)
 
-    # العلاقات
     goals = relationship("StrategicGoal", back_populates="pillar")
 
 
@@ -215,7 +198,6 @@ class StrategicGoal(Base):
     updated_at = Column(DateTime, onupdate=func.now())
     is_active = Column(Boolean, default=True)
 
-    # العلاقات
     pillar = relationship("StrategicPillar", back_populates="goals")
     programs = relationship("Program", back_populates="goal")
     creator = relationship("Employee", foreign_keys=[created_by])
@@ -237,7 +219,6 @@ class Program(Base):
     updated_at = Column(DateTime, onupdate=func.now())
     is_active = Column(Boolean, default=True)
 
-    # العلاقات
     goal = relationship("StrategicGoal", back_populates="programs")
     initiatives = relationship("Initiative", back_populates="program")
 
@@ -259,14 +240,10 @@ class Initiative(Base):
     updated_at = Column(DateTime, onupdate=func.now())
     is_active = Column(Boolean, default=True)
 
-    # العلاقات
     program = relationship("Program", back_populates="initiatives")
     major_tasks = relationship("MajorTask", back_populates="initiative")
 
 
-# ================================================================
-# 4. طبقة التنفيذ (Execution)
-# ================================================================
 
 class MajorTask(Base):
     __tablename__ = "major_tasks"
@@ -283,7 +260,7 @@ class MajorTask(Base):
     updated_at = Column(DateTime, onupdate=func.now())
     is_active = Column(Boolean, default=True)
 
-    # العلاقات
+    
     initiative = relationship("Initiative", back_populates="major_tasks")
     operational_tasks = relationship("OperationalTask", back_populates="major_task")
 
@@ -319,7 +296,6 @@ class OperationalTask(Base):
     updated_at = Column(DateTime, onupdate=func.now())
     is_active = Column(Boolean, default=True)
 
-    # العلاقات - تم إصلاح budget_lines باستخدام primaryjoin
     major_task = relationship("MajorTask", back_populates="operational_tasks")
     department = relationship("Department")
     assignments = relationship("TaskAssignment", back_populates="task")
@@ -330,7 +306,6 @@ class OperationalTask(Base):
     comments = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan")  
 
     
-    # علاقة خاصة بـ budget_lines (متعدد الأغراض)
     budget_lines = relationship(
         "BudgetLine",
         primaryjoin="and_(OperationalTask.task_id == BudgetLine.budgetable_id, BudgetLine.budgetable_type == 'operational_task')",
@@ -340,9 +315,6 @@ class OperationalTask(Base):
     )
 
 
-# ================================================================
-# 5. توزيع المهام والتقدم
-# ================================================================
 
 class TaskAssignment(Base):
     __tablename__ = "task_assignments"
@@ -359,7 +331,7 @@ class TaskAssignment(Base):
     assigned_at = Column(DateTime, server_default=func.now())
     is_active = Column(Boolean, default=True)
 
-    # العلاقات
+    
     task = relationship("OperationalTask", back_populates="assignments")
     employee = relationship("Employee", back_populates="task_assignments", foreign_keys=[employee_id])
 
@@ -436,11 +408,9 @@ class BudgetLine(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
 
-    # العلاقات - تم إصلاح task باستخدام primaryjoin
     parent = relationship("BudgetLine", remote_side=[budget_id])
     transactions = relationship("BudgetTransaction", back_populates="budget")
     
-    # علاقة عكسية لـ operational_task
     task = relationship(
         "OperationalTask",
         primaryjoin="and_(BudgetLine.budgetable_id == OperationalTask.task_id, BudgetLine.budgetable_type == 'operational_task')",
@@ -463,7 +433,7 @@ class BudgetTransaction(Base):
     approved_by = Column(Integer, ForeignKey("employees.employee_id"))
     approved_at = Column(DateTime)
 
-    # العلاقات
+    # 
     budget = relationship("BudgetLine", back_populates="transactions")
 
 
@@ -477,14 +447,13 @@ class Risk(Base):
     risk_level_id = Column(Integer, ForeignKey("dict_risk_levels.risk_level_id"))
     probability = Column(Integer)
     impact = Column(Integer)
-    risk_score = Column(Integer, default=0)  # <-- أضف هذا السطر
+    risk_score = Column(Integer, default=0) 
     identified_by = Column(Integer, ForeignKey("employees.employee_id"))
     identified_at = Column(DateTime, server_default=func.now())
     target_date = Column(Date)
     status_id = Column(Integer, ForeignKey("dict_statuses.status_id"))
     updated_at = Column(DateTime, onupdate=func.now())
 
-    # العلاقات
     task = relationship("OperationalTask", foreign_keys=[task_id])
     mitigations = relationship("RiskMitigation", back_populates="risk")
 
@@ -505,13 +474,9 @@ class RiskMitigation(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
 
-    # العلاقات
     risk = relationship("Risk", back_populates="mitigations")
 
 
-# ================================================================
-# 7. مؤشرات الأداء (KPIs)
-# ================================================================
 
 class KPI(Base):
     __tablename__ = "kpis"
@@ -554,13 +519,8 @@ class KPIMeasurement(Base):
     recorded_by = Column(Integer, ForeignKey("employees.employee_id"))
     notes = Column(Text)
 
-    # العلاقات
     kpi = relationship("KPI")
 
-
-# ================================================================
-# 8. تحليل (SWOT / PESTEL)
-# ================================================================
 
 class SWOTAnalysis(Base):
     __tablename__ = "swot_analysis"
@@ -594,10 +554,6 @@ class PESTELAnalysis(Base):
     updated_at = Column(DateTime, onupdate=func.now())
 
 
-# ================================================================
-# 9. الذكاء الاصطناعي (AI)
-# ================================================================
-
 class AIModel(Base):
     __tablename__ = "ai_models"
 
@@ -622,11 +578,10 @@ class AIPrediction(Base):
     probability = Column(DECIMAL(5, 2))
     confidence = Column(DECIMAL(5, 2))
     model_id = Column(Integer, ForeignKey("ai_models.model_id"))
-    features_used = Column(Text)  # JSON
+    features_used = Column(Text)  
     created_at = Column(DateTime, server_default=func.now())
     expires_at = Column(DateTime)
 
-    # العلاقات
     task = relationship("OperationalTask", back_populates="predictions")
 
 
@@ -644,13 +599,9 @@ class AIRecommendation(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
 
-    # العلاقات
     task = relationship("OperationalTask", back_populates="recommendations")
 
 
-# ================================================================
-# 10. الموقع والتدقيق
-# ================================================================
 
 class LocationLog(Base):
     __tablename__ = "location_logs"
@@ -664,7 +615,6 @@ class LocationLog(Base):
     recorded_at = Column(DateTime, server_default=func.now())
     source = Column(String(50))
 
-    # العلاقات
     employee = relationship("Employee", back_populates="location_logs")
 
 
@@ -676,8 +626,8 @@ class AuditLog(Base):
     action = Column(String(255), nullable=False)
     table_name = Column(String(100), nullable=False)
     record_id = Column(Integer)
-    old_data = Column(Text)  # JSON
-    new_data = Column(Text)  # JSON
+    old_data = Column(Text)  
+    new_data = Column(Text)  
     ip_address = Column(String(45))
     user_agent = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
@@ -697,8 +647,8 @@ class AiJob(Base):
     job_id = Column(Integer, primary_key=True, autoincrement=True)
     job_type = Column(String(50), nullable=False)
     status = Column(String(20), default="pending")
-    input_data = Column(Text)  # JSON
-    result_json = Column(Text)  # JSON
+    input_data = Column(Text)  
+    result_json = Column(Text)  
     created_by = Column(Integer, ForeignKey("employees.employee_id"))
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
@@ -720,7 +670,7 @@ class TaskAttachment(Base):
     updated_at = Column(DateTime, onupdate=func.now())
     is_active = Column(Boolean, default=True)
 
-    # العلاقات
+    
     task = relationship("OperationalTask", back_populates="attachments")
     employee = relationship("Employee", back_populates="task_attachments")
 
@@ -743,3 +693,263 @@ class TaskAttachmentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class KPICreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    unit: Optional[str] = None
+    target_min: Optional[float] = None
+    target_max: Optional[float] = None
+    calculation_method: Optional[str] = None
+    goal_id: int
+    target_value: float
+    baseline_value: Optional[float] = None
+    weight: Optional[float] = 1.0
+
+class KPIUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    unit: Optional[str] = None
+    target_min: Optional[float] = None
+    target_max: Optional[float] = None
+    calculation_method: Optional[str] = None
+    goal_id: Optional[int] = None
+    target_value: Optional[float] = None
+    baseline_value: Optional[float] = None
+    weight: Optional[float] = None
+
+class KPIMeasurementCreate(BaseModel):
+    value: float
+    measured_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+class GoalInfo(BaseModel):
+    goal_id: Optional[int] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+class GoalKPIInfo(BaseModel):
+    target_value: Optional[float] = None
+    baseline_value: Optional[float] = None
+    weight: Optional[float] = None
+
+class MeasurementResponse(BaseModel):
+    measurement_id: int
+    value: float
+    measured_at: Optional[str] = None
+    source_type: str
+    notes: Optional[str] = None
+    recorded_by: Optional[int] = None
+
+class KPIResponse(BaseModel):
+    kpi_id: int
+    name: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    unit: Optional[str] = None
+    target_min: Optional[float] = None
+    target_max: Optional[float] = None
+    calculation_method: Optional[str] = None
+    is_active: bool = True
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    goal_title: Optional[str] = None
+    goal_id: Optional[int] = None
+    current_value: Optional[float] = None
+    target_value: Optional[float] = None
+    achievement_percentage: Optional[float] = None
+    trend: Optional[str] = None
+    status: Optional[str] = None
+    last_updated: Optional[str] = None
+
+class KPIDetailResponse(BaseModel):
+    kpi_id: int
+    name: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    unit: Optional[str] = None
+    target_min: Optional[float] = None
+    target_max: Optional[float] = None
+    calculation_method: Optional[str] = None
+    is_active: bool = True
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    goal: Optional[GoalInfo] = None
+    goal_kpi: Optional[GoalKPIInfo] = None
+    current_value: Optional[float] = None
+    achievement_percentage: Optional[float] = None
+    trend: Optional[str] = None
+    status: Optional[str] = None
+    measurements: Optional[List[MeasurementResponse]] = []
+
+class BudgetLineCreate(BaseModel):
+    budgetable_type: str
+    budgetable_id: int
+    department_id: Optional[int] = None
+    fiscal_year: int
+    allocated_amount: float
+    parent_budget_id: Optional[int] = None
+
+class BudgetLineUpdate(BaseModel):
+    department_id: Optional[int] = None
+    fiscal_year: Optional[int] = None
+    allocated_amount: Optional[float] = None
+    parent_budget_id: Optional[int] = None
+
+class BudgetTransactionCreate(BaseModel):
+    amount: float
+    transaction_type_id: int
+    description: Optional[str] = None
+    transaction_date: Optional[datetime] = None
+
+class BudgetTransactionUpdate(BaseModel):
+    amount: Optional[float] = None
+    transaction_type_id: Optional[int] = None
+    description: Optional[str] = None
+    transaction_date: Optional[datetime] = None
+
+class DepartmentInfo(BaseModel):
+    id: Optional[int] = None
+    name: Optional[str] = None
+
+class BudgetableInfo(BaseModel):
+    id: Optional[int] = None
+    name: Optional[str] = None
+    type: Optional[str] = None
+
+class TransactionTypeInfo(BaseModel):
+    id: Optional[int] = None
+    name: Optional[str] = None
+
+class EmployeeInfo(BaseModel):
+    id: Optional[int] = None
+    name: Optional[str] = None
+
+class BudgetTransactionResponse(BaseModel):
+    transaction_id: int
+    budget_id: int
+    budgetable_type: Optional[str] = None
+    budgetable_name: Optional[str] = None
+    amount: float
+    transaction_type: Optional[TransactionTypeInfo] = None
+    description: Optional[str] = None
+    transaction_date: Optional[str] = None
+    created_by: Optional[EmployeeInfo] = None
+    approved_by: Optional[EmployeeInfo] = None
+    approved_at: Optional[str] = None
+    is_approved: bool = False
+
+class BudgetLineResponse(BaseModel):
+    budget_id: int
+    budgetable_type: str
+    budgetable_id: int
+    budgetable_name: Optional[str] = None
+    department: Optional[DepartmentInfo] = None
+    fiscal_year: int
+    allocated_amount: float
+    spent_amount: float
+    remaining_amount: float
+    execution_percentage: float
+    status: str
+    parent_budget: Optional[dict] = None
+    transactions: Optional[List[BudgetTransactionResponse]] = []
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+class BudgetOptionsResponse(BaseModel):
+    budget_types: List[str] = []
+    programs: List[dict] = []
+    initiatives: List[dict] = []
+    major_tasks: List[dict] = []
+    operational_tasks: List[dict] = []
+    departments: List[dict] = []
+    transaction_types: List[dict] = []
+    fiscal_years: List[int] = []
+    parent_budgets: List[dict] = []
+
+
+class RiskLevelInfo(BaseModel):
+    risk_level_id: Optional[int] = None
+    name_ar: Optional[str] = None
+    name_en: Optional[str] = None
+    color_hex: Optional[str] = "#6c757d"
+
+class StatusInfo(BaseModel):
+    status_id: Optional[int] = None
+    name_ar: Optional[str] = None
+    name_en: Optional[str] = None
+    color_hex: Optional[str] = "#6c757d"
+
+class TaskInfo(BaseModel):
+    task_id: Optional[int] = None
+    title: Optional[str] = None
+
+class EmployeeInfo(BaseModel):
+    employee_id: Optional[int] = None
+    full_name: Optional[str] = None
+
+class RiskCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    task_id: Optional[int] = None
+    probability: int
+    impact: int
+    target_date: Optional[date] = None
+    status_id: Optional[int] = None
+
+class RiskUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    task_id: Optional[int] = None
+    probability: Optional[int] = None
+    impact: Optional[int] = None
+    target_date: Optional[date] = None
+    status_id: Optional[int] = None
+
+class RiskMitigationCreate(BaseModel):
+    action: str
+    task_id: Optional[int] = None
+    assigned_to: Optional[int] = None
+    due_date: Optional[date] = None
+    status_id: Optional[int] = None
+    notes: Optional[str] = None
+
+class RiskMitigationUpdate(BaseModel):
+    action: Optional[str] = None
+    task_id: Optional[int] = None
+    assigned_to: Optional[int] = None
+    due_date: Optional[date] = None
+    status_id: Optional[int] = None
+    notes: Optional[str] = None
+
+class RiskMitigationResponse(BaseModel):
+    mitigation_id: int
+    action: str
+    task: Optional[TaskInfo] = None
+    assigned_to: Optional[EmployeeInfo] = None
+    status: Optional[StatusInfo] = None
+    due_date: Optional[str] = None
+    completed_at: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+class RiskResponse(BaseModel):
+    risk_id: int
+    name: str
+    description: Optional[str] = None
+    task_id: Optional[int] = None
+    task: Optional[TaskInfo] = None
+    probability: int
+    impact: int
+    risk_score: int
+    risk_level: Optional[RiskLevelInfo] = None
+    status: Optional[StatusInfo] = None
+    identified_by: Optional[EmployeeInfo] = None
+    identified_at: Optional[str] = None
+    target_date: Optional[str] = None
+    updated_at: Optional[str] = None
+    mitigations: Optional[List[RiskMitigationResponse]] = []

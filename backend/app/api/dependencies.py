@@ -17,7 +17,6 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> Employee:
-    """الحصول على المستخدم الحالي من التوكن"""
     token = credentials.credentials
     payload = decode_access_token(token)
     
@@ -51,7 +50,6 @@ def get_current_user(
     return employee
 
 def has_role(required_roles: list):
-    """التحقق من صلاحيات المستخدم (RBAC)"""
     def role_checker(current_user: Employee = Depends(get_current_user)):
         user_roles = [role.name for role in current_user.roles]
         for role in required_roles:

@@ -2,120 +2,298 @@
 
 @section('title', 'تفاصيل المؤشر')
 
-@push('styles')
-<style>
-    .measurement-table td { vertical-align: middle; }
-    .trend-up { color: #38a169; }
-    .trend-down { color: #e53e3e; }
-    .trend-stable { color: #718096; }
-    .chart-placeholder {
-        background: linear-gradient(135deg, #f8fafc, #edf2f7);
-        border-radius: 12px;
-        padding: 40px;
-        text-align: center;
-        margin-bottom: 20px;
-    }
-</style>
-@endpush
-
 @section('content')
 <div class="container-fluid px-4">
-    <a href="{{ route('kpis.index') }}" class="btn btn-outline-secondary mb-3">
-        <i class="fas fa-arrow-right"></i> العودة للمؤشرات
-    </a>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3><i class="fas fa-chart-line ml-2"></i>{{ $kpi['name'] ?? '' }}</h3>
+            <p class="text-muted mb-0">{{ $kpi['description'] ?? '' }}</p>
+        </div>
+        <div>
+            <a href="{{ route('kpis.edit', $kpi['kpi_id']) }}" class="btn btn-outline-primary">
+                <i class="fas fa-edit"></i> تعديل
+            </a>
+            <a href="{{ route('kpis.measurements.create', $kpi['kpi_id']) }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> إضافة قياس
+            </a>
+            <a href="{{ route('kpis.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-right"></i> العودة
+            </a>
+        </div>
+    </div>
 
-    @if(session('success')) <div class="alert alert-success">{{ session('success') }}</div> @endif
+    @if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i> {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    @endif
 
-    @if(empty($kpi))
-        <div class="alert alert-info">المؤشر غير موجود</div>
-    @else
-        <div class="row">
-            {{-- بطاقة المؤشر --}}
-            <div class="col-lg-4">
-                <div class="card-custom mb-4 text-center">
-                    @php
-                        $current = $kpi['current_value'] ?? 0;
-                        $target = $kpi['target_value'] ?? 100;
-                        $pct = $target > 0 ? min(round(($current / $target) * 100), 100) : 0;
-                    @endphp
-                    <h5 class="mb-3">{{ $kpi['name'] ?? $kpi['title'] ?? '' }}</h5>
-                    <div class="display-3 fw-bold {{ $current >= $target ? 'text-success' : 'text-danger' }} mb-2">
-                        {{ $current }}<small class="fs-6"> {{ $kpi['unit'] ?? '%' }}</small>
-                    </div>
-                    <p class="text-muted">المستهدف: {{ $target }} {{ $kpi['unit'] ?? '%' }}</p>
-                    <div class="progress mb-3" style="height: 12px;">
-                        <div class="progress-bar {{ $pct >= 100 ? 'bg-success' : ($pct > 60 ? 'bg-warning' : 'bg-danger') }}" style="width: {{ $pct }}%">{{ $pct }}%</div>
-                    </div>
-                    <p class="text-muted small">{{ $kpi['description'] ?? '' }}</p>
-                    <div class="d-flex justify-content-center gap-2 mt-3">
-                        <a href="{{ route('kpis.measurements', $kpi['id']) }}" class="btn btn-outline-info btn-sm">
-                            <i class="fas fa-ruler"></i> القياسات
-                        </a>
-                        <a href="{{ route('kpis.edit', $kpi['id']) }}" class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-edit"></i> تعديل
-                        </a>
-                    </div>
-                </div>
+    @if(session('error'))
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i> {{ session('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    @endif
 
-                {{-- إحصائيات --}}
-                <div class="row">
-                    <div class="col-6"><div class="stat-mini text-center p-3 bg-light rounded mb-2"><div class="fw-bold">{{ $avg }}</div><small>المتوسط</small></div></div>
-                    <div class="col-6"><div class="stat-mini text-center p-3 bg-light rounded mb-2"><div class="fw-bold">{{ $max }}</div><small>الأعلى</small></div></div>
-                    <div class="col-6"><div class="stat-mini text-center p-3 bg-light rounded"><div class="fw-bold">{{ $min }}</div><small>الأدنى</small></div></div>
-                    <div class="col-6"><div class="stat-mini text-center p-3 bg-light rounded">
-                        <div class="fw-bold"><i class="fas fa-arrow-{{ $trend == 'up' ? 'up text-success' : ($trend == 'down' ? 'down text-danger' : 'right text-muted') }}"></i></div>
-                        <small>{{ $trend == 'up' ? 'صاعد' : ($trend == 'down' ? 'هابط' : 'ثابت') }}</small>
-                    </div></div>
-                </div>
-            </div>
-
-            {{-- جدول القياسات --}}
-            <div class="col-lg-8">
-                <div class="card-custom">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5><i class="fas fa-history ml-2"></i>سجل القياسات</h5>
-                        <a href="{{ route('kpis.measurements.create', $kpi['id']) }}" class="btn btn-sm btn-gold">
-                            <i class="fas fa-plus"></i> قياس جديد
-                        </a>
-                    </div>
-
-                    @if(empty($measurements))
-                        <div class="text-center py-4">
-                            <i class="fas fa-ruler fa-3x text-muted mb-3"></i>
-                            <p>لا توجد قياسات بعد</p>
-                            <a href="{{ route('kpis.measurements.create', $kpi['id']) }}" class="btn btn-primary">تسجيل أول قياس</a>
-                        </div>
-                    @else
-                        <div class="chart-placeholder">
-                            <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">الرسم البياني للقياسات</p>
-                            <small>آخر {{ count($measurements) }} قياس</small>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover measurement-table">
-                                <thead><tr><th>#</th><th>القيمة</th><th>التاريخ</th><th>ملاحظات</th><th></th></tr></thead>
-                                <tbody>
-                                    @foreach($measurements as $m)
-                                    <tr>
-                                        <td>{{ $loop->iteration }}</td>
-                                        <td><strong>{{ $m['value'] ?? 0 }}</strong> {{ $kpi['unit'] ?? '%' }}</td>
-                                        <td><small>{{ $m['measurement_date'] ?? $m['created_at'] ?? '' }}</small></td>
-                                        <td><small>{{ $m['notes'] ?? '' }}</small></td>
-                                        <td>
-                                            <form action="{{ route('kpis.measurements.destroy', $m['id']) }}" method="POST" onsubmit="return confirm('حذف هذا القياس؟')">
-                                                @csrf @method('DELETE')
-                                                <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card-custom text-center">
+                <div class="card-body">
+                    <h6 class="text-muted">التصنيف</h6>
+                    <h5>{{ $kpi['category'] ?? 'غير محدد' }}</h5>
                 </div>
             </div>
         </div>
-    @endif
+        <div class="col-md-4">
+            <div class="card-custom text-center">
+                <div class="card-body">
+                    <h6 class="text-muted">وحدة القياس</h6>
+                    <h5>{{ $kpi['unit'] ?? 'غير محدد' }}</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-custom text-center">
+                <div class="card-body">
+                    <h6 class="text-muted">الهدف الاستراتيجي</h6>
+                    <h5>{{ $kpi['goal']['title'] ?? 'غير مرتبط' }}</h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card-custom text-center border-primary">
+                <div class="card-body">
+                    <h6 class="text-muted">القيمة الحالية</h6>
+                    <h2 class="text-primary">
+                        @if(isset($kpi['current_value']))
+                            {{ number_format($kpi['current_value'], 2) }} {{ $kpi['unit'] ?? '' }}
+                        @else
+                            --
+                        @endif
+                    </h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-custom text-center border-success">
+                <div class="card-body">
+                    <h6 class="text-muted">القيمة المستهدفة</h6>
+                    <h2 class="text-success">
+                        @if(isset($kpi['goal_kpi']['target_value']))
+                            {{ number_format($kpi['goal_kpi']['target_value'], 2) }} {{ $kpi['unit'] ?? '' }}
+                        @else
+                            --
+                        @endif
+                    </h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-custom text-center border-info">
+                <div class="card-body">
+                    <h6 class="text-muted">نسبة الإنجاز</h6>
+                    <h2 class="text-info">
+                        @if(isset($kpi['achievement_percentage']))
+                            {{ round($kpi['achievement_percentage']) }}%
+                        @else
+                            --
+                        @endif
+                    </h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card-custom text-center border-warning">
+                <div class="card-body">
+                    <h6 class="text-muted">القيمة الأساسية</h6>
+                    <h2 class="text-warning">
+                        @if(isset($kpi['goal_kpi']['baseline_value']))
+                            {{ number_format($kpi['goal_kpi']['baseline_value'], 2) }} {{ $kpi['unit'] ?? '' }}
+                        @else
+                            --
+                        @endif
+                    </h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card-custom">
+                <div class="card-body">
+                    <h5><i class="fas fa-chart-area text-primary me-2"></i>أداء المؤشر عبر الزمن</h5>
+                    <div style="height:300px;">
+                        <canvas id="kpiChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card-custom">
+                <div class="card-body">
+                    <h5><i class="fas fa-clock text-info me-2"></i>آخر القياسات</h5>
+                    <div class="timeline" style="max-height:300px;overflow-y:auto;">
+                        @forelse(array_slice($kpi['measurements'] ?? [], 0, 5) as $measurement)
+                        <div class="timeline-item">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <div class="d-flex justify-content-between">
+                                    <strong>{{ $measurement['value'] ?? '' }} {{ $kpi['unit'] ?? '' }}</strong>
+                                    <small class="text-muted">{{ isset($measurement['measured_at']) ? \Carbon\Carbon::parse($measurement['measured_at'])->format('Y-m-d H:i') : '' }}</small>
+                                </div>
+                                @if(isset($measurement['notes']))
+                                <small class="text-muted">{{ $measurement['notes'] }}</small>
+                                @endif
+                            </div>
+                        </div>
+                        @empty
+                        <div class="text-center py-3 text-muted">لا توجد قياسات</div>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 @endsection
+
+@push('styles')
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 20px;
+    }
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 8px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #e9ecef;
+    }
+    .timeline-item {
+        position: relative;
+        margin-bottom: 12px;
+        padding-left: 12px;
+    }
+    .timeline-item:last-child {
+        margin-bottom: 0;
+    }
+    .timeline-marker {
+        position: absolute;
+        left: -16px;
+        top: 6px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #007bff;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 2px #007bff;
+    }
+    .timeline-content {
+        background: #f8f9fa;
+        padding: 8px 12px;
+        border-radius: 6px;
+    }
+    .border-primary { border-top: 3px solid #007bff !important; }
+    .border-success { border-top: 3px solid #28a745 !important; }
+    .border-info { border-top: 3px solid #17a2b8 !important; }
+    .border-warning { border-top: 3px solid #ffc107 !important; }
+</style>
+@endpush
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('kpiChart').getContext('2d');
+
+    var chartData = @json($chartData ?? ['labels' => [], 'actual' => [], 'target' => []]);
+
+    var labels = chartData.labels || [];
+    var actualData = chartData.actual || [];
+    var targetData = chartData.target || [];
+
+    if (labels.length === 0) {
+        labels = ['لا توجد بيانات'];
+        actualData = [0];
+        targetData = [0];
+    }
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'القيمة الفعلية',
+                    data: actualData,
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#007bff'
+                },
+                {
+                    label: 'القيمة المستهدفة',
+                    data: targetData,
+                    borderColor: '#dc3545',
+                    backgroundColor: 'rgba(220, 53, 69, 0.05)',
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            var label = context.dataset.label || '';
+                            var value = context.parsed.y || 0;
+                            var unit = '{{ $kpi["unit"] ?? "" }}';
+                            return label + ': ' + value.toFixed(2) + (unit ? ' ' + unit : '');
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            var unit = '{{ $kpi["unit"] ?? "" }}';
+                            return value + (unit ? ' ' + unit : '');
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 30
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+@endpush
