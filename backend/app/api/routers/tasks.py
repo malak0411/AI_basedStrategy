@@ -1539,7 +1539,7 @@ async def add_task_comment(
         "created_at": new_comment.created_at.isoformat() if new_comment.created_at else None
     }
 
-@router.delete("/comments/{comment_id}")  # ← هذا المسار يعمل (200 OK)
+@router.delete("/comments/{comment_id}")  
 async def delete_task_comment(
     comment_id: int,
     current_user: int = Depends(get_current_user),

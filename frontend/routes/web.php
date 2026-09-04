@@ -224,6 +224,12 @@ Route::middleware('check.jwt')->group(function () {
     Route::get('/risks/mitigations/{mitigationId}/edit', [RiskController::class, 'editMitigation'])->name('risks.mitigations.edit');
     Route::put('/risks/mitigations/{mitigationId}', [RiskController::class, 'updateMitigation'])->name('risks.mitigations.update');
     Route::delete('/risks/mitigations/{mitigationId}', [RiskController::class, 'destroyMitigation'])->name('risks.mitigations.destroy');
+    Route::get('/locations', [LocationController::class, 'index'])->name('location.index');
+    Route::get('/locations/history', [LocationController::class, 'history'])->name('location.history');
+    Route::get('/locations/employee/{employeeId}', [LocationController::class, 'employee'])->name('location.employee');
+    Route::post('/locations', [LocationController::class, 'store'])->name('location.store');
+    Route::delete('/locations/{locationId}', [LocationController::class, 'destroy'])->name('location.destroy');
+    Route::get('/locations/map-data', [LocationController::class, 'getMapData'])->name('location.map-data');
 
 });
 
@@ -320,12 +326,6 @@ Route::middleware('check.jwt')->group(function () {
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
-
-    Route::prefix('location-tracking')->name('location.')->group(function () {
-        Route::get('/', [LocationController::class, 'index'])->name('index');
-        Route::get('/employee/{employeeId}', [LocationController::class, 'employee'])->name('employee');
-        Route::get('/history', [LocationController::class, 'history'])->name('history');
-    });
 
     Route::prefix('performance')->name('performance.')->group(function () {
         Route::get('/', [PerformanceController::class, 'index'])->name('index');

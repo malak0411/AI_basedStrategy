@@ -953,3 +953,80 @@ class RiskResponse(BaseModel):
     target_date: Optional[str] = None
     updated_at: Optional[str] = None
     mitigations: Optional[List[RiskMitigationResponse]] = []
+
+
+class EmployeeLocationInfo(BaseModel):
+    employee_id: Optional[int] = None
+    employee_number: Optional[str] = None
+    full_name: Optional[str] = None
+    job_title: Optional[str] = None
+    gps_enabled: bool = False
+    is_active: bool = False
+    department: Optional[dict] = None
+
+class TaskLocationInfo(BaseModel):
+    task_id: Optional[int] = None
+    title: Optional[str] = None
+
+class LocationLogCreate(BaseModel):
+    employee_id: int
+    task_id: Optional[int] = None
+    latitude: float
+    longitude: float
+    accuracy: Optional[float] = None
+    recorded_at: Optional[datetime] = None
+    source: Optional[str] = None
+
+class LocationLogUpdate(BaseModel):
+    task_id: Optional[int] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    accuracy: Optional[float] = None
+    source: Optional[str] = None
+
+class LocationLogResponse(BaseModel):
+    location_id: int
+    employee_id: int
+    employee: Optional[EmployeeLocationInfo] = None
+    task_id: Optional[int] = None
+    task: Optional[TaskLocationInfo] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    accuracy: Optional[float] = None
+    recorded_at: Optional[str] = None
+    source: Optional[str] = None
+
+class LocationEmployeeLatestResponse(BaseModel):
+    employee_id: int
+    employee: EmployeeLocationInfo
+    has_location: bool = False
+    location: Optional[LocationLogResponse] = None
+
+class LocationEmployeeHistoryResponse(BaseModel):
+    employee: EmployeeLocationInfo
+    data: List[LocationLogResponse] = []
+    total: int = 0
+    page: int = 1
+    per_page: int = 10
+    total_pages: int = 0
+
+class LocationSummaryResponse(BaseModel):
+    total_logs: int = 0
+    employees_with_gps: int = 0
+    locations_today: int = 0
+    active_employees: int = 0
+    latest_recorded_at: Optional[str] = None
+
+class LocationMapResponse(BaseModel):
+    location_id: int
+    employee_id: int
+    employee_name: Optional[str] = None
+    employee_number: Optional[str] = None
+    job_title: Optional[str] = None
+    task_id: Optional[int] = None
+    task_title: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    accuracy: Optional[float] = None
+    recorded_at: Optional[str] = None
+    source: Optional[str] = None
