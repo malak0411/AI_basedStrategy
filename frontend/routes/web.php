@@ -150,6 +150,9 @@ Route::middleware('check.jwt')->group(function () {
     Route::get('/operational/waiting', [OperationalTaskController::class, 'waiting'])
         ->name('operational.waiting');
 
+    Route::get('/operational/job/{job_id}', [OperationalTaskController::class, 'checkJobStatus'])
+    ->name('operational.job');
+
     Route::get('/operational/review', [OperationalTaskController::class, 'review'])
         ->name('operational.review');
 
@@ -314,6 +317,7 @@ Route::middleware('check.jwt')->group(function () {
             Route::get('/context/{id}', [AiStrategicController::class, 'getInitiativeContext'])->name('context');
             Route::post('/generate', [AiStrategicController::class, 'generate'])->name('generate');
             Route::get('/waiting', [AiStrategicController::class, 'waiting'])->name('waiting');
+            Route::get('/job/{job_id}', [AiStrategicController::class, 'checkJobStatus'])->name('job');
             Route::post('/edit-prompt', [AiStrategicController::class, 'editWithPrompt'])->name('edit-prompt');
             Route::get('/review', [AiStrategicController::class, 'review'])->name('review');
             Route::post('/edit-plan', [AiStrategicController::class, 'editPlan'])->name('edit-plan');

@@ -438,30 +438,83 @@ class OperationalTaskController extends Controller
         ]);
     }
 
+    public function checkJobStatus($job_id)
+{
+    $token = session('jwt_token');
+
+
+    $response = $this->apiClient->get(
+        "/api/ai/jobs/{$job_id}",
+        $token
+    );
+
+
+    return response()->json($response);
+}
+
     public function review(Request $request)
-    {
-        $token = session('jwt_token');
+{
+    $request->validate([
+        'job_id' => 'required|string'
+    ]);
 
-        $jobResponse = $this->apiClient->get(
-            "/api/ai/jobs/{$request->job_id}",
-            $token
-        );
 
-        $job = $jobResponse['data'] ?? [];
+    $token = session('jwt_token');
 
-        $tasks = $job['result']['operational_tasks'] ?? [];
 
-        $departments = $this->apiClient->safeGet(
-            '/api/departments',
-            $token,
-            []
-        );
+    $jobResponse = $this->apiClient->get(
+        "/api/ai/jobs/{$request->job_id}",
+        $token
+    );
 
-        return view(
-            'operational.review',
-            compact('tasks', 'job', 'departments')
-        );
+
+    $job = $jobResponse['data'] ?? [];
+    $result = $job['result'] ?? [];
+
+
+    $rawTasks = $result['operational_tasks'] ?? [];
+
+
+    $tasks = [];
+
+
+    foreach ($rawTasks as $task) {
+        if (!is_array($task)) {
+            continue;
+        }
+
+
+        $tasks[] = [
+            'title' => $task[0] ?? '',
+            'description' => $task[1] ?? '',
+            'priority_id' => $task[2] ?? null,
+            'estimated_hours' => $task[3] ?? null,
+            'start_date' => $task[4] ?? '',
+            'end_date' => $task[5] ?? '',
+            'department_id' => $task[6] ?? null
+        ];
     }
+
+
+    $departmentsResponse = $this->apiClient->safeGet(
+        '/api/departments',
+        $token,
+        []
+    );
+
+
+    $departments = $departmentsResponse['data']
+        ?? $departmentsResponse
+        ?? [];
+
+
+    return view('operational.review', [
+        'tasks' => $tasks,
+        'job' => $job,
+        'departments' => $departments,
+        'jobId' => $request->job_id
+    ]);
+}
 
     public function editWithPrompt(Request $request)
     {

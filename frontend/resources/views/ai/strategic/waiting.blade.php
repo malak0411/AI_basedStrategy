@@ -38,7 +38,7 @@
     }, 1000);
 
     function checkStatus() {
-        fetch('/api/ai/jobs/' + jobId)
+        fetch('{{ route("ai.strategic.job", ["job_id" => $jobId]) }}')
             .then(r => r.json())
             .then(data => {
                 if (data.success && data.data) {

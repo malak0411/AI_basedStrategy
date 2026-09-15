@@ -10,24 +10,38 @@ class OperationalPlanner:
         self.db = SessionLocal()
 
     def get_major_task_context(self, major_task_id: int) -> dict:
-        t = self.db.query(MajorTask).filter(MajorTask.major_task_id == major_task_id).first()
+        t = self.db.query(MajorTask).filter(
+            MajorTask.major_task_id == major_task_id
+        ).first()
+
+
         if not t:
             raise ValueError("Major task not found")
 
-        depts = self.db.query(Department).filter(Department.is_active == True).all()
-        emps = self.db.query(Employee).filter(Employee.is_active == True).all()
+
+        depts = self.db.query(
+            Department
+        ).filter(
+            Department.is_active == True
+        ).all()
+
 
         return {
-            "major_task": {
-                "id": t.major_task_id,
-                "name": t.name,
-                "description": t.description or "",
-                "duration": t.estimated_duration_days,
-                "is_cross": t.is_cross_department
-            },
-            "departments": [{"id": d.department_id, "name": d.name} for d in depts],
-            "employees": [{"id": e.employee_id, "name": e.full_name, "dept_id": e.department_id} for e in emps]
-        }
+        "major_task": {
+            "id": t.major_task_id,
+            "name": t.name,
+            "description": t.description or "",
+            "duration": t.estimated_duration_days or 30,
+            "is_cross": bool(t.is_cross_department)
+        },
+        "departments": [
+            {
+                "id": d.department_id,
+                "name": d.name
+            }
+            for d in depts
+        ]
+    }
 
     def build_prompt(self, ctx: dict, instructions: str = "") -> str:
         return json.dumps({

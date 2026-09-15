@@ -326,34 +326,82 @@ Write ONE short Arabic sentence explaining the specific role of this department 
                 "dependencies": task.get("dependencies", [])
             })
         return processed
-
+    
     def save_major_tasks(self, initiative_id: int, tasks_data: list, created_by: int = None):
         saved = []
         priority_map = {"High": 3, "Medium": 2, "Low": 1}
-        for task in tasks_data:
-            priority_id = priority_map.get(task.get("priority", "Medium"), 2)
-            mt = MajorTask(
-                initiative_id=initiative_id,
-                name=task["name"],
-                description=task.get("description", ""),
-                priority_id=priority_id,
-                estimated_duration_days=task.get("estimated_duration_days", 30),
-                is_cross_department=task.get("is_cross_department", False),
-                created_by=created_by
-            )
-            self.db.add(mt)
-            self.db.flush()
-            for dept in task.get("departments", []):
-                mtd = MajorTaskDepartment(
-                    major_task_id=mt.major_task_id,
-                    department_id=dept["department_id"],
-                    responsibility_type=dept.get("responsibility_type", "SUPPORT"),
-                    notes=dept.get("notes", "")
+        try:
+            for task in tasks_data:
+                departments = task.get("departments", [])
+                unique_departments = []
+                seen_departments = set()
+
+                for dept in departments:
+                    department_id = dept.get("department_id")
+
+                    if not department_id:
+                        continue
+
+                    if department_id in seen_departments:
+                        continue
+
+                    seen_departments.add(department_id)
+                    unique_departments.append(dept)
+
+                if not unique_departments:
+                    raise ValueError(
+                        f"No department assigned for major task: {task.get('name', '')}"
+                    )
+
+                is_cross_department = len(unique_departments) > 1
+
+                priority = task.get("priority", "Medium")
+                priority_id = priority_map.get(priority, 2)
+
+                duration = task.get("estimated_duration_days", 30)
+
+                try:
+                    duration = int(duration)
+                except (TypeError, ValueError):
+                    duration = 30
+
+                duration = max(10, min(duration, 180))
+
+                mt = MajorTask(
+                    initiative_id=initiative_id,
+                    name=task["name"],
+                    description=task.get("description", ""),
+                    priority_id=priority_id,
+                    estimated_duration_days=duration,
+                    is_cross_department=is_cross_department,
+                    created_by=created_by
                 )
-                self.db.add(mtd)
-            saved.append({"id": mt.major_task_id, "name": mt.name})
-        self.db.commit()
-        return saved
+
+                self.db.add(mt)
+                self.db.flush()
+
+                for dept in unique_departments:
+                    mtd = MajorTaskDepartment(
+                        major_task_id=mt.major_task_id,
+                        department_id=dept["department_id"],
+                        responsibility_type=dept.get("responsibility_type", "SUPPORT"),
+                        notes=dept.get("notes", "")
+                    )
+                    self.db.add(mtd)
+
+                saved.append({
+                    "id": mt.major_task_id,
+                    "name": mt.name,
+                    "is_cross_department": is_cross_department
+                })
+
+            self.db.commit()
+            return saved
+
+        except Exception:
+            self.db.rollback()
+            raise
+
 
     def create_job(self, initiative_id: int, created_by: int = None) -> int:
         job = AiJob(
