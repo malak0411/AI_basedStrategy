@@ -14,6 +14,7 @@ from app.ai.models.recommender import Recommender
 from app.ai.services.strategic_planner import StrategicPlanner
 from app.ai.services.scheduler import ai_scheduler
 from app.ai.services.operational_planner import OperationalPlanner
+from app.api.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
 
@@ -31,14 +32,26 @@ def operational_in_background(job_id: int, major_task_id: int, instructions: str
         )
 
         planner2 = OperationalPlanner()
-        tasks = planner2.parse_response(response_text)
+        tasks = planner2.parse_response(
+            response_text
+            )
+        tasks = planner2.normalize_tasks(
+            tasks,
+            major_task_id
+            )
         if not tasks:
-            raise ValueError("No tasks generated")
-
-        planner2.update_job(job_id, "review", {
-            "major_task_id": major_task_id,
-            "operational_tasks": tasks
-        })
+            raise ValueError(
+                "No valid tasks generated"
+                )
+        
+        planner2.update_job(
+            job_id,
+            "review",
+            {
+                "major_task_id": major_task_id,
+                "operational_tasks": tasks
+            }
+        )
         planner2.close()
         print(f"Job #{job_id}: Completed - {len(tasks)} tasks generated")
 
@@ -133,35 +146,109 @@ Apply the instructions and return the modified JSON array.
 
 
 @router.post("/operational/approve-tasks/{job_id}")
-async def approve_operational_tasks(job_id: int, db: Session = Depends(get_db)):
+async def approve_operational_tasks(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: Employee = Depends(get_current_user)
+):
     try:
-        job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
+        job = db.query(AiJob).filter(
+            AiJob.job_id == job_id
+        ).first()
 
-        result = json.loads(job.result_json) if job.result_json else {}
+
+        if not job:
+            raise HTTPException(
+                status_code=404,
+                detail="Job not found"
+            )
+
+
+        result = json.loads(
+            job.result_json
+        ) if job.result_json else {}
+
+
         major_task_id = result.get("major_task_id")
-        tasks = result.get("operational_tasks", [])
+
+
+        tasks = result.get(
+            "operational_tasks",
+            []
+        )
+
+
+        if not major_task_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Major task ID not found"
+            )
+
 
         if not tasks:
-            raise HTTPException(status_code=400, detail="No tasks to save")
+            raise HTTPException(
+                status_code=400,
+                detail="No tasks to save"
+            )
+
+
+        department_id = current_user.department_id
+        employee_id = current_user.employee_id
+
+
+        if not department_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Current employee has no department"
+            )
+
 
         planner = OperationalPlanner()
-        saved = planner.save_tasks(major_task_id, tasks)
-        planner.update_job(job_id, "completed", {"saved_tasks": saved})
+
+
+        saved = planner.save_tasks(
+            major_task_id=major_task_id,
+            tasks=tasks,
+            department_id=department_id,
+            created_by=employee_id
+        )
+
+
+        planner.update_job(
+            job_id,
+            "completed",
+            {
+                "major_task_id": major_task_id,
+                "operational_tasks": tasks,
+                "saved_tasks": saved
+            }
+        )
+
+
         planner.close()
+
 
         return {
             "success": True,
             "data": {
                 "message": f"Saved {len(saved)} operational tasks",
+                "major_task_id": major_task_id,
+                "department_id": department_id,
+                "created_by": employee_id,
                 "tasks": saved
             }
         }
+
+
+    except HTTPException:
+        raise
+
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 def generate_in_background(job_id: int, initiative_id: int, user_instructions: str = ""):
     try:

@@ -221,7 +221,7 @@
             </div>
 
 
-            <button type="submit" class="btn btn-success px-5" id="finalApproveButton">
+            <button type="submit" class="btn btn-success px-5" id="approveButton">
                 اعتماد وحفظ
             </button>
         </div>
@@ -382,28 +382,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     <div class="col-12">
                         <label class="form-label fw-semibold">وصف المهمة</label>
-                        <textarea class="form-control task-description" rows="3"></textarea>                </div>
-
-
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold">الإدارة</label>
-                    <select class="form-select task-department" required>
-                        <option value="">اختر الإدارة</option>
-
-
-                        @foreach($departments as $department)
-                            @php
-                                $departmentId = $department['department_id'] ?? $department['id'] ?? null;
-                            @endphp
-
-
-                            <option value="{{ $departmentId }}">
-                                {{ $department['name'] ?? $department['department_name'] ?? 'إدارة بدون اسم' }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
+                        <textarea class="form-control task-description" rows="3"></textarea>                
+                    </div>
 
                 <div class="col-md-4">
                     <label class="form-label fw-semibold">الأولوية</label>
@@ -516,7 +496,6 @@ function collectTasks() {
         tasks.push({
             title: title,
             description: description,
-            department_id: departmentId ? Number(departmentId) : null,
             priority: priority,
             estimated_hours: estimatedHours ? Number(estimatedHours) : null,
             start_date: startDate || null,
@@ -600,7 +579,7 @@ approvalForm.addEventListener('submit', function (event) {
     tasksData.value = JSON.stringify(tasks);
 
 
-    const button = document.getElementById('finalApproveButton');
+    const button = document.getElementById('approveButton');
 
 
     button.disabled = true;

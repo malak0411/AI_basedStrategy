@@ -452,10 +452,15 @@ class OperationalTaskController extends Controller
     return response()->json($response);
 }
 
-    public function review(Request $request)
+public function review(Request $request)
 {
+    if (!$this->isManager()) {
+        return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+    }
+
+
     $request->validate([
-        'job_id' => 'required|string'
+        'job_id' => 'required|integer'
     ]);
 
 
@@ -468,31 +473,31 @@ class OperationalTaskController extends Controller
     );
 
 
+    if (!($jobResponse['success'] ?? false)) {
+        return redirect()
+            ->route('operational.waiting', [
+                'job_id' => $request->job_id
+            ])
+            ->with('error', 'تعذر الحصول على نتيجة التوليد');
+    }
+
+
     $job = $jobResponse['data'] ?? [];
+
+
     $result = $job['result'] ?? [];
 
 
-    $rawTasks = $result['operational_tasks'] ?? [];
+    if (!is_array($result)) {
+        $result = [];
+    }
 
 
-    $tasks = [];
+    $tasks = $result['operational_tasks'] ?? [];
 
 
-    foreach ($rawTasks as $task) {
-        if (!is_array($task)) {
-            continue;
-        }
-
-
-        $tasks[] = [
-            'title' => $task[0] ?? '',
-            'description' => $task[1] ?? '',
-            'priority_id' => $task[2] ?? null,
-            'estimated_hours' => $task[3] ?? null,
-            'start_date' => $task[4] ?? '',
-            'end_date' => $task[5] ?? '',
-            'department_id' => $task[6] ?? null
-        ];
+    if (!is_array($tasks)) {
+        $tasks = [];
     }
 
 
@@ -503,14 +508,18 @@ class OperationalTaskController extends Controller
     );
 
 
-    $departments = $departmentsResponse['data']
-        ?? $departmentsResponse
-        ?? [];
+    if (isset($departmentsResponse['data']) && is_array($departmentsResponse['data'])) {
+        $departments = $departmentsResponse['data'];
+    } else {
+        $departments = is_array($departmentsResponse)
+            ? $departmentsResponse
+            : [];
+    }
 
 
     return view('operational.review', [
-        'tasks' => $tasks,
         'job' => $job,
+        'tasks' => $tasks,
         'departments' => $departments,
         'jobId' => $request->job_id
     ]);
@@ -535,51 +544,69 @@ class OperationalTaskController extends Controller
 
         return response()->json($response);
     }
-
+    
     public function approve(Request $request)
-    {
-        $request->validate([
-            'job_id' => 'required|string'
-        ]);
+{
+    $request->validate([
+        'job_id' => 'required|integer'
+    ]);
 
-        $token = session('jwt_token');
 
-        $response = $this->apiClient->post(
-            "/api/ai/operational/approve-tasks/{$request->job_id}",
-            [],
-            $token
-        );
+    $token = session('jwt_token');
 
-        if ($response['success'] ?? false) {
-            $jobResponse = $this->apiClient->get(
-                "/api/ai/jobs/{$request->job_id}",
-                $token
-            );
 
-            $jobData = $jobResponse['data'] ?? [];
+    \Log::info('Operational approve started', [
+        'job_id' => $request->job_id
+    ]);
 
-            $result = json_decode(
-                $jobData['result_json'] ?? '{}',
-                true
-            );
 
-            $majorTaskId = $result['major_task_id'] ?? 0;
+    $response = $this->apiClient->post(
+        "/api/ai/operational/approve-tasks/{$request->job_id}",
+        [],
+        $token
+    );
 
-            return redirect()
-                ->to('/operational/major-task/' . $majorTaskId)
-                ->with(
-                    'success',
-                    'تم حفظ المهام التشغيلية بنجاح'
-                );
-        }
 
+    \Log::info('Operational approve API response', [
+        'job_id' => $request->job_id,
+        'response' => $response
+    ]);
+
+
+    if (!($response['success'] ?? false)) {
         return back()->with(
             'error',
             $response['detail']
             ?? $response['message']
-            ?? 'فشل الاعتماد'
+            ?? 'فشل اعتماد المهام التشغيلية'
         );
     }
+
+
+    $majorTaskId =
+        $response['data']['major_task_id']
+        ?? null;
+
+
+    if (!$majorTaskId) {
+        return back()->with(
+            'error',
+            'تم حفظ المهام ولكن تعذر تحديد المهمة الرئيسية'
+        );
+    }
+
+
+    return redirect()
+        ->route(
+            'operational.show-major-task',
+            ['id' => $majorTaskId]
+        )
+        ->with(
+            'success',
+            'تم اعتماد المهام التشغيلية وحفظها بنجاح'
+        );
+}
+
 
     public function showOperationalTask($id)
 {
