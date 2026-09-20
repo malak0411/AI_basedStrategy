@@ -213,26 +213,48 @@ Route::middleware('check.jwt')->group(function () {
     Route::get('/budget/transactions/{transactionId}', [BudgetController::class, 'showTransaction'])->name('budget.transactions.show');
     Route::delete('/budget/transactions/{transactionId}', [BudgetController::class, 'destroyTransaction'])->name('budget.transactions.destroy');
     
-    Route::get('/risks', [RiskController::class, 'index'])->name('risks.index');
-    Route::get('/risks/create', [RiskController::class, 'create'])->name('risks.create');
-    Route::post('/risks', [RiskController::class, 'store'])->name('risks.store');
-    Route::get('/risks/{id}', [RiskController::class, 'show'])->name('risks.show');
-    Route::get('/risks/{id}/edit', [RiskController::class, 'edit'])->name('risks.edit');
-    Route::put('/risks/{id}', [RiskController::class, 'update'])->name('risks.update');
-    Route::delete('/risks/{id}', [RiskController::class, 'destroy'])->name('risks.destroy');
-
-    Route::get('/risks/{id}/mitigations', [RiskController::class, 'mitigations'])->name('risks.mitigations');
-    Route::get('/risks/{id}/mitigations/create', [RiskController::class, 'createMitigation'])->name('risks.mitigations.create');
-    Route::post('/risks/{id}/mitigations', [RiskController::class, 'storeMitigation'])->name('risks.mitigations.store');
-    Route::get('/risks/mitigations/{mitigationId}/edit', [RiskController::class, 'editMitigation'])->name('risks.mitigations.edit');
-    Route::put('/risks/mitigations/{mitigationId}', [RiskController::class, 'updateMitigation'])->name('risks.mitigations.update');
-    Route::delete('/risks/mitigations/{mitigationId}', [RiskController::class, 'destroyMitigation'])->name('risks.mitigations.destroy');
     Route::get('/locations', [LocationController::class, 'index'])->name('location.index');
     Route::get('/locations/history', [LocationController::class, 'history'])->name('location.history');
     Route::get('/locations/employee/{employeeId}', [LocationController::class, 'employee'])->name('location.employee');
     Route::post('/locations', [LocationController::class, 'store'])->name('location.store');
     Route::delete('/locations/{locationId}', [LocationController::class, 'destroy'])->name('location.destroy');
     Route::get('/locations/map-data', [LocationController::class, 'getMapData'])->name('location.map-data');
+
+    Route::get('/risks', [RiskController::class, 'index'])->name('risks.index');
+Route::get('/risks/create', [RiskController::class, 'create'])->name('risks.create');
+Route::post('/risks', [RiskController::class, 'store'])->name('risks.store');
+Route::get('/risks/{id}', [RiskController::class, 'show'])->name('risks.show');
+Route::get('/risks/{id}/edit', [RiskController::class, 'edit'])->name('risks.edit');
+Route::put('/risks/{id}', [RiskController::class, 'update'])->name('risks.update');
+Route::delete('/risks/{id}', [RiskController::class, 'destroy'])->name('risks.destroy');
+
+
+Route::get('/risks/{id}/mitigations', [RiskController::class, 'mitigations'])->name('risks.mitigations');
+Route::get('/risks/{id}/mitigations/create', [RiskController::class, 'createMitigation'])->name('risks.mitigations.create');
+Route::post('/risks/{id}/mitigations', [RiskController::class, 'storeMitigation'])->name('risks.mitigations.store');
+Route::put('/risks/mitigations/{mitigationId}', [RiskController::class, 'updateMitigation'])->name('risks.mitigations.update');
+Route::delete('/risks/mitigations/{mitigationId}', [RiskController::class, 'destroyMitigation'])->name('risks.mitigations.destroy');
+
+
+Route::post('/risks/{id}/recommendations', [RiskController::class, 'generateRecommendations'])->name('risks.recommendations');
+Route::post('/risks/{id}/reassess', [RiskController::class, 'reassess'])->name('risks.reassess');
+Route::get('/risks/{id}/ai-recommendations', [RiskController::class, 'getAiRecommendations'])->name('risks.ai-recommendations');
+Route::post('/risks/auto-detect/{taskId}', [RiskController::class, 'detectForTask'])->name('risks.auto-detect');
+
+Route::post('/operational/task/{taskId}/predict', [OperationalTaskController::class, 'predictTaskDelay'])
+    ->name('operational.task.predict');
+
+
+Route::post('/operational/risks/{riskId}/recommendations', [OperationalTaskController::class, 'generateTaskRiskRecommendations'])
+    ->name('operational.risks.generate-recommendations');
+
+
+Route::post('/operational/risks/{riskId}/mitigations', [OperationalTaskController::class, 'addTaskMitigation'])
+    ->name('operational.risks.add-mitigation');
+
+
+Route::put('/operational/risks/mitigations/{mitigationId}', [OperationalTaskController::class, 'updateTaskMitigation'])
+    ->name('operational.risks.update-mitigation');
 
 });
 

@@ -3,17 +3,17 @@ import os
 import shutil
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import desc, func
 from app.database import get_db
-from app.models import DictRoleType, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority, TaskComment, TaskDependency , TaskProgressLog , TaskAttachment , TaskAttachmentResponse , AttachmentEmployeeInfo
+from app.models import DictRoleType, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority, TaskComment, TaskDependency , TaskProgressLog , TaskAttachment , TaskAttachmentResponse , AttachmentEmployeeInfo , AIPrediction , RiskMitigation , Risk , AIRecommendation , DictRiskLevel , AiJob
 from pydantic import BaseModel
 from datetime import date as date_type, datetime
-from typing import Optional, List
+from typing import Optional, List 
 from sqlalchemy.orm import joinedload
 from app.core.dependencies import get_current_user
 from fastapi import UploadFile, File, Form
 from fastapi.responses import FileResponse
-
+import json as json_module
 
 
 router = APIRouter(prefix="/api/tasks", tags=["Tasks"])
@@ -1566,3 +1566,205 @@ async def delete_task_comment(
     db.commit()
     
     return {"message": "تم حذف التعليق بنجอด"}
+
+@router.get("/{task_id}/risks")
+async def get_task_risks(
+    task_id: int,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+
+    task = db.query(OperationalTask).filter(
+        OperationalTask.task_id == task_id
+    ).first()
+
+
+    if not task:
+        raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+
+
+    risks = db.query(Risk).filter(
+        Risk.task_id == task_id
+    ).order_by(desc(Risk.identified_at)).all()
+
+
+    result = []
+    for risk in risks:
+        level = db.query(DictRiskLevel).filter(
+            DictRiskLevel.risk_level_id == risk.risk_level_id
+        ).first() if risk.risk_level_id else None
+
+
+        status = db.query(DictStatus).filter(
+            DictStatus.status_id == risk.status_id
+        ).first() if risk.status_id else None
+
+
+        mitigations = db.query(RiskMitigation).filter(
+            RiskMitigation.risk_id == risk.risk_id
+        ).order_by(desc(RiskMitigation.created_at)).all()
+
+
+        mitigations_data = []
+        for m in mitigations:
+            m_status = db.query(DictStatus).filter(
+                DictStatus.status_id == m.status_id
+            ).first() if m.status_id else None
+
+
+            m_assigned = db.query(Employee).filter(
+                Employee.employee_id == m.assigned_to
+            ).first() if m.assigned_to else None
+
+
+            mitigations_data.append({
+                "mitigation_id": m.mitigation_id,
+                "action": m.action,
+                "assigned_to": {
+                    "employee_id": m_assigned.employee_id if m_assigned else None,
+                    "full_name": m_assigned.full_name if m_assigned else None
+                },
+                "status": {
+                    "status_id": m_status.status_id if m_status else None,
+                    "code": m_status.code if m_status else None,
+                    "name_ar": m_status.name_ar if m_status else None,
+                    "color_hex": m_status.color_hex if m_status else "#6c757d"
+                },
+                "due_date": m.due_date.isoformat() if m.due_date else None,
+                "completed_at": m.completed_at.isoformat() if m.completed_at else None,
+                "notes": m.notes,
+                "created_at": m.created_at.isoformat() if m.created_at else None
+            })
+
+
+        ai_recs = db.query(AIRecommendation).filter(
+            AIRecommendation.task_id == task_id
+        ).order_by(desc(AIRecommendation.created_at)).limit(20).all()
+
+
+        ai_recs_data = []
+        for r in ai_recs:
+            parsed_reasoning = None
+            reasoning_risk_id = None
+            try:
+                parsed_reasoning = json_module.loads(r.reasoning) if r.reasoning else None
+                if parsed_reasoning:
+                    reasoning_risk_id = parsed_reasoning.get('risk_id')
+            except Exception:
+                parsed_reasoning = None
+
+
+            if reasoning_risk_id is not None and reasoning_risk_id != risk.risk_id:
+                continue
+
+
+            priority = None
+            if r.priority_id:
+                p = db.query(DictPriority).filter(
+                    DictPriority.priority_id == r.priority_id
+                ).first()
+                if p:
+                    priority = {"code": p.code, "name_ar": p.name_ar}
+
+
+            reasoning_text = r.reasoning
+            if parsed_reasoning:
+                reasoning_text = parsed_reasoning.get('text', r.reasoning)
+
+
+            ai_recs_data.append({
+                "recommendation_id": r.recommendation_id,
+                "text": r.text,
+                "reasoning": reasoning_text,
+                "priority": priority,
+                "implemented_at": r.implemented_at.isoformat() if r.implemented_at else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None
+            })
+
+
+        result.append({
+            "risk_id": risk.risk_id,
+            "name": risk.name,
+            "description": risk.description,
+            "probability": risk.probability,
+            "impact": risk.impact,
+            "risk_score": risk.risk_score,
+            "risk_level": {
+                "risk_level_id": level.risk_level_id if level else None,
+                "code": level.code if level else None,
+                "name_ar": level.name_ar if level else None,
+                "color_hex": level.color_hex if level else "#6c757d"
+            },
+            "status": {
+                "status_id": status.status_id if status else None,
+                "code": status.code if status else None,
+                "name_ar": status.name_ar if status else None,
+                "color_hex": status.color_hex if status else "#6c757d"
+            },
+            "identified_at": risk.identified_at.isoformat() if risk.identified_at else None,
+            "target_date": risk.target_date.isoformat() if risk.target_date else None,
+            "mitigations": mitigations_data,
+            "ai_recommendations": ai_recs_data
+        })
+
+
+    return {"data": result, "total": len(result)}
+
+
+
+
+@router.get("/{task_id}/latest-prediction")
+async def get_task_latest_prediction(
+    task_id: int,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    task = db.query(OperationalTask).filter(
+        OperationalTask.task_id == task_id
+    ).first()
+
+
+    if not task:
+        raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+
+
+    prediction = db.query(AIPrediction).filter(
+        AIPrediction.task_id == task_id,
+        AIPrediction.prediction_type == 'delay'
+    ).order_by(desc(AIPrediction.created_at)).first()
+
+
+    if not prediction:
+        return {"data": None, "has_prediction": False}
+
+
+    import json as json_module
+
+
+    top_factors = []
+    try:
+        top_factors = json_module.loads(prediction.features_used) if prediction.features_used else []
+    except Exception:
+        top_factors = []
+
+
+    prob = float(prediction.probability or 0)
+    prob_pct = prob * 100 if prob <= 1 else prob
+
+
+    return {
+        "data": {
+            "prediction_id": prediction.prediction_id,
+            "task_id": prediction.task_id,
+            "prediction_type": prediction.prediction_type,
+            "text": prediction.text,
+            "probability": prob,
+            "probability_percent": round(prob_pct, 1),
+            "confidence": float(prediction.confidence or 0),
+            "top_factors": top_factors,
+            "created_at": prediction.created_at.isoformat() if prediction.created_at else None
+        },
+        "has_prediction": True
+    }

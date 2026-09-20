@@ -162,6 +162,125 @@ class OperationalTaskController extends Controller
     ]);
 }
 
+public function addRiskMitigation(Request $request, $riskId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
+        }
+
+
+        $request->validate([
+            'action' => 'required|string|max:2000',
+            'assigned_to' => 'nullable|integer',
+            'due_date' => 'nullable|date',
+            'status_id' => 'nullable|integer',
+            'notes' => 'nullable|string|max:2000'
+        ]);
+
+
+        $data = [
+            'action' => $request->action,
+            'task_id' => $request->task_id ? (int) $request->task_id : null,
+            'assigned_to' => $request->assigned_to ? (int) $request->assigned_to : null,
+            'due_date' => $request->due_date,
+            'status_id' => $request->status_id ? (int) $request->status_id : null,
+            'notes' => $request->notes
+        ];
+
+
+        $response = $this->apiClient->post("/api/risks/{$riskId}/mitigations", $data, $token);
+
+
+        if ($response['success'] ?? false) {
+            return response()->json(['success' => true, 'message' => 'تم إضافة الإجراء بنجاح']);
+        }
+
+
+        return response()->json([
+            'success' => false,
+            'error' => $response['detail'] ?? 'فشل إضافة الإجراء'
+        ], 500);
+
+
+    } catch (\Exception $e) {
+        Log::error('Add risk mitigation error: ' . $e->getMessage());
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
+
+
+public function updateRiskMitigation(Request $request, $mitigationId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
+        }
+
+
+        $data = [];
+        foreach (['status_id', 'notes', 'due_date', 'assigned_to', 'action'] as $field) {
+            if ($request->has($field)) {
+                $data[$field] = $request->$field;
+            }
+        }
+
+
+        $response = $this->apiClient->put("/api/risks/mitigations/{$mitigationId}", $data, $token);
+
+
+        if ($response['success'] ?? false) {
+            return response()->json(['success' => true, 'message' => 'تم تحديث الإجراء']);
+        }
+
+
+        return response()->json([
+            'success' => false,
+            'error' => $response['detail'] ?? 'فشل التحديث'
+        ], 500);
+
+
+    } catch (\Exception $e) {
+        Log::error('Update risk mitigation error: ' . $e->getMessage());
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
+
+
+public function generateRiskRecommendations($riskId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
+        }
+
+
+        $response = $this->apiClient->post("/api/risks/{$riskId}/recommendations", [], $token);
+
+
+        if ($response['success'] ?? false) {
+            return response()->json([
+                'success' => true,
+                'message' => 'تم توليد التوصيات',
+                'data' => $response['data'] ?? []
+            ]);
+        }
+
+
+        return response()->json([
+            'success' => false,
+            'error' => $response['detail'] ?? 'فشل توليد التوصيات'
+        ], 500);
+
+
+    } catch (\Exception $e) {
+        Log::error('Generate risk recommendations error: ' . $e->getMessage());
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
 
     
     public function storeOperational(Request $request)
@@ -616,17 +735,22 @@ public function review(Request $request)
             return redirect()->route('login')->with('error', 'الرجاء تسجيل الدخول أولاً');
         }
 
+
         $taskResponse = $this->apiClient->get("/api/tasks/{$id}", $token);
         $task = $taskResponse['data'] ?? [];
+
 
         $logsResponse = $this->apiClient->get("/api/tasks/{$id}/progress-logs", $token);
         $logs = $logsResponse['data'] ?? [];
 
+
         $attachmentsResponse = $this->apiClient->get("/api/tasks/{$id}/attachments", $token);
         $attachments = $attachmentsResponse['data'] ?? [];
 
+
         $commentsResponse = $this->apiClient->get("/api/tasks/{$id}/comments", $token);
-        
+
+
         if (isset($commentsResponse['data']) && is_array($commentsResponse['data'])) {
             $comments = $commentsResponse['data'];
         } elseif (is_array($commentsResponse)) {
@@ -635,17 +759,38 @@ public function review(Request $request)
             $comments = [];
         }
 
-        \Log::info('Task Detail - Comments loaded: ' . count($comments));
+
+        $predictionResponse = $this->apiClient->get("/api/tasks/{$id}/latest-prediction", $token);
+        $prediction = $predictionResponse['data'] ?? null;
+
+
+        $risksResponse = $this->apiClient->get("/api/tasks/{$id}/risks", $token);
+        $risks = $risksResponse['data'] ?? [];
+
+
+        $riskOptionsResponse = $this->apiClient->get('/api/risks/options', $token);
+        $riskOptions = $riskOptionsResponse ?? [];
+
+
+        $departmentId = $this->getDepartmentId();
+        $employeesResponse = $this->apiClient->get("/api/employees/department/{$departmentId}", $token);
+        $employees = $employeesResponse['data'] ?? [];
+
 
         return view('operational.task-detail', [
             'task' => $task,
             'logs' => $logs,
             'attachments' => $attachments,
-            'comments' => $comments
+            'comments' => $comments,
+            'prediction' => $prediction,
+            'risks' => $risks,
+            'riskOptions' => $riskOptions,
+            'employees' => $employees
         ]);
 
+
     } catch (\Exception $e) {
-        \Log::error('Task detail error: ' . $e->getMessage());
+        Log::error('Task detail error: ' . $e->getMessage());
         return back()->with('error', 'حدث خطأ أثناء تحميل بيانات المهمة');
     }
 }
@@ -1483,6 +1628,158 @@ public function deleteComment($commentId)
     }
 }
 
+public function predictTaskDelay($taskId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
+        }
+
+
+        $response = $this->apiClient->post("/api/risks/auto-detect/{$taskId}", [], $token);
+
+
+        if ($response['success'] ?? false) {
+            return response()->json([
+                'success' => true,
+                'message' => 'تم التنبؤ بالخطر بنجاح',
+                'data' => $response['data'] ?? []
+            ]);
+        }
+
+
+        return response()->json([
+            'success' => false,
+            'error' => $response['detail'] ?? 'فشل التنبؤ'
+        ], 500);
+
+
+    } catch (\Exception $e) {
+        Log::error('Predict task delay error: ' . $e->getMessage());
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
+
+
+public function generateTaskRiskRecommendations($riskId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
+        }
+
+
+        $response = $this->apiClient->post("/api/risks/{$riskId}/recommendations", [], $token);
+
+
+        if ($response['success'] ?? false) {
+            return response()->json([
+                'success' => true,
+                'message' => 'تم توليد التوصيات',
+                'data' => $response['data'] ?? []
+            ]);
+        }
+
+
+        return response()->json([
+            'success' => false,
+            'error' => $response['detail'] ?? 'فشل التوليد'
+        ], 500);
+
+
+    } catch (\Exception $e) {
+        Log::error('Generate recommendations error: ' . $e->getMessage());
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
+
+
+public function addTaskMitigation(Request $request, $riskId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
+        }
+
+
+        $request->validate([
+            'action' => 'required|string|max:2000',
+            'assigned_to' => 'nullable|integer',
+            'due_date' => 'nullable|date',
+            'status_id' => 'nullable|integer',
+            'notes' => 'nullable|string|max:2000'
+        ]);
+
+
+        $data = [
+            'action' => $request->action,
+            'assigned_to' => $request->assigned_to ? (int) $request->assigned_to : null,
+            'due_date' => $request->due_date,
+            'status_id' => $request->status_id ? (int) $request->status_id : null,
+            'notes' => $request->notes
+        ];
+
+
+        $response = $this->apiClient->post("/api/risks/{$riskId}/mitigations", $data, $token);
+
+
+        if ($response['success'] ?? false) {
+            return response()->json(['success' => true, 'message' => 'تم إضافة الإجراء بنجاح']);
+        }
+
+
+        return response()->json([
+            'success' => false,
+            'error' => $response['detail'] ?? 'فشل الإضافة'
+        ], 500);
+
+
+    } catch (\Exception $e) {
+        Log::error('Add mitigation error: ' . $e->getMessage());
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
+
+
+public function updateTaskMitigation(Request $request, $mitigationId)
+{
+    try {
+        $token = session('jwt_token');
+        if (!$token) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
+        }
+
+
+        $data = [];
+        foreach (['status_id', 'notes', 'due_date', 'assigned_to', 'action'] as $field) {
+            if ($request->has($field)) {
+                $data[$field] = $request->$field;
+            }
+        }
+
+
+        $response = $this->apiClient->put("/api/risks/mitigations/{$mitigationId}", $data, $token);
+
+
+        if ($response['success'] ?? false) {
+            return response()->json(['success' => true, 'message' => 'تم تحديث الإجراء']);
+        }
+
+
+        return response()->json([
+            'success' => false,
+            'error' => $response['detail'] ?? 'فشل التحديث'
+        ], 500);
+
+
+    } catch (\Exception $e) {
+        Log::error('Update mitigation error: ' . $e->getMessage());
+        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
 
 }
 
