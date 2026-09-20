@@ -256,6 +256,7 @@ Route::post('/operational/risks/{riskId}/mitigations', [OperationalTaskControlle
 Route::put('/operational/risks/mitigations/{mitigationId}', [OperationalTaskController::class, 'updateTaskMitigation'])
     ->name('operational.risks.update-mitigation');
 
+    
 });
 
 

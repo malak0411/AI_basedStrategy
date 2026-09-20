@@ -41,7 +41,8 @@ class PredictionService:
             db.close()
 
 
-    def predict_single(self, task_id: int, save: bool = True, detect_risk: bool = False):
+    def predict_single(self, task_id: int, save: bool = True, detect_risk: bool = True,
+                       generate_recommendations: bool = False):
 
 
         self._ensure_loaded()
@@ -90,6 +91,26 @@ class PredictionService:
                         task_id, result, created_by=created_by
                     )
                     result["risk_detection"] = risk_result
+
+
+                    if generate_recommendations and risk_result.get("detected"):
+                        risk_id = risk_result.get("risk_id")
+                        if risk_id:
+                            try:
+                                from app.ai.services.risk_recommendation_service import RiskRecommendationService
+                                rec_service = RiskRecommendationService()
+                                try:
+                                    rec_result = rec_service.generate_for_risk(
+                                        risk_id, created_by=created_by
+                                    )
+                                    result["recommendations_result"] = rec_result
+                                finally:
+                                    rec_service.close()
+                            except Exception as rec_err:
+                                result["recommendations_result"] = {
+                                    "success": False,
+                                    "error": str(rec_err)
+                                }
                 finally:
                     detection.close()
             except Exception as e:

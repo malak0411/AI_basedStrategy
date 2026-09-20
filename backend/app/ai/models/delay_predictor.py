@@ -37,7 +37,7 @@ class DelayPredictor:
         self.model = None
         self.feature_engineer = FeatureEngineer()
         self.feature_names = []
-        self.model_version = "1.0.0"
+        self.model_version = "2.0.0"
         self.training_date = None
         self.metrics = {}
         self.is_trained = False
@@ -48,8 +48,10 @@ class DelayPredictor:
 
 
     def train(self, force=False):
+
+
         print("\n" + "=" * 60)
-        print(" تدريب نموذج التنبؤ بتأخير المهام")
+        print(" تدريب نموذج التنبؤ بتأخير المهام - النسخة 2.0")
         print("=" * 60)
 
 
@@ -67,12 +69,19 @@ class DelayPredictor:
             loader.close()
 
 
-        if len(df) < 10:
+        if df.empty or len(df) < 10:
             print(" عدد البيانات غير كافٍ للتدريب (أقل من 10)")
             return None
 
 
-        self.feature_names = [c for c in df.columns if c not in ['task_id', 'is_delayed']]
+        print(f" عدد السجلات: {len(df)}")
+        if 'is_delayed' in df.columns:
+            delayed_count = int((df['is_delayed'] == 1).sum())
+            normal_count = int((df['is_delayed'] == 0).sum())
+            print(f" تأخير: {delayed_count} | غير متأخر: {normal_count}")
+
+
+        self.feature_names = [c for c in df.columns if c not in ['task_id', 'is_delayed', 'delay_days']]
 
 
         print("\n الخطوة 2: معالجة الميزات")
@@ -86,19 +95,38 @@ class DelayPredictor:
 
         models = {
             'XGBoost': XGBClassifier(
-                n_estimators=100, max_depth=5, learning_rate=0.1,
-                random_state=42, eval_metric='logloss'
+                n_estimators=200,
+                max_depth=6,
+                learning_rate=0.08,
+                subsample=0.85,
+                colsample_bytree=0.85,
+                min_child_weight=2,
+                gamma=0.1,
+                reg_alpha=0.1,
+                reg_lambda=1.5,
+                random_state=42,
+                eval_metric='logloss'
             ),
             'Random Forest': RandomForestClassifier(
-                n_estimators=100, max_depth=10, random_state=42
+                n_estimators=150,
+                max_depth=12,
+                min_samples_split=3,
+                random_state=42,
+                class_weight='balanced'
             )
         }
 
 
         if LIGHTGBM_AVAILABLE:
             models['LightGBM'] = LGBMClassifier(
-                n_estimators=100, max_depth=5, learning_rate=0.1,
-                random_state=42, verbose=-1
+                n_estimators=200,
+                max_depth=6,
+                learning_rate=0.08,
+                subsample=0.85,
+                colsample_bytree=0.85,
+                random_state=42,
+                verbose=-1,
+                class_weight='balanced'
             )
 
 
@@ -119,8 +147,6 @@ class DelayPredictor:
             self.metrics = best_result
             self.training_date = datetime.now()
             self.is_trained = True
-
-
             self._save_model()
 
 
@@ -128,11 +154,6 @@ class DelayPredictor:
 
 
     def predict(self, task_id=None, task_features=None):
-
-
-        if not self.is_trained:
-            if not self.load_model():
-                return self._empty_prediction(task_id)
 
 
         if task_features is None and task_id is not None:
@@ -143,14 +164,48 @@ class DelayPredictor:
             return self._empty_prediction(task_id)
 
 
-        try:
-            X = self.feature_engineer.transform_single(task_features)
+        is_past_deadline = int(task_features.get('is_past_deadline', 0))
+        is_completed = int(task_features.get('is_completed', 0))
+        days_overdue = int(task_features.get('days_overdue', 0))
+        delay_days = int(task_features.get('delay_days', 0))
 
 
-            proba = self.model.predict_proba(X)[0]
-            delay_prob = proba[1] if len(proba) > 1 else proba[0]
+        is_currently_delayed = False
+        if is_completed == 0 and is_past_deadline == 1:
+            is_currently_delayed = True
+        elif delay_days > 0:
+            is_currently_delayed = True
 
 
+        model_prob = 0.0
+        model_confidence = 0.0
+        model_used = False
+
+
+        if not self.is_trained:
+            self.load_model()
+
+
+        if self.is_trained and self.model is not None:
+            try:
+                X = self.feature_engineer.transform_single(task_features)
+                proba = self.model.predict_proba(X)[0]
+                model_prob = float(proba[1]) if len(proba) > 1 else float(proba[0])
+                model_confidence = float(max(proba))
+                model_used = True
+            except Exception as e:
+                print(f" فشل التنبؤ من النموذج: {str(e)}")
+                model_used = False
+
+
+        if is_currently_delayed:
+            if days_overdue > 0:
+                delay_prob = max(model_prob, 0.95)
+            else:
+                delay_prob = max(model_prob, 0.90)
+            risk_level = "High"
+        else:
+            delay_prob = model_prob
             if delay_prob > 0.75:
                 risk_level = "High"
             elif delay_prob > 0.50:
@@ -161,71 +216,120 @@ class DelayPredictor:
                 risk_level = "Normal"
 
 
-            top_factors = self._get_top_factors(task_features)
+        top_factors = self._get_top_factors(task_features)
 
 
-            return {
-                "task_id": task_features.get('task_id', task_id),
-                "delay_probability": round(float(delay_prob), 3),
-                "risk_level": risk_level,
-                "confidence": round(float(max(proba)), 3),
-                "top_factors": top_factors,
-                "prediction_time": datetime.now().isoformat(),
-                "model_version": self.model_version
-            }
-
-
-        except Exception as e:
-            print(f" خطأ في التنبؤ: {str(e)}")
-            return self._empty_prediction(task_id)
+        return {
+            "task_id": task_features.get('task_id', task_id),
+            "delay_probability": round(delay_prob, 3),
+            "risk_level": risk_level,
+            "confidence": round(model_confidence, 3) if model_used else 0.0,
+            "top_factors": top_factors,
+            "is_currently_delayed": is_currently_delayed,
+            "days_overdue": days_overdue,
+            "delay_days": delay_days,
+            "prediction_time": datetime.now().isoformat(),
+            "model_version": self.model_version,
+            "model_used": model_used
+        }
 
 
     def _get_features_for_task(self, task_id):
         loader = DataLoader()
         try:
-            tasks = loader.load_all_tasks()
-            for task in tasks:
-                if task.task_id == task_id:
-                    return loader._extract_single_task(task)
+            return loader.get_task_features(task_id)
         finally:
             loader.close()
-        return None
 
 
     def _get_top_factors(self, features):
         factors = []
 
 
-        completion = float(features.get('completion_percentage', 100))
+        completion = float(features.get('completion_percentage', 0))
+        expected = float(features.get('expected_progress', 0))
+        progress_gap = float(features.get('progress_gap', 0))
+        days_overdue = int(features.get('days_overdue', 0))
+        delay_days = int(features.get('delay_days', 0))
+        remaining = int(features.get('remaining_days', 30))
         days_without = int(features.get('days_without_update', 0))
         critical_risks = int(features.get('critical_risk_count', 0))
-        remaining = int(features.get('remaining_days', 30))
         budget_ratio = float(features.get('budget_ratio', 0))
         num_employees = int(features.get('num_assigned_employees', 0))
         workload = float(features.get('department_workload', 0))
 
 
-        if completion < 30:
-            factors.append({"feature": f"نسبة الإنجاز منخفضة جداً ({int(completion)}%)", "importance": 0.32})
+        if days_overdue > 0:
+            factors.append({
+                "feature": f"المهمة متأخرة فعلياً بـ {days_overdue} يوم",
+                "importance": 0.40
+            })
+
+
+        if delay_days > 0 and days_overdue == 0:
+            factors.append({
+                "feature": f"اكتملت المهمة بعد موعدها بـ {delay_days} يوم",
+                "importance": 0.35
+            })
+
+
+        if progress_gap < -20:
+            factors.append({
+                "feature": f"التقدم متأخر عن المتوقع بـ {abs(int(progress_gap))}%",
+                "importance": 0.30
+            })
+
+
+        if completion < 30 and expected > 30:
+            factors.append({
+                "feature": f"نسبة الإنجاز منخفضة ({int(completion)}%) مقارنة بالمدة المنقضية",
+                "importance": 0.28
+            })
+
+
         if days_without > 14:
-            factors.append({"feature": f"لا تحديثات منذ {days_without} يوم", "importance": 0.25})
+            factors.append({
+                "feature": f"لا تحديثات منذ {days_without} يوم",
+                "importance": 0.22
+            })
+
+
         if critical_risks > 0:
-            factors.append({"feature": f"يوجد {critical_risks} مخاطر حرجة", "importance": 0.18})
-        if remaining < 7 and completion < 50:
-            factors.append({"feature": f"الموعد النهائي قريب ({remaining} يوم) والتقدم ضعيف", "importance": 0.15})
+            factors.append({
+                "feature": f"يوجد {critical_risks} مخاطر حرجة",
+                "importance": 0.18
+            })
+
+
+        if 0 < remaining < 7 and completion < 50:
+            factors.append({
+                "feature": f"الموعد النهائي بعد {remaining} يوم والتقدم ضعيف",
+                "importance": 0.15
+            })
+
+
         if budget_ratio > 0.9:
-            factors.append({"feature": f"الميزانية مستنفدة تقريباً ({int(budget_ratio * 100)}%)", "importance": 0.10})
+            factors.append({
+                "feature": f"الميزانية مستنفدة ({int(budget_ratio * 100)}%)",
+                "importance": 0.10
+            })
+
+
         if num_employees < 2 and workload > 1.5:
-            factors.append({"feature": f"عدد الموظفين غير كافٍ ({num_employees} موظف)", "importance": 0.08})
-        if completion >= 50:
-            factors.append({"feature": f"التقدم جيد ({int(completion)}%) - استمرار المتابعة", "importance": 0.05})
+            factors.append({
+                "feature": f"عدد الموظفين غير كافٍ ({num_employees})",
+                "importance": 0.08
+            })
 
 
         if not factors:
-            factors.append({"feature": "المهمة تسير بشكل طبيعي", "importance": 0.5})
+            factors.append({
+                "feature": "المهمة تسير بشكل طبيعي",
+                "importance": 0.5
+            })
 
 
-        return factors[:3]
+        return factors[:4]
 
 
     def _empty_prediction(self, task_id=None):
@@ -234,9 +338,13 @@ class DelayPredictor:
             "delay_probability": 0.0,
             "risk_level": "Unknown",
             "confidence": 0.0,
-            "top_factors": [{"feature": "لا يمكن التنبؤ", "importance": 0.0}],
+            "top_factors": [{"feature": "لا يمكن التنبؤ - المهمة غير موجودة", "importance": 0.0}],
+            "is_currently_delayed": False,
+            "days_overdue": 0,
+            "delay_days": 0,
             "prediction_time": datetime.now().isoformat(),
-            "model_version": self.model_version
+            "model_version": self.model_version,
+            "model_used": False
         }
 
 
@@ -273,10 +381,12 @@ class DelayPredictor:
                 self.feature_engineer.load(self.engineer_path)
 
 
-                print(" تم تحميل النموذج المدرب")
+                print(f" تم تحميل النموذج المدرب - الإصدار: {self.model_version}")
                 return True
             except Exception as e:
                 print(f" فشل تحميل النموذج: {str(e)}")
+                self.is_trained = False
+                self.model = None
 
 
         return False

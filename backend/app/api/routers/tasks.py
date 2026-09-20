@@ -1768,3 +1768,32 @@ async def get_task_latest_prediction(
         },
         "has_prediction": True
     }
+
+@router.post("/{task_id}/predict-and-analyze")
+async def predict_and_analyze_task(
+    task_id: int,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from app.ai.services.prediction_service import prediction_service
+
+
+    task = db.query(OperationalTask).filter(
+        OperationalTask.task_id == task_id
+    ).first()
+
+
+    if not task:
+        raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+
+
+    try:
+        result = prediction_service.predict_single(
+            task_id,
+            save=True,
+            detect_risk=True,
+            generate_recommendations=True
+        )
+        return {"success": True, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

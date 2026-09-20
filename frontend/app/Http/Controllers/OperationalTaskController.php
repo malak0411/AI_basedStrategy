@@ -1637,13 +1637,17 @@ public function predictTaskDelay($taskId)
         }
 
 
-        $response = $this->apiClient->post("/api/risks/auto-detect/{$taskId}", [], $token);
+        $response = $this->apiClient->post(
+            "/api/tasks/{$taskId}/predict-and-analyze",
+            [],
+            $token
+        );
 
 
         if ($response['success'] ?? false) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم التنبؤ بالخطر بنجاح',
+                'message' => 'تم التنبؤ وتحليل المخاطر',
                 'data' => $response['data'] ?? []
             ]);
         }

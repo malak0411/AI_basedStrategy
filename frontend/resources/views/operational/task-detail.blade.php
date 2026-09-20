@@ -422,16 +422,16 @@
         {{-- ============ الشريط الجانبي (يسار) ============ --}}
         <div class="col-lg-4">
             {{-- بطاقة التنبؤ --}}
-            <div class="sidebar-card mb-4">
-                <div class="sidebar-card-header">
-                    <h6 class="mb-0">
-                        <i class="fas fa-brain text-primary me-1"></i>
-                        التنبؤ الذكي
-                    </h6>
-                    <button class="btn btn-sm btn-primary" onclick="runPrediction()" id="predictBtn">
-                        <i class="fas fa-magic"></i>
-                    </button>
-                </div>
+            <div class="sidebar-card-header">
+    <h6 class="mb-0">
+        <i class="fas fa-brain text-primary me-1"></i>
+        التنبؤ الذكي
+    </h6>
+    <button class="btn btn-sm btn-primary" onclick="runPrediction()" id="predictBtn">
+        <i class="fas fa-magic"></i> تحليل شامل
+    </button>
+</div>
+
                 <div class="sidebar-card-body" id="predictionContent">
                     @if(!empty($prediction))
                     @php
@@ -1430,8 +1430,9 @@ var currentMitigationIdToDelete = null;
 
 function runPrediction() {
     var btn = document.getElementById('predictBtn');
+    var originalHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جارٍ التحليل...';
 
 
     var token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -1449,16 +1450,41 @@ function runPrediction() {
     .then(function(r) { return r.json(); })
     .then(function(res) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-magic"></i>';
+        btn.innerHTML = originalHtml;
+
+
         if (res.success) {
+            var data = res.data || {};
+            var msg = 'اكتمل التحليل:\n';
+            msg += '• احتمال التأخير: ' + Math.round((data.delay_probability || 0) * 100) + '%\n';
+            msg += '• مستوى الخطر: ' + (data.risk_level || 'غير محدد') + '\n';
+
+
+            if (data.is_currently_delayed) {
+                msg += '• المهمة متأخرة: ' + (data.days_overdue || 0) + ' يوم\n';
+            }
+
+
+            if (data.risk_detection && data.risk_detection.detected) {
+                var action = data.risk_detection.action === 'created' ? 'تم إنشاء خطر جديد' : 'تم تحديث الخطر';
+                msg += '• ' + action + '\n';
+            }
+
+
+            if (data.recommendations_result && data.recommendations_result.success) {
+                msg += '• تم توليد التوصيات الذكية';
+            }
+
+
+            alert(msg);
             location.reload();
         } else {
-            alert('خطأ: ' + (res.error || 'فشل التنبؤ'));
+            alert('خطأ: ' + (res.error || 'فشل التحليل'));
         }
     })
     .catch(function(err) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-magic"></i>';
+        btn.innerHTML = originalHtml;
         alert('حدث خطأ: ' + err);
     });
 }
