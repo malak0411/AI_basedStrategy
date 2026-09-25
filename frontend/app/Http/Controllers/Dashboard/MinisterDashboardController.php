@@ -1,71 +1,41 @@
 <?php
 
+
 namespace App\Http\Controllers\Dashboard;
+
 
 use App\Http\Controllers\Controller;
 use App\Services\ApiClient;
 
+
 class MinisterDashboardController extends Controller
 {
-    protected $apiClient;
-
-    public function __construct()
-    {
-        $this->apiClient = new ApiClient();
-    }
-
     public function index()
     {
+        $api   = new ApiClient();
         $token = session('jwt_token');
-        $role = session('user_role');
 
-        if (!$token) {
-            return redirect()->route('login')->with('error', 'يجب تسجيل الدخول أولاً');
+
+        $response = $api->get('/api/dashboard/minister', $token);
+        $data     = $response['data'] ?? $response;
+
+
+        $pillarsResp = $api->get('/api/strategic/pillars', $token);
+        $pillars     = $pillarsResp['data'] ?? [];
+
+
+        $delayedResp = $api->get('/api/tasks/delayed', $token);
+        $delayed     = $delayedResp['data'] ?? [];
+
+
+        if (($response['status'] ?? 500) >= 400 || empty($data)) {
+            return back()->with('error', $response['detail'] ?? 'تعذر تحميل البيانات الاستراتيجية.');
         }
 
-        // السماح للقيادات فقط
-        if (!in_array($role, ['minister', 'deputy', 'general_manager'])) {
-            return redirect()->route('dashboard.employee')
-                ->with('error', 'ليس لديك صلاحية للوصول إلى هذه الصفحة');
-        }
 
-        try {
-            $stats = $this->fetchData('/api/dashboard/minister', $token, [
-                'total_employees' => 0,
-                'total_departments' => 0,
-                'active_projects' => 0,
-                'budget_utilization' => 0,
-                'completion_rate' => 0,
-                'delayed_tasks' => 0,
-            ]);
+        $role = session('user_role', 'employee');
 
-            $departments = $this->fetchData('/api/dashboard/departments-performance', $token, []);
-            $pillars = $this->fetchData('/api/strategic/pillars', $token, []);
-            $delayedTasks = $this->fetchData('/api/tasks/delayed', $token, []);
 
-            return view('dashboard.minister', compact(
-                'stats', 'departments', 'pillars', 'delayedTasks'
-            ));
-
-        } catch (\Exception $e) {
-            \Log::error('Minister Dashboard Error: ' . $e->getMessage());
-            return view('dashboard.minister', [
-                'stats' => [],
-                'departments' => [],
-                'pillars' => [],
-                'delayedTasks' => [],
-                'error' => 'عذراً، حدث خطأ في تحميل البيانات'
-            ]);
-        }
-    }
-
-    private function fetchData($endpoint, $token, $default = [])
-    {
-        try {
-            $response = $this->apiClient->get($endpoint, $token);
-            return $response['data'] ?? $default;
-        } catch (\Exception $e) {
-            return $default;
-        }
+        return view('dashboard.minister', compact('data', 'pillars', 'delayed', 'role'));
     }
 }

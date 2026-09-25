@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from sqlalchemy import Column, Integer, String, Text, Date, DateTime, Boolean, ForeignKey, Enum, Table, DECIMAL
+from sqlalchemy import Column, FetchedValue, Integer, String, Text, Date, DateTime, Boolean, ForeignKey, Enum, Table, DECIMAL
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
@@ -447,7 +447,7 @@ class Risk(Base):
     risk_level_id = Column(Integer, ForeignKey("dict_risk_levels.risk_level_id"))
     probability = Column(Integer)
     impact = Column(Integer)
-    risk_score = Column(Integer, default=0) 
+    risk_score = Column(Integer, server_default=FetchedValue()) 
     identified_by = Column(Integer, ForeignKey("employees.employee_id"))
     identified_at = Column(DateTime, server_default=func.now())
     target_date = Column(Date)

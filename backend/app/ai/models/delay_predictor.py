@@ -164,14 +164,13 @@ class DelayPredictor:
             return self._empty_prediction(task_id)
 
 
-        is_past_deadline = int(task_features.get('is_past_deadline', 0))
         is_completed = int(task_features.get('is_completed', 0))
         days_overdue = int(task_features.get('days_overdue', 0))
         delay_days = int(task_features.get('delay_days', 0))
 
 
         is_currently_delayed = False
-        if is_completed == 0 and is_past_deadline == 1:
+        if days_overdue > 0 and is_completed == 0:
             is_currently_delayed = True
         elif delay_days > 0:
             is_currently_delayed = True

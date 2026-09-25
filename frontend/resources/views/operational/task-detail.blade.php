@@ -1353,7 +1353,6 @@
     }
 
 
-    /* ==================== Scrollbars ==================== */
     .ai-recs-container-sidebar::-webkit-scrollbar,
     .mitigations-container-sidebar::-webkit-scrollbar,
     .comments-section::-webkit-scrollbar,

@@ -84,6 +84,19 @@ Route::middleware('check.jwt')->group(function () {
     });
 
 
+    Route::get('/dashboard/employee', [\App\Http\Controllers\Dashboard\EmployeeDashboardController::class, 'index'])
+        ->name('dashboard.employee');
+
+
+    Route::post('/dashboard/employee/assignments/{assignmentId}/accept',
+        [\App\Http\Controllers\Dashboard\EmployeeDashboardController::class, 'acceptAssignment'])
+        ->name('employee.assignments.accept');
+
+
+    Route::post('/dashboard/employee/assignments/{assignmentId}/reject',
+        [\App\Http\Controllers\Dashboard\EmployeeDashboardController::class, 'rejectAssignment'])
+        ->name('employee.assignments.reject');
+
 
     Route::middleware(['web', 'check.jwt'])->group(function () {
 

@@ -118,7 +118,7 @@ class DataLoader:
         if end_date:
             delta = (end_date - today).days
             remaining_days = delta
-            if delta < 0:
+            if delta < 0 and status_id != COMPLETED_STATUS_ID:
                 days_overdue = abs(delta)
 
 
@@ -127,7 +127,7 @@ class DataLoader:
 
 
         is_past_deadline = 0
-        if end_date and today > end_date:
+        if end_date and today > end_date and status_id != COMPLETED_STATUS_ID:
             is_past_deadline = 1
 
 

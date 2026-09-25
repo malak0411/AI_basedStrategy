@@ -61,7 +61,6 @@ class RiskDetectionService:
         if existing_risk:
             existing_risk.probability = probability
             existing_risk.impact = impact
-            existing_risk.risk_score = risk_score
             if risk_level:
                 existing_risk.risk_level_id = risk_level.risk_level_id
             existing_risk.updated_at = datetime.now()
@@ -99,7 +98,6 @@ class RiskDetectionService:
             description=risk_description,
             probability=probability,
             impact=impact,
-            risk_score=risk_score,
             risk_level_id=risk_level.risk_level_id if risk_level else None,
             identified_by=created_by or task.created_by,
             identified_at=datetime.now(),

@@ -520,7 +520,7 @@ async def create_risk(
         impact=impact,
         risk_score=risk_score,
         risk_level_id=risk_level.risk_level_id,
-        identified_by=current_user.employee_id,
+        identified_by=current_user,
         identified_at=datetime.now(),
         target_date=target_date,
         status_id=status_id
@@ -897,7 +897,7 @@ async def generate_risk_recommendations(
         service = RiskRecommendationService()
         try:
             result = service.generate_for_risk(
-                risk_id, created_by=current_user.employee_id
+                risk_id, created_by=current_user
             )
             return {"success": True, "data": result}
         finally:
@@ -920,7 +920,7 @@ async def reassess_risk(
         service = RiskReassessmentService()
         try:
             result = service.reassess(
-                risk_id, created_by=current_user.employee_id
+                risk_id, created_by=current_user
             )
             return {"success": True, "data": result}
         finally:

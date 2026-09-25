@@ -15,7 +15,7 @@ class ApiClient
         $this->baseUrl = env('API_BASE_URL', 'http://localhost:8000');
         $this->client = new Client([
             'base_uri' => $this->baseUrl,
-            'timeout' => 30.0,
+            'timeout' => 300.0,
             'http_errors' => false,
         ]);
     }
