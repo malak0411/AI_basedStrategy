@@ -3,43 +3,87 @@
 
 @section('title', 'تفاصيل المهمة التشغيلية')
 
-
 @section('content')
 @php
+    $currentUserId = session('user_id') ?? session('employee_id') ?? 0;
+    $userRole      = session('user_role', 'employee');
+    $isManager     = in_array($userRole, ['manager','general_manager','deputy','minister','super_admin']);
+
+
     $comments = [];
     try {
-        $token = session('jwt_token');
+        $token  = session('jwt_token');
         $client = app(\App\Services\ApiClient::class);
         $taskId = isset($task['task_id']) ? $task['task_id'] : (isset($task['id']) ? $task['id'] : 0);
         $response = $client->get("/api/tasks/{$taskId}/comments", $token);
-
-
         if (isset($response['data']) && is_array($response['data'])) {
             $comments = $response['data'];
         } elseif (is_array($response)) {
             $comments = $response;
         }
-
-
-        $comments = array_filter($comments, function($item) {
-            return is_array($item) && isset($item['comment_id']);
-        });
+        $comments = array_filter($comments, fn($i) => is_array($i) && isset($i['comment_id']));
         $comments = array_values($comments);
     } catch (\Exception $e) {
         $comments = [];
     }
     $commentsCount = count($comments);
-    $logsCount = is_array($logs ?? null) ? count($logs) : 0;
-    $risksCount = is_array($risks ?? null) ? count($risks) : 0;
+    $logsCount     = is_array($logs ?? null) ? count($logs) : 0;
+    $risksCount    = is_array($risks ?? null) ? count($risks) : 0;
+
+
+    $participantsList = [];
+    if (!empty($participants) && is_array($participants)) {
+        $participantsList = $participants;
+    } elseif (!empty($task['participants']) && is_array($task['participants'])) {
+        $participantsList = $task['participants'];
+    } elseif (!empty($task['assigned_to_name'])) {
+        $participantsList = [[
+            'employee_id'  => $task['assigned_to'] ?? 0,
+            'full_name'    => $task['assigned_to_name'],
+            'role_type_id' => $task['assigned_to_role_id'] ?? null,
+            'role_type'    => $task['assigned_to_role']    ?? null,
+            'job_title'    => null,
+            'acceptance_status' => 'accepted',
+        ]];
+    }
+
+
+    $isTaskResponsible = false;
+    foreach ($participantsList as $p) {
+        $pid    = (int) ($p['employee_id']  ?? 0);
+        $roleId = (int) ($p['role_type_id'] ?? 0);
+        $acc    = $p['acceptance_status'] ?? 'accepted';
+        if ($pid === (int)$currentUserId && in_array($roleId, [1, 2]) && $acc === 'accepted') {
+            $isTaskResponsible = true;
+            break;
+        }
+    }
+
+
+    $taskStatusId    = (int) ($task['status_id'] ?? ($task['status'] ?? 0));
+    $canSendToReview = $isTaskResponsible && $taskStatusId === 6;
+
+
+    $progress = (float) ($task['progress_percent'] ?? 0);
+    if ($progress <= 0 && !empty($logs) && is_array($logs)) {
+        $maxLogProgress = 0;
+        foreach ($logs as $log) {
+            if (is_array($log) && isset($log['progress_percent'])) {
+                $lp = (float) $log['progress_percent'];
+                if ($lp > $maxLogProgress) $maxLogProgress = $lp;
+            }
+        }
+        $progress = $maxLogProgress;
+    }
+    $progress = min(100, max(0, $progress));
 
 
     $allMitigations = [];
     if (!empty($risks) && is_array($risks)) {
         foreach ($risks as $risk) {
-            $riskMits = $risk['mitigations'] ?? [];
-            foreach ($riskMits as $mit) {
-                $mit['risk_name'] = $risk['name'] ?? '';
-                $mit['risk_id'] = $risk['risk_id'] ?? 0;
+            foreach (($risk['mitigations'] ?? []) as $mit) {
+                $mit['risk_name']  = $risk['name'] ?? '';
+                $mit['risk_id']    = $risk['risk_id'] ?? 0;
                 $mit['risk_level'] = $risk['risk_level'] ?? [];
                 $allMitigations[] = $mit;
             }
@@ -50,15 +94,21 @@
 
 
 <div class="container-fluid px-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <a href="{{ route('operational.kanban') }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-right"></i> العودة للوحة المهام
         </a>
-        <div>
+        <div class="d-flex gap-2 flex-wrap">
+            @if($canSendToReview)
+                <button type="button" class="btn btn-warning"
+                        onclick="sendTaskToReview({{ $taskId }})">
+                    <i class="fas fa-clipboard-check"></i> إرسال للمراجعة
+                </button>
+            @endif
             <a href="{{ route('task.attachments.index', $taskId ?? 0) }}" class="btn btn-outline-info">
                 <i class="fas fa-paperclip"></i> المرفقات
                 @if(!empty($attachments))
-                <span class="badge bg-primary ms-1">{{ count($attachments) }}</span>
+                    <span class="badge bg-primary ms-1">{{ count($attachments) }}</span>
                 @endif
             </a>
         </div>
@@ -72,35 +122,94 @@
     </div>
     @else
     <div class="row g-4">
-        {{-- ============ العمود الرئيسي (يمين) ============ --}}
         <div class="col-lg-8">
-            {{-- بطاقة معلومات المهمة --}}
             <div class="task-detail-card mb-4">
                 <div class="task-header">
-                    <h3 class="task-title">{{ isset($task['task_name']) ? $task['task_name'] : (isset($task['title']) ? $task['title'] : '') }}</h3>
-                    <span class="task-status-badge status-{{ isset($task['status']) ? $task['status'] : 0 }}">
-                        {{ isset($task['status_name']) ? $task['status_name'] : '' }}
+                    <h3 class="task-title">
+                        {{ $task['task_name'] ?? ($task['title'] ?? '') }}
+                    </h3>
+                    <span class="task-status-badge status-{{ $task['status'] ?? 0 }}">
+                        {{ $task['status_name'] ?? '' }}
                     </span>
                 </div>
-                <p class="task-description">{{ isset($task['description']) ? $task['description'] : '' }}</p>
+                <p class="task-description">{{ $task['description'] ?? '' }}</p>
+
+
+                <div class="task-parent-info mb-3">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <div class="parent-info-item">
+                                <i class="fas fa-layer-group text-primary"></i>
+                                <div>
+                                    <small class="text-muted d-block">المهمة الرئيسية</small>
+                                    <strong>{{ $task['major_task_name'] ?? ($task['major_task']['name'] ?? 'غير محدد') }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="parent-info-item">
+                                <i class="fas fa-bullseye text-success"></i>
+                                <div>
+                                    <small class="text-muted d-block">المبادرة</small>
+                                    <strong>{{ $task['initiative_name'] ?? ($task['initiative']['name'] ?? 'غير محدد') }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="participants-block mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-users text-info me-2"></i>
+                        <strong>المشاركون ({{ count($participantsList) }})</strong>
+                    </div>
+                    @if(empty($participantsList))
+                        <small class="text-muted">لا يوجد مشاركون بعد</small>
+                    @else
+                        <div class="participants-list">
+                            @foreach($participantsList as $p)
+                                @php
+                                    $roleName = $p['role_type'] ?? null;
+                                    if (is_numeric($roleName) || !$roleName) {
+                                        $roleMap  = [1=>'منفذ', 2=>'مسؤول نهائي', 3=>'استشاري', 4=>'مطلع', 5=>'معتمد'];
+                                        $roleName = $roleMap[(int)($p['role_type_id'] ?? $roleName)] ?? '—';
+                                    }
+                                @endphp
+                                <div class="participant-chip">
+                                    <div class="participant-avatar">{{ mb_substr($p['full_name'] ?? '?', 0, 1, 'UTF-8') }}</div>
+                                    <div class="participant-info">
+                                        <div class="participant-name">{{ $p['full_name'] ?? '—' }}</div>
+                                        <div class="participant-role">
+                                            <span class="badge bg-primary">{{ $roleName ?: '—' }}</span>
+                                            @if(!empty($p['job_title']))
+                                                <small class="text-muted ms-1">{{ $p['job_title'] }}</small>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
 
 
                 <div class="task-meta-grid">
                     <div class="meta-item">
-                        <span class="meta-label"><i class="fas fa-user"></i> المسؤول</span>
-                        <span class="meta-value">{{ isset($task['assigned_to_name']) ? $task['assigned_to_name'] : 'غير معين' }}</span>
-                    </div>
-                    <div class="meta-item">
                         <span class="meta-label"><i class="fas fa-calendar-alt"></i> تاريخ البداية</span>
-                        <span class="meta-value">{{ isset($task['start_date']) ? $task['start_date'] : 'غير محدد' }}</span>
+                        <span class="meta-value">{{ $task['start_date'] ?? 'غير محدد' }}</span>
                     </div>
                     <div class="meta-item">
                         <span class="meta-label"><i class="fas fa-calendar-check"></i> تاريخ التسليم</span>
-                        <span class="meta-value">{{ isset($task['due_date']) ? $task['due_date'] : (isset($task['end_date']) ? $task['end_date'] : 'غير محدد') }}</span>
+                        <span class="meta-value">{{ $task['due_date'] ?? ($task['end_date'] ?? 'غير محدد') }}</span>
                     </div>
                     <div class="meta-item">
-                        <span class="meta-label"><i class="fas fa-clock"></i> الساعات المقدرة</span>
-                        <span class="meta-value">{{ isset($task['estimated_hours']) ? $task['estimated_hours'] : 0 }} ساعة</span>
+                        <span class="meta-label"><i class="fas fa-clock"></i> الساعات المقدرة للمهمة</span>
+                        <span class="meta-value">{{ $task['estimated_hours'] ?? 0 }} ساعة</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label"><i class="fas fa-hourglass-half"></i> الساعات الفعلية</span>
+                        <span class="meta-value">{{ $task['actual_hours'] ?? 0 }} ساعة</span>
                     </div>
                 </div>
 
@@ -108,43 +217,39 @@
                 <div class="progress-container">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="progress-label"><i class="fas fa-chart-line"></i> نسبة الإنجاز</span>
-                        <span class="progress-value">
-                            @php
-                                $progress = 0;
-                                if (!empty($logs) && is_array($logs) && count($logs) > 0) {
-                                    $firstLog = isset($logs[0]) ? $logs[0] : array();
-                                    $progress = is_array($firstLog) && isset($firstLog['progress_percent']) ? $firstLog['progress_percent'] : 0;
-                                }
-                            @endphp
-                            {{ $progress }}%
-                        </span>
+                        <span class="progress-value">{{ number_format($progress, 1) }}%</span>
                     </div>
                     <div class="progress">
-                        <div class="progress-bar bg-gradient" role="progressbar" style="width: {{ $progress }}%;" aria-valuenow="{{ $progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="progress-bar dirigo-progress-bar" role="progressbar"
+                             style="width: {{ $progress }}%; min-width: 4px;"
+                             aria-valuenow="{{ $progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+
                     </div>
                 </div>
             </div>
 
 
-            {{-- ============ التبويبات الثلاث ============ --}}
             <div class="activity-section">
                 <ul class="nav nav-tabs" id="activityTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs-pane" type="button" role="tab">
+                        <button class="nav-link active" id="logs-tab" data-bs-toggle="tab"
+                                data-bs-target="#logs-pane" type="button" role="tab">
                             <i class="fas fa-history me-1"></i>
                             سجل التقدم
                             <span class="badge bg-secondary ms-1">{{ $logsCount }}</span>
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="mitigations-tab" data-bs-toggle="tab" data-bs-target="#mitigations-pane" type="button" role="tab">
+                        <button class="nav-link" id="mitigations-tab" data-bs-toggle="tab"
+                                data-bs-target="#mitigations-pane" type="button" role="tab">
                             <i class="fas fa-tasks me-1"></i>
                             الإجراءات
                             <span class="badge bg-info ms-1">{{ $mitigationsCount }}</span>
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="comments-tab" data-bs-toggle="tab" data-bs-target="#comments-pane" type="button" role="tab">
+                        <button class="nav-link" id="comments-tab" data-bs-toggle="tab"
+                                data-bs-target="#comments-pane" type="button" role="tab">
                             <i class="fas fa-comments me-1"></i>
                             التعليقات
                             <span class="badge bg-secondary ms-1" id="comments-count">{{ $commentsCount }}</span>
@@ -154,250 +259,289 @@
 
 
                 <div class="tab-content">
-                    {{-- ===== تبويب سجل التقدم ===== --}}
                     <div class="tab-pane fade show active" id="logs-pane" role="tabpanel">
                         @if(empty($logs) || !is_array($logs))
-                        <div class="empty-state">
-                            <i class="fas fa-history fa-2x text-muted"></i>
-                            <p class="text-muted mb-0">لا توجد سجلات تقدم</p>
-                        </div>
-                        @else
-                        <div class="timeline">
-                            @foreach($logs as $log)
-                            @if(is_array($log))
-                            <div class="timeline-item">
-                                <div class="timeline-marker"></div>
-                                <div class="timeline-content">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <strong>{{ isset($log['employee_name']) ? $log['employee_name'] : '' }}</strong>
-                                        <small class="text-muted">{{ isset($log['log_time']) ? $log['log_time'] : '' }}</small>
-                                    </div>
-                                    <p class="timeline-text">{{ isset($log['notes']) ? $log['notes'] : '' }}</p>
-                                    <small class="text-muted"><i class="fas fa-chart-line"></i> التقدم: {{ isset($log['progress_percent']) ? $log['progress_percent'] : 0 }}%</small>
-                                </div>
+                            <div class="empty-state">
+                                <i class="fas fa-history fa-2x text-muted"></i>
+                                <p class="text-muted mb-0">لا توجد سجلات تقدم</p>
                             </div>
-                            @endif
-                            @endforeach
-                        </div>
+                        @else
+                            <div class="timeline">
+                                @foreach($logs as $log)
+                                    @if(is_array($log))
+                                        <div class="timeline-item">
+                                            <div class="timeline-marker"></div>
+                                            <div class="timeline-content">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <strong>{{ $log['employee_name'] ?? '' }}</strong>
+                                                    <small class="text-muted">{{ $log['log_time'] ?? '' }}</small>
+                                                </div>
+                                                <p class="timeline-text">{{ $log['notes'] ?? '' }}</p>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-chart-line"></i>
+                                                    التقدم: {{ $log['progress_percent'] ?? 0 }}%
+                                                </small>
+                                            </div>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
                         @endif
                     </div>
 
 
-                    {{-- ===== تبويب الإجراءات (جديد) ===== --}}
                     <div class="tab-pane fade" id="mitigations-pane" role="tabpanel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h6 class="mb-0 text-muted">
                                 <i class="fas fa-list-check"></i>
-                                جميع إجراءات المعالجة ({{ $mitigationsCount }})
+                                إجراءات المعالجة ({{ $mitigationsCount }})
                             </h6>
-                            @if($risksCount > 0)
-                            <button class="btn btn-sm btn-info text-white" onclick="showAddMitigationGeneral()">
-                                <i class="fas fa-plus"></i> إضافة إجراء جديد
-                            </button>
+                            @if($isManager && $risksCount > 0)
+                                <button class="btn btn-sm btn-info text-white"
+                                        onclick="showAddMitigationGeneral()">
+                                    <i class="fas fa-plus"></i> إضافة إجراء
+                                </button>
                             @endif
                         </div>
 
 
                         @if(empty($allMitigations))
-                        <div class="empty-state">
-                            <i class="fas fa-tasks fa-2x text-muted"></i>
-                            <p class="text-muted mb-0">لا توجد إجراءات معالجة</p>
-                            @if($risksCount > 0)
-                            <small class="text-muted">اضغط "إضافة إجراء جديد" لإنشاء أول إجراء</small>
-                            @else
-                            <small class="text-muted">يجب كشف المخاطر أولاً قبل إضافة الإجراءات</small>
-                            @endif
-                        </div>
+                            <div class="empty-state">
+                                <i class="fas fa-tasks fa-2x text-muted"></i>
+                                <p class="text-muted mb-0">لا توجد إجراءات معالجة</p>
+                            </div>
                         @else
-                        <div class="mitigations-table-container">
-                            <table class="table table-hover align-middle mitigations-table">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th width="40">#</th>
-                                        <th>الإجراء</th>
-                                        <th width="140">الخطر المرتبط</th>
-                                        <th width="120">المسؤول</th>
-                                        <th width="110">الاستحقاق</th>
-                                        <th width="140">الحالة</th>
-                                        <th width="80" class="text-center">إجراءات</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                            <div class="mitigations-table-container">
+                                <table class="table table-hover align-middle mitigations-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th width="40">#</th>
+                                            <th>الإجراء والملاحظات</th>
+                                            <th width="140">الخطر</th>
+                                            <th width="120">المسؤول</th>
+                                            <th width="105">الاستحقاق</th>
+                                            <th width="140">الحالة</th>
+                                            <th width="150">الإجراءات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
                                     @foreach($allMitigations as $index => $mit)
-                                    @php
-                                        $mStatus = $mit['status'] ?? [];
-                                        $mStatusColor = $mStatus['color_hex'] ?? '#6c757d';
-                                        $mRiskLevel = $mit['risk_level'] ?? [];
-                                        $mRiskLevelColor = $mRiskLevel['color_hex'] ?? '#6c757d';
-                                        $isCompleted = !empty($mit['completed_at']);
-                                    @endphp
-                                    <tr class="{{ $isCompleted ? 'mitigation-completed' : '' }}">
-                                        <td><span class="text-muted">{{ $index + 1 }}</span></td>
-                                        <td>
-                                            <div class="mitigation-action-text">{{ $mit['action'] ?? '' }}</div>
-                                            @if(!empty($mit['notes']))
-                                            <small class="text-muted d-block mt-1">
-                                                <i class="fas fa-sticky-note"></i> {{ Str::limit($mit['notes'], 60) }}
-                                            </small>
-                                            @endif
-                                            @if($isCompleted)
-                                            <small class="text-success d-block mt-1">
-                                                <i class="fas fa-check-circle"></i> اكتمل: {{ \Carbon\Carbon::parse($mit['completed_at'])->format('Y-m-d') }}
-                                            </small>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <a href="#risk-{{ $mit['risk_id'] }}" class="risk-ref-link" onclick="highlightRisk({{ $mit['risk_id'] }}); return false;">
-                                                <span class="badge" style="background-color: {{ $mRiskLevelColor }}; color: #fff; font-size: 9px; margin-bottom: 2px;">
+                                        @php
+                                            $mStatus         = $mit['status'] ?? [];
+                                            $mStatusColor    = $mStatus['color_hex'] ?? '#6c757d';
+                                            $mStatusId       = (int) ($mStatus['status_id'] ?? ($mit['status_id'] ?? 0));
+                                            $mRiskLevel      = $mit['risk_level'] ?? [];
+                                            $mRiskLevelColor = $mRiskLevel['color_hex'] ?? '#6c757d';
+                                            $isCompleted     = !empty($mit['completed_at']) || $mStatusId == 44;
+
+
+                                            $assignedToId   = $mit['assigned_to']['employee_id'] ?? null;
+                                            $assignedName   = $mit['assigned_to']['full_name'] ?? null;
+                                            $isMyMitigation = $assignedToId && (int)$assignedToId === (int)$currentUserId;
+
+
+                                            $canStart   = $isMyMitigation && $mStatusId == 41;
+                                            $canSubmit  = $isMyMitigation && $mStatusId == 42;
+                                            $canApprove = $isManager && $mStatusId == 43;
+                                            $canDelete  = $isManager;
+                                        @endphp
+                                        <tr class="{{ $isCompleted ? 'mitigation-completed' : '' }}">
+                                            <td><span class="text-muted">{{ $index + 1 }}</span></td>
+
+
+                                            <td>
+                                                <div class="mitigation-action-text">{{ $mit['action'] ?? '' }}</div>
+                                                @if(!empty($mit['notes']))
+                                                    <small class="text-muted d-block mt-1">
+                                                        <i class="fas fa-sticky-note"></i> {{ $mit['notes'] }}
+                                                    </small>
+                                                @endif
+                                                @if($isCompleted && !empty($mit['completed_at']))
+                                                    <small class="text-success d-block mt-1">
+                                                        <i class="fas fa-check-circle"></i>
+                                                        اكتمل: {{ \Carbon\Carbon::parse($mit['completed_at'])->format('Y-m-d') }}
+                                                    </small>
+                                                @endif
+                                            </td>
+
+
+                                            <td>
+                                                <span class="badge"
+                                                      style="background-color: {{ $mRiskLevelColor }}; color: #fff; font-size: 9px;">
                                                     {{ $mRiskLevel['name_ar'] ?? '' }}
                                                 </span>
                                                 <div class="risk-ref-name">{{ Str::limit($mit['risk_name'] ?? '', 30) }}</div>
-                                            </a>
-                                        </td>
-                                        <td>
-                                            @if(!empty($mit['assigned_to']['full_name']))
-                                            <div class="d-flex align-items-center gap-1">
-                                                <div class="assignee-avatar">{{ mb_substr($mit['assigned_to']['full_name'], 0, 1, 'UTF-8') }}</div>
-                                                <small>{{ Str::limit($mit['assigned_to']['full_name'], 15) }}</small>
-                                            </div>
-                                            @else
-                                            <small class="text-muted">غير معين</small>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            @if(!empty($mit['due_date']))
-                                            <small>{{ $mit['due_date'] }}</small>
-                                            @else
-                                            <small class="text-muted">--</small>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <select class="form-select form-select-sm mitigation-status-select"
-                                                    data-mitigation-id="{{ $mit['mitigation_id'] }}"
-                                                    onchange="updateMitigationStatus(this)"
-                                                    style="font-size: 11px;">
-                                                <option value="">-- تغيير --</option>
-                                                @foreach(($riskOptions['mitigation_statuses'] ?? []) as $st)
-                                                <option value="{{ $st['status_id'] }}"
-                                                        {{ ($mStatus['status_id'] ?? 0) == $st['status_id'] ? 'selected' : '' }}>
-                                                    {{ $st['name_ar'] }}
-                                                </option>
-                                                @endforeach
-                                            </select>
-                                            <span class="badge mt-1 d-block" style="background-color: {{ $mStatusColor }}; color: #fff; font-size: 9px;">
-                                                {{ $mStatus['name_ar'] ?? 'غير محدد' }}
-                                            </span>
-                                        </td>
-                                        <td class="text-center">
-                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteMitigation({{ $mit['mitigation_id'] }})" title="حذف">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
+                                            </td>
+
+
+                                            <td>
+                                                @if($assignedName)
+                                                    <div class="d-flex align-items-center gap-1">
+                                                        <div class="assignee-avatar">{{ mb_substr($assignedName, 0, 1, 'UTF-8') }}</div>
+                                                        <small>{{ Str::limit($assignedName, 15) }}</small>
+                                                    </div>
+                                                @else
+                                                    <small class="text-muted">غير معين</small>
+                                                @endif
+                                            </td>
+
+
+                                            <td><small>{{ $mit['due_date'] ?? '--' }}</small></td>
+
+
+                                            <td>
+                                                <span class="badge"
+                                                      style="background-color: {{ $mStatusColor }}; color: #fff; font-size: 10px;">
+                                                    {{ $mStatus['name_ar'] ?? 'غير محدد' }}
+                                                </span>
+                                            </td>
+
+
+                                            <td>
+                                                @if($canStart)
+                                                    <button class="btn btn-sm btn-primary w-100 mb-1"
+                                                            onclick="updateMitigationStatus({{ $mit['mitigation_id'] }}, 42)">
+                                                        <i class="fas fa-play"></i> بدء التنفيذ
+                                                    </button>
+                                                @elseif($canSubmit)
+                                                    <button class="btn btn-sm btn-success w-100 mb-1"
+                                                            onclick="updateMitigationStatus({{ $mit['mitigation_id'] }}, 43)">
+                                                        <i class="fas fa-paper-plane"></i> إرسال للتحقق
+                                                    </button>
+                                                @elseif($canApprove)
+                                                    <button class="btn btn-sm btn-success w-100 mb-1"
+                                                            onclick="updateMitigationStatus({{ $mit['mitigation_id'] }}, 44)">
+                                                        <i class="fas fa-check-double"></i> اعتماد كمكتمل
+                                                    </button>
+                                                @else
+                                                    <small class="text-muted d-block text-center">—</small>
+                                                @endif
+
+
+                                                @if($canDelete)
+                                                    <button class="btn btn-sm btn-outline-danger w-100"
+                                                            onclick="deleteMitigation({{ $mit['mitigation_id'] }})">
+                                                        <i class="fas fa-trash"></i> حذف
+                                                    </button>
+                                                @endif
+                                            </td>
+                                        </tr>
                                     @endforeach
-                                </tbody>
-                            </table>
-                        </div>
+                                    </tbody>
+                                </table>
+                            </div>
                         @endif
                     </div>
 
 
-                    {{-- ===== تبويب التعليقات ===== --}}
                     <div class="tab-pane fade" id="comments-pane" role="tabpanel">
                         <div class="comments-section" id="commentsSection">
                             @if($commentsCount == 0)
-                            <div class="empty-state">
-                                <i class="fas fa-comments fa-2x text-muted"></i>
-                                <p class="text-muted mb-0">لا توجد تعليقات</p>
-                            </div>
+                                <div class="empty-state">
+                                    <i class="fas fa-comments fa-2x text-muted"></i>
+                                    <p class="text-muted mb-0">لا توجد تعليقات</p>
+                                </div>
                             @else
-                            @foreach($comments as $comment)
-                            @if(is_array($comment))
-                            @php
-                                $commentId = isset($comment['comment_id']) ? $comment['comment_id'] : 0;
-                                $employeeName = isset($comment['employee_name']) ? $comment['employee_name'] : '';
-                                $employeeId = isset($comment['employee_id']) ? $comment['employee_id'] : 0;
-                                $commentText = isset($comment['comment']) ? $comment['comment'] : '';
-                                $createdAt = isset($comment['created_at']) ? $comment['created_at'] : '';
-                                $replies = isset($comment['replies']) && is_array($comment['replies']) ? $comment['replies'] : array();
-                            @endphp
-                            <div class="comment-item" id="comment-{{ $commentId }}">
-                                <div class="comment-header">
-                                    <div class="comment-user">
-                                        <div class="comment-avatar">{{ mb_substr($employeeName, 0, 1, 'UTF-8') }}</div>
-                                        <div>
-                                            <strong>{{ $employeeName }}</strong>
-                                            @if(count($replies) > 0)
-                                            <span class="badge bg-info ms-1"><i class="fas fa-reply"></i> {{ count($replies) }}</span>
-                                            @endif
-                                        </div>
-                                    </div>
-                                    <div class="comment-actions">
-                                        <small class="text-muted">{{ !empty($createdAt) ? \Carbon\Carbon::parse($createdAt)->diffForHumans() : '' }}</small>
+                                @foreach($comments as $comment)
+                                    @if(is_array($comment))
                                         @php
-                                            $currentUserId = session('user_id') ?? session('employee_id') ?? 0;
+                                            $commentId      = $comment['comment_id'] ?? 0;
+                                            $employeeName   = $comment['employee_name'] ?? '';
+                                            $employeeId     = $comment['employee_id'] ?? 0;
+                                            $commentText    = $comment['comment'] ?? '';
+                                            $createdAt      = $comment['created_at'] ?? '';
+                                            $replies        = is_array($comment['replies'] ?? null) ? $comment['replies'] : [];
+                                            $currentUserIdC = session('user_id') ?? session('employee_id') ?? 0;
                                         @endphp
-                                        @if($employeeId == $currentUserId && count($replies) == 0)
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteComment({{ $commentId }})" title="حذف">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                        @endif
-                                    </div>
-                                </div>
-                                <p class="comment-text">{{ $commentText }}</p>
-                                <button class="btn btn-sm btn-outline-primary reply-btn" onclick="showReplyForm({{ $commentId }}, '{{ addslashes($employeeName) }}')">
-                                    <i class="fas fa-reply"></i> رد
-                                </button>
-                                <div class="reply-form-container" id="reply-form-{{ $commentId }}" style="display:none;">
-                                    <form onsubmit="submitReply(event, {{ $taskId }}, {{ $commentId }})">
-                                        @csrf
-                                        <div class="input-group">
-                                            <input type="text" class="form-control" placeholder="أضف رداً على {{ $employeeName }}..." required>
-                                            <button class="btn btn-primary" type="submit"><i class="fas fa-paper-plane"></i></button>
-                                            <button class="btn btn-secondary" type="button" onclick="hideReplyForm({{ $commentId }})">إلغاء</button>
-                                        </div>
-                                    </form>
-                                </div>
-
-
-                                @if(count($replies) > 0)
-                                <div class="replies-container">
-                                    @foreach($replies as $reply)
-                                    @if(is_array($reply))
-                                    @php
-                                        $replyId = isset($reply['comment_id']) ? $reply['comment_id'] : 0;
-                                        $replyEmployeeName = isset($reply['employee_name']) ? $reply['employee_name'] : '';
-                                        $replyEmployeeId = isset($reply['employee_id']) ? $reply['employee_id'] : 0;
-                                        $replyText = isset($reply['comment']) ? $reply['comment'] : '';
-                                        $replyCreatedAt = isset($reply['created_at']) ? $reply['created_at'] : '';
-                                    @endphp
-                                    <div class="reply-item" id="comment-{{ $replyId }}">
-                                        <div class="comment-header">
-                                            <div class="comment-user">
-                                                <div class="comment-avatar reply-avatar">{{ mb_substr($replyEmployeeName, 0, 1, 'UTF-8') }}</div>
-                                                <div>
-                                                    <strong>{{ $replyEmployeeName }}</strong>
-                                                    <span class="badge bg-secondary ms-1">رد</span>
+                                        <div class="comment-item" id="comment-{{ $commentId }}">
+                                            <div class="comment-header">
+                                                <div class="comment-user">
+                                                    <div class="comment-avatar">{{ mb_substr($employeeName, 0, 1, 'UTF-8') }}</div>
+                                                    <div>
+                                                        <strong>{{ $employeeName }}</strong>
+                                                        @if(count($replies) > 0)
+                                                            <span class="badge bg-info ms-1">
+                                                                <i class="fas fa-reply"></i> {{ count($replies) }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                                <div class="comment-actions">
+                                                    <small class="text-muted">
+                                                        {{ !empty($createdAt) ? \Carbon\Carbon::parse($createdAt)->diffForHumans() : '' }}
+                                                    </small>
+                                                    @if($employeeId == $currentUserIdC && count($replies) == 0)
+                                                        <button class="btn btn-sm btn-outline-danger"
+                                                                onclick="deleteComment({{ $commentId }})">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    @endif
                                                 </div>
                                             </div>
-                                            <div class="comment-actions">
-                                                <small class="text-muted">{{ !empty($replyCreatedAt) ? \Carbon\Carbon::parse($replyCreatedAt)->diffForHumans() : '' }}</small>
-                                                @if($replyEmployeeId == $currentUserId)
-                                                <button class="btn btn-sm btn-outline-danger" onclick="deleteComment({{ $replyId }})">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                                @endif
+                                            <p class="comment-text">{{ $commentText }}</p>
+                                            <button class="btn btn-sm btn-outline-primary reply-btn"
+                                                    onclick="showReplyForm({{ $commentId }}, '{{ addslashes($employeeName) }}')">
+                                                <i class="fas fa-reply"></i> رد
+                                            </button>
+                                            <div class="reply-form-container" id="reply-form-{{ $commentId }}" style="display:none;">
+                                                <form onsubmit="submitReply(event, {{ $taskId }}, {{ $commentId }})">
+                                                    @csrf
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control"
+                                                               placeholder="أضف رداً على {{ $employeeName }}..." required>
+                                                        <button class="btn btn-primary" type="submit">
+                                                            <i class="fas fa-paper-plane"></i>
+                                                        </button>
+                                                        <button class="btn btn-secondary" type="button"
+                                                                onclick="hideReplyForm({{ $commentId }})">إلغاء</button>
+                                                    </div>
+                                                </form>
                                             </div>
+
+
+                                            @if(count($replies) > 0)
+                                                <div class="replies-container">
+                                                    @foreach($replies as $reply)
+                                                        @if(is_array($reply))
+                                                            @php
+                                                                $replyId           = $reply['comment_id'] ?? 0;
+                                                                $replyEmployeeName = $reply['employee_name'] ?? '';
+                                                                $replyEmployeeId   = $reply['employee_id'] ?? 0;
+                                                                $replyText         = $reply['comment'] ?? '';
+                                                                $replyCreatedAt    = $reply['created_at'] ?? '';
+                                                            @endphp
+                                                            <div class="reply-item" id="comment-{{ $replyId }}">
+                                                                <div class="comment-header">
+                                                                    <div class="comment-user">
+                                                                        <div class="comment-avatar reply-avatar">
+                                                                            {{ mb_substr($replyEmployeeName, 0, 1, 'UTF-8') }}
+                                                                        </div>
+                                                                        <div>
+                                                                            <strong>{{ $replyEmployeeName }}</strong>
+                                                                            <span class="badge bg-secondary ms-1">رد</span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="comment-actions">
+                                                                        <small class="text-muted">
+                                                                            {{ !empty($replyCreatedAt) ? \Carbon\Carbon::parse($replyCreatedAt)->diffForHumans() : '' }}
+                                                                        </small>
+                                                                        @if($replyEmployeeId == $currentUserIdC)
+                                                                            <button class="btn btn-sm btn-outline-danger"
+                                                                                    onclick="deleteComment({{ $replyId }})">
+                                                                                <i class="fas fa-trash"></i>
+                                                                            </button>
+                                                                        @endif
+                                                                    </div>
+                                                                </div>
+                                                                <p class="comment-text">{{ $replyText }}</p>
+                                                            </div>
+                                                        @endif
+                                                    @endforeach
+                                                </div>
+                                            @endif
                                         </div>
-                                        <p class="comment-text">{{ $replyText }}</p>
-                                    </div>
                                     @endif
-                                    @endforeach
-                                </div>
-                                @endif
-                            </div>
-                            @endif
-                            @endforeach
+                                @endforeach
                             @endif
                         </div>
 
@@ -406,7 +550,8 @@
                             <form id="commentForm" onsubmit="submitComment(event, {{ $taskId }})">
                                 @csrf
                                 <div class="input-group">
-                                    <input type="text" id="commentInput" class="form-control" placeholder="أضف تعليقاً..." required>
+                                    <input type="text" id="commentInput" class="form-control"
+                                           placeholder="أضف تعليقاً..." required>
                                     <button class="btn btn-primary" type="submit">
                                         <i class="fas fa-paper-plane"></i> إرسال
                                     </button>
@@ -419,76 +564,82 @@
         </div>
 
 
-        {{-- ============ الشريط الجانبي (يسار) ============ --}}
         <div class="col-lg-4">
-            {{-- بطاقة التنبؤ --}}
-            <div class="sidebar-card-header">
-    <h6 class="mb-0">
-        <i class="fas fa-brain text-primary me-1"></i>
-        التنبؤ الذكي
-    </h6>
-    <button class="btn btn-sm btn-primary" onclick="runPrediction()" id="predictBtn">
-        <i class="fas fa-magic"></i> تحليل شامل
-    </button>
-</div>
-
+            <div class="sidebar-card mb-4">
+                <div class="sidebar-card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-brain text-primary me-1"></i>
+                        التنبؤ الذكي
+                    </h6>
+                    @if($isManager)
+                        <button class="btn btn-sm btn-primary" onclick="runPrediction()" id="predictBtn">
+                            <i class="fas fa-magic"></i>
+                        </button>
+                    @endif
+                </div>
                 <div class="sidebar-card-body" id="predictionContent">
                     @if(!empty($prediction))
-                    @php
-                        $probPercent = $prediction['probability_percent'] ?? 0;
-                        $probColor = $probPercent >= 75 ? 'danger' : ($probPercent >= 50 ? 'warning' : ($probPercent >= 25 ? 'info' : 'success'));
-                        $probLabel = $probPercent >= 75 ? 'مخاطر عالية' : ($probPercent >= 50 ? 'مخاطر متوسطة' : ($probPercent >= 25 ? 'مخاطر منخفضة' : 'طبيعي'));
-                    @endphp
-                    <div class="text-center mb-3">
-                        <div class="prediction-circle border-{{ $probColor }}" style="width:110px;height:110px;border-width:5px;">
-                            <div class="prediction-value text-{{ $probColor }}" style="font-size:28px;">
-                                {{ $probPercent }}%
+                        @php
+                            $probPercent = $prediction['probability_percent'] ?? 0;
+                            $probColor   = $probPercent >= 75 ? 'danger' : ($probPercent >= 50 ? 'warning' : ($probPercent >= 25 ? 'info' : 'success'));
+                            $probLabel   = $probPercent >= 75 ? 'مخاطر عالية' : ($probPercent >= 50 ? 'مخاطر متوسطة' : ($probPercent >= 25 ? 'مخاطر منخفضة' : 'طبيعي'));
+                        @endphp
+                        <div class="text-center mb-3">
+                            <div class="prediction-circle border-{{ $probColor }}"
+                                 style="width:110px;height:110px;border-width:5px;">
+                                <div class="prediction-value text-{{ $probColor }}" style="font-size:28px;">
+                                    {{ $probPercent }}%
+                                </div>
+                                <small class="text-muted" style="font-size:10px;">احتمال التأخير</small>
                             </div>
-                            <small class="text-muted" style="font-size:10px;">احتمال التأخير</small>
+                            <span class="badge bg-{{ $probColor }} mt-2">{{ $probLabel }}</span>
                         </div>
-                        <span class="badge bg-{{ $probColor }} mt-2">{{ $probLabel }}</span>
-                    </div>
 
 
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <div class="prediction-stat">
-                                <small class="text-muted d-block">الثقة</small>
-                                <strong>{{ round(($prediction['confidence'] ?? 0) * 100, 1) }}%</strong>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <div class="prediction-stat">
+                                    <small class="text-muted d-block">الثقة</small>
+                                    <strong>{{ round(($prediction['confidence'] ?? 0) * 100, 1) }}%</strong>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="prediction-stat">
+                                    <small class="text-muted d-block">آخر تحديث</small>
+                                    <strong style="font-size:11px;">
+                                        {{ isset($prediction['created_at']) ? \Carbon\Carbon::parse($prediction['created_at'])->diffForHumans() : 'غير محدد' }}
+                                    </strong>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-6">
-                            <div class="prediction-stat">
-                                <small class="text-muted d-block">آخر تحديث</small>
-                                <strong style="font-size:11px;">{{ isset($prediction['created_at']) ? \Carbon\Carbon::parse($prediction['created_at'])->diffForHumans() : 'غير محدد' }}</strong>
+
+
+                        @if(!empty($prediction['top_factors']))
+                            <div>
+                                <small class="text-muted d-block mb-2">العوامل الرئيسية:</small>
+                                @foreach(array_slice($prediction['top_factors'], 0, 3) as $factor)
+                                    <div class="factor-item">
+                                        <i class="fas fa-exclamation-circle text-warning"></i>
+                                        <span style="flex:1;font-size:12px;">{{ $factor['feature'] ?? '' }}</span>
+                                    </div>
+                                @endforeach
                             </div>
-                        </div>
-                    </div>
-
-
-                    @if(!empty($prediction['top_factors']))
-                    <div>
-                        <small class="text-muted d-block mb-2">العوامل الرئيسية:</small>
-                        @foreach(array_slice($prediction['top_factors'], 0, 3) as $factor)
-                        <div class="factor-item">
-                            <i class="fas fa-exclamation-circle text-warning"></i>
-                            <span style="flex:1;font-size:12px;">{{ $factor['feature'] ?? '' }}</span>
-                        </div>
-                        @endforeach
-                    </div>
-                    @endif
+                        @endif
                     @else
-                    <div class="text-center py-3 text-muted">
-                        <i class="fas fa-brain fa-2x d-block mb-2 opacity-25"></i>
-                        <p class="mb-1 small">لا يوجد تنبؤ بعد</p>
-                        <small style="font-size:11px;">اضغط <i class="fas fa-magic"></i> لتحليل المهمة</small>
-                    </div>
+                        <div class="text-center py-3 text-muted">
+                            <i class="fas fa-brain fa-2x d-block mb-2 opacity-25"></i>
+                            <p class="mb-1 small">لا يوجد تنبؤ بعد</p>
+                            @if($isManager)
+                                <small style="font-size:11px;">
+                                    اضغط <i class="fas fa-magic"></i> لتحليل المهمة
+                                </small>
+                            @endif
+                        </div>
                     @endif
                 </div>
             </div>
 
 
-            {{-- بطاقة المخاطر --}}
             <div class="sidebar-card mb-4">
                 <div class="sidebar-card-header">
                     <h6 class="mb-0">
@@ -499,139 +650,139 @@
                 </div>
                 <div class="sidebar-card-body">
                     @if(empty($risks))
-                    <div class="text-center py-3 text-muted">
-                        <i class="fas fa-shield-alt fa-2x d-block mb-2 opacity-25"></i>
-                        <p class="mb-1 small">لا توجد مخاطر</p>
-                        <small style="font-size:11px;">شغّل التنبؤ لكشف المخاطر</small>
-                    </div>
+                        <div class="text-center py-3 text-muted">
+                            <i class="fas fa-shield-alt fa-2x d-block mb-2 opacity-25"></i>
+                            <p class="mb-1 small">لا توجد مخاطر</p>
+                            @if($isManager)
+                                <small style="font-size:11px;">شغّل التنبؤ لكشف المخاطر</small>
+                            @endif
+                        </div>
                     @else
-                    @foreach($risks as $risk)
-                    @php
-                        $riskId = $risk['risk_id'] ?? 0;
-                        $level = $risk['risk_level'] ?? [];
-                        $levelColor = $level['color_hex'] ?? '#6c757d';
-                        $status = $risk['status'] ?? [];
-                        $statusColor = $status['color_hex'] ?? '#6c757d';
-                        $mitigations = $risk['mitigations'] ?? [];
-                        $aiRecs = $risk['ai_recommendations'] ?? [];
-                        $score = (int) ($risk['risk_score'] ?? 0);
-                        $scoreColor = $score >= 60 ? 'danger' : ($score >= 40 ? 'warning' : 'success');
-                    @endphp
-                    <div class="risk-sidebar-item mb-3" id="risk-{{ $riskId }}">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div class="flex-grow-1">
-                                <span class="badge mb-1" style="background-color: {{ $levelColor }}; color: #fff; font-size:10px;">
-                                    {{ $level['name_ar'] ?? 'غير محدد' }}
-                                </span>
-                                <div class="risk-title">{{ $risk['name'] ?? '' }}</div>
-                            </div>
-                        </div>
-
-
-                        <div class="risk-stats-row">
-                            <div class="risk-stat-box">
-                                <small>احتمال</small>
-                                <strong>{{ $risk['probability'] ?? 0 }}</strong>
-                            </div>
-                            <div class="risk-stat-box">
-                                <small>تأثير</small>
-                                <strong>{{ $risk['impact'] ?? 0 }}</strong>
-                            </div>
-                            <div class="risk-stat-box">
-                                <small>درجة</small>
-                                <strong class="text-{{ $scoreColor }}">{{ $score }}</strong>
-                            </div>
-                        </div>
-
-
-                        <div class="mt-2">
-                            <span class="badge" style="background-color: {{ $statusColor }}; color: #fff; font-size:10px;">
-                                {{ $status['name_ar'] ?? 'غير محدد' }}
-                            </span>
-                        </div>
-
-
-                        {{-- التوصيات --}}
-                        <div class="mt-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <small class="text-muted">
-                                    <i class="fas fa-robot"></i> التوصيات
-                                    <span class="badge bg-secondary" style="font-size:9px;">{{ count($aiRecs) }}</span>
-                                </small>
-                                <button class="btn btn-xs btn-outline-primary"
-                                        onclick="generateRecommendations({{ $riskId }})"
-                                        id="genRecsBtn-{{ $riskId }}"
-                                        style="padding:2px 6px;font-size:10px;">
-                                    <i class="fas fa-magic"></i> توليد
-                                </button>
-                            </div>
-                            <div class="ai-recs-container-sidebar" id="aiRecs-{{ $riskId }}">
-                                @if(!empty($aiRecs))
-                                @foreach(array_slice($aiRecs, 0, 3) as $rec)
-                                <div class="ai-rec-item">
-                                    <div style="font-size:11px;font-weight:500;">{{ $rec['text'] ?? '' }}</div>
-                                </div>
-                                @endforeach
-                                @else
-                                <div class="text-muted text-center py-1" style="font-size:10px;">لا توجد توصيات</div>
-                                @endif
-                            </div>
-                        </div>
-
-
-                        {{-- الإجراءات المصغرة --}}
-                        <div class="mt-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <small class="text-muted">
-                                    <i class="fas fa-tasks"></i> الإجراءات
-                                    <span class="badge bg-secondary" style="font-size:9px;">{{ count($mitigations) }}</span>
-                                </small>
-                                <button class="btn btn-xs btn-outline-info"
-                                        onclick="showAddMitigation({{ $riskId }})"
-                                        style="padding:2px 6px;font-size:10px;">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                            </div>
-                            <div class="mitigations-container-sidebar">
-                                @if(!empty($mitigations))
-                                @foreach($mitigations as $mit)
-                                @php
-                                    $mStatus = $mit['status'] ?? [];
-                                    $mStatusColor = $mStatus['color_hex'] ?? '#6c757d';
-                                @endphp
-                                <div class="mitigation-item-sidebar">
-                                    <div style="font-size:11px;">{{ $mit['action'] ?? '' }}</div>
-                                    @if(!empty($mit['assigned_to']['full_name']))
-                                    <div class="text-muted" style="font-size:10px;">
-                                        <i class="fas fa-user"></i> {{ $mit['assigned_to']['full_name'] }}
-                                    </div>
-                                    @endif
-                                    <div class="d-flex justify-content-between align-items-center gap-1 mt-1">
-                                        <select class="form-select form-select-sm"
-                                                data-mitigation-id="{{ $mit['mitigation_id'] }}"
-                                                onchange="updateMitigationStatus(this)"
-                                                style="font-size:10px;padding:2px 4px;">
-                                            <option value="">-- تغيير --</option>
-                                            @foreach(($riskOptions['mitigation_statuses'] ?? []) as $st)
-                                            <option value="{{ $st['status_id'] }}"
-                                                    {{ ($mStatus['status_id'] ?? 0) == $st['status_id'] ? 'selected' : '' }}>
-                                                {{ $st['name_ar'] }}
-                                            </option>
-                                            @endforeach
-                                        </select>
-                                        <span class="badge" style="background-color: {{ $mStatusColor }}; color: #fff; font-size:9px;white-space:nowrap;">
-                                            {{ $mStatus['name_ar'] ?? '' }}
+                        @foreach($risks as $risk)
+                            @php
+                                $riskId      = $risk['risk_id'] ?? 0;
+                                $level       = $risk['risk_level'] ?? [];
+                                $levelColor  = $level['color_hex'] ?? '#6c757d';
+                                $status      = $risk['status'] ?? [];
+                                $statusColor = $status['color_hex'] ?? '#6c757d';
+                                $mitigations = $risk['mitigations'] ?? [];
+                                $aiRecs      = $risk['ai_recommendations'] ?? [];
+                                $score       = (int) ($risk['risk_score'] ?? 0);
+                                $scoreColor  = $score >= 60 ? 'danger' : ($score >= 40 ? 'warning' : 'success');
+                            @endphp
+                            <div class="risk-sidebar-item mb-3" id="risk-{{ $riskId }}">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="flex-grow-1">
+                                        <span class="badge mb-1"
+                                              style="background-color: {{ $levelColor }}; color: #fff; font-size:10px;">
+                                            {{ $level['name_ar'] ?? 'غير محدد' }}
                                         </span>
+                                        <div class="risk-title">{{ $risk['name'] ?? '' }}</div>
                                     </div>
                                 </div>
-                                @endforeach
-                                @else
-                                <div class="text-muted text-center py-1" style="font-size:10px;">لا توجد إجراءات</div>
-                                @endif
+
+
+                                <div class="risk-stats-row">
+                                    <div class="risk-stat-box">
+                                        <small>احتمال</small>
+                                        <strong>{{ $risk['probability'] ?? 0 }}</strong>
+                                    </div>
+                                    <div class="risk-stat-box">
+                                        <small>تأثير</small>
+                                        <strong>{{ $risk['impact'] ?? 0 }}</strong>
+                                    </div>
+                                    <div class="risk-stat-box">
+                                        <small>درجة</small>
+                                        <strong class="text-{{ $scoreColor }}">{{ $score }}</strong>
+                                    </div>
+                                </div>
+
+
+                                <div class="mt-2">
+                                    <span class="badge"
+                                          style="background-color: {{ $statusColor }}; color: #fff; font-size:10px;">
+                                        {{ $status['name_ar'] ?? 'غير محدد' }}
+                                    </span>
+                                </div>
+
+
+                                <div class="mt-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="text-muted">
+                                            <i class="fas fa-robot"></i> التوصيات
+                                            <span class="badge bg-secondary" style="font-size:9px;">{{ count($aiRecs) }}</span>
+                                        </small>
+                                        @if($isManager)
+                                            <button class="btn btn-xs btn-outline-primary"
+                                                    onclick="generateRecommendations({{ $riskId }})"
+                                                    id="genRecsBtn-{{ $riskId }}"
+                                                    style="padding:2px 6px;font-size:10px;">
+                                                <i class="fas fa-magic"></i> توليد
+                                            </button>
+                                        @endif
+                                    </div>
+                                    <div class="ai-recs-container-sidebar" id="aiRecs-{{ $riskId }}">
+                                        @if(!empty($aiRecs))
+                                            @foreach($aiRecs as $rec)
+                                                <div class="ai-rec-item">
+                                                    <div style="font-size:11px;font-weight:500;">{{ $rec['text'] ?? '' }}</div>
+                                                </div>
+                                            @endforeach
+                                        @else
+                                            <div class="text-muted text-center py-1" style="font-size:10px;">
+                                                لا توجد توصيات
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+
+
+                                <div class="mt-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <small class="text-muted">
+                                            <i class="fas fa-tasks"></i> الإجراءات
+                                            <span class="badge bg-secondary" style="font-size:9px;">{{ count($mitigations) }}</span>
+                                        </small>
+                                        @if($isManager)
+                                            <button class="btn btn-xs btn-outline-info"
+                                                    onclick="showAddMitigation({{ $riskId }})"
+                                                    style="padding:2px 6px;font-size:10px;">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    <div class="mitigations-container-sidebar">
+                                        @if(!empty($mitigations))
+                                            @foreach($mitigations as $mit)
+                                                @php
+                                                    $mStatus      = $mit['status'] ?? [];
+                                                    $mStatusColor = $mStatus['color_hex'] ?? '#6c757d';
+                                                @endphp
+                                                <div class="mitigation-item-sidebar">
+                                                    <div style="font-size:11px;">{{ $mit['action'] ?? '' }}</div>
+                                                    @if(!empty($mit['assigned_to']['full_name']))
+                                                        <div class="text-muted" style="font-size:10px;">
+                                                            <i class="fas fa-user"></i>
+                                                            {{ $mit['assigned_to']['full_name'] }}
+                                                        </div>
+                                                    @endif
+                                                    <div class="mt-1">
+                                                        <span class="badge"
+                                                              style="background-color: {{ $mStatusColor }}; color: #fff; font-size:9px;">
+                                                            {{ $mStatus['name_ar'] ?? '' }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        @else
+                                            <div class="text-muted text-center py-1" style="font-size:10px;">
+                                                لا توجد إجراءات
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                    @endforeach
+                        @endforeach
                     @endif
                 </div>
             </div>
@@ -641,7 +792,6 @@
 </div>
 
 
-{{-- Modal إضافة إجراء (مع اختيار الخطر) --}}
 <div class="modal fade" id="addMitigationModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -655,9 +805,9 @@
                     <select id="mitigationRiskId" class="form-control">
                         <option value="">اختر الخطر</option>
                         @foreach(($risks ?? []) as $riskItem)
-                        <option value="{{ $riskItem['risk_id'] ?? 0 }}">
-                            {{ $riskItem['name'] ?? '' }} (درجة: {{ $riskItem['risk_score'] ?? 0 }})
-                        </option>
+                            <option value="{{ $riskItem['risk_id'] ?? 0 }}">
+                                {{ $riskItem['name'] ?? '' }} (درجة: {{ $riskItem['risk_score'] ?? 0 }})
+                            </option>
                         @endforeach
                     </select>
                 </div>
@@ -674,7 +824,7 @@
                     <select id="mitigationAssignedTo" class="form-control">
                         <option value="">اختر موظفاً</option>
                         @foreach(($employees ?? []) as $emp)
-                        <option value="{{ $emp['employee_id'] ?? 0 }}">{{ $emp['full_name'] ?? '' }}</option>
+                            <option value="{{ $emp['employee_id'] ?? 0 }}">{{ $emp['full_name'] ?? '' }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -685,14 +835,11 @@
                         <label class="form-label fw-bold">تاريخ الاستحقاق</label>
                         <input type="date" id="mitigationDueDate" class="form-control">
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">الحالة</label>
-                        <select id="mitigationStatus" class="form-control">
-                            <option value="">اختر الحالة</option>
-                            @foreach(($riskOptions['mitigation_statuses'] ?? []) as $st)
-                            <option value="{{ $st['status_id'] }}">{{ $st['name_ar'] }}</option>
-                            @endforeach
-                        </select>
+                    <div class="col-md-6 mb-3 d-flex align-items-end">
+                        <div class="alert alert-info py-2 px-3 mb-0 small w-100">
+                            <i class="fas fa-info-circle"></i>
+                            الحالة الافتراضية: <strong>قيد الانتظار</strong>
+                        </div>
                     </div>
                 </div>
 
@@ -713,7 +860,6 @@
 </div>
 
 
-{{-- Modal تأكيد الحذف --}}
 <div class="modal fade" id="confirmDeleteModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
@@ -738,7 +884,6 @@
 
 @push('styles')
 <style>
-    /* ==================== البطاقة الرئيسية ==================== */
     .task-detail-card {
         background: #fff;
         border-radius: 16px;
@@ -775,17 +920,17 @@
     }
 
 
-    .status-1 { background: #e9ecef; color: #495057; }
-    .status-2 { background: #cfe2ff; color: #0d6efd; }
-    .status-3 { background: #d1e7dd; color: #198754; }
-    .status-4 { background: #f8d7da; color: #dc3545; }
-    .status-5 { background: #fff3cd; color: #ffc107; }
-    .status-6 { background: #cfe2ff; color: #0d6efd; }
-    .status-7 { background: #f8d7da; color: #dc3545; }
-    .status-8 { background: #e2d9f5; color: #6f42c1; }
+    .status-1  { background: #e9ecef; color: #495057; }
+    .status-2  { background: #cfe2ff; color: #0d6efd; }
+    .status-3  { background: #d1e7dd; color: #198754; }
+    .status-4  { background: #f8d7da; color: #dc3545; }
+    .status-5  { background: #fff3cd; color: #ffc107; }
+    .status-6  { background: #cfe2ff; color: #0d6efd; }
+    .status-7  { background: #f8d7da; color: #dc3545; }
+    .status-8  { background: #e2d9f5; color: #6f42c1; }
+    .status-16 { background: #e9ecef; color: #6c757d; }
     .status-19 { background: #d1e7dd; color: #198754; }
     .status-26 { background: #cfe2ff; color: #0d6efd; }
-    .status-16 { background: #e9ecef; color: #6c757d; }
 
 
     .task-description {
@@ -797,6 +942,64 @@
         border-radius: 8px;
         border-left: 4px solid #007bff;
     }
+
+
+    .task-parent-info .parent-info-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        height: 100%;
+    }
+
+
+    .task-parent-info .parent-info-item i { font-size: 20px; }
+
+
+    .participants-block {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 8px;
+    }
+
+
+    .participants-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+
+    .participant-chip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #fff;
+        border: 1px solid #e9ecef;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+    }
+
+
+    .participant-avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6c5ce7, #0984e3);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+
+    .participant-name { font-weight: 600; color: #1a2332; }
+    .participant-role { display: flex; align-items: center; }
 
 
     .task-meta-grid {
@@ -817,17 +1020,19 @@
         padding: 16px;
         border-radius: 8px;
     }
+
+
     .progress-label { font-size: 13px; font-weight: 500; color: #495057; }
     .progress-value { font-size: 14px; font-weight: 600; color: #007bff; }
     .progress { height: 8px; border-radius: 4px; background: #e9ecef; }
-    .progress-bar.bg-gradient {
-        background: linear-gradient(90deg, #007bff, #20c997);
+    .progress-bar.dirigo-progress-bar {
+        background: linear-gradient(90deg, #007bff, #20c997) !important;
         border-radius: 4px;
         transition: width 0.6s ease;
     }
 
 
-    /* ==================== التبويبات ==================== */
+
     .activity-section {
         background: #fff;
         border-radius: 16px;
@@ -860,10 +1065,7 @@
     }
 
 
-    .nav-tabs .nav-link:hover {
-        background: #f8f9fa;
-        color: #1a2332;
-    }
+    .nav-tabs .nav-link:hover { background: #f8f9fa; color: #1a2332; }
 
 
     .nav-tabs .nav-link.active {
@@ -874,16 +1076,12 @@
     }
 
 
-    .nav-tabs .nav-link .badge {
-        font-size: 11px;
-        padding: 2px 8px;
-    }
+    .nav-tabs .nav-link .badge { font-size: 11px; padding: 2px 8px; }
 
 
     .tab-content { padding: 24px; }
 
 
-    /* ==================== سجل التقدم ==================== */
     .timeline {
         position: relative;
         padding-left: 28px;
@@ -903,13 +1101,7 @@
     }
 
 
-    .timeline-item {
-        position: relative;
-        margin-bottom: 20px;
-        padding-left: 16px;
-    }
-
-
+    .timeline-item { position: relative; margin-bottom: 20px; padding-left: 16px; }
     .timeline-item:last-child { margin-bottom: 0; }
 
 
@@ -926,21 +1118,12 @@
     }
 
 
-    .timeline-content {
-        background: #f8f9fa;
-        padding: 12px 16px;
-        border-radius: 8px;
-    }
+    .timeline-content { background: #f8f9fa; padding: 12px 16px; border-radius: 8px; }
 
 
-    .timeline-text {
-        margin: 4px 0 0 0;
-        font-size: 14px;
-        color: #495057;
-    }
+    .timeline-text { margin: 4px 0 0 0; font-size: 14px; color: #495057; }
 
 
-    /* ==================== جدول الإجراءات ==================== */
     .mitigations-table-container {
         max-height: 550px;
         overflow-y: auto;
@@ -949,10 +1132,7 @@
     }
 
 
-    .mitigations-table {
-        margin-bottom: 0;
-        font-size: 13px;
-    }
+    .mitigations-table { margin-bottom: 0; font-size: 13px; }
 
 
     .mitigations-table thead {
@@ -973,48 +1153,17 @@
     }
 
 
-    .mitigations-table td {
-        padding: 10px 8px;
-        vertical-align: middle;
-    }
+    .mitigations-table td { padding: 10px 8px; vertical-align: middle; }
 
 
-    .mitigations-table tr.mitigation-completed {
-        background: #f0f9f4;
-    }
+    .mitigations-table tr.mitigation-completed { background: #f0f9f4; }
+    .mitigations-table tr.mitigation-completed td { opacity: 0.75; }
 
 
-    .mitigations-table tr.mitigation-completed td {
-        opacity: 0.75;
-    }
+    .mitigation-action-text { font-weight: 500; color: #1a2332; line-height: 1.4; }
 
 
-    .mitigation-action-text {
-        font-weight: 500;
-        color: #1a2332;
-        line-height: 1.4;
-    }
-
-
-    .risk-ref-link {
-        text-decoration: none;
-        display: inline-block;
-        line-height: 1.3;
-    }
-
-
-    .risk-ref-link:hover .risk-ref-name {
-        color: #007bff;
-        text-decoration: underline;
-    }
-
-
-    .risk-ref-name {
-        font-size: 11px;
-        color: #2d3748;
-        margin-top: 3px;
-        font-weight: 500;
-    }
+    .risk-ref-name { font-size: 11px; color: #2d3748; margin-top: 3px; font-weight: 500; }
 
 
     .assignee-avatar {
@@ -1032,26 +1181,10 @@
     }
 
 
-    .mitigation-status-select {
-        font-size: 11px;
-        padding: 3px 6px;
-    }
+    .comments-section { max-height: 500px; overflow-y: auto; margin-bottom: 16px; }
 
 
-    /* ==================== التعليقات ==================== */
-    .comments-section {
-        max-height: 500px;
-        overflow-y: auto;
-        margin-bottom: 16px;
-    }
-
-
-    .comment-item {
-        padding: 16px 0;
-        border-bottom: 1px solid #f1f3f5;
-    }
-
-
+    .comment-item { padding: 16px 0; border-bottom: 1px solid #f1f3f5; }
     .comment-item:last-child { border-bottom: none; }
 
 
@@ -1065,11 +1198,7 @@
     }
 
 
-    .comment-user {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
+    .comment-user { display: flex; align-items: center; gap: 10px; }
 
 
     .comment-avatar {
@@ -1095,11 +1224,7 @@
     }
 
 
-    .comment-actions {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
+    .comment-actions { display: flex; align-items: center; gap: 8px; }
 
 
     .comment-text {
@@ -1110,10 +1235,7 @@
     }
 
 
-    .reply-btn {
-        margin: 4px 0 0 42px;
-        font-size: 12px;
-    }
+    .reply-btn { margin: 4px 0 0 42px; font-size: 12px; }
 
 
     .reply-form-container { margin: 8px 0 0 42px; }
@@ -1126,19 +1248,11 @@
     }
 
 
-    .reply-item {
-        padding: 12px 0;
-        border-bottom: 1px solid #f1f3f5;
-    }
-
-
+    .reply-item { padding: 12px 0; border-bottom: 1px solid #f1f3f5; }
     .reply-item:last-child { border-bottom: none; }
 
 
-    .comment-form {
-        padding-top: 16px;
-        border-top: 2px solid #f1f3f5;
-    }
+    .comment-form { padding-top: 16px; border-top: 2px solid #f1f3f5; }
 
 
     .comment-form .input-group,
@@ -1158,30 +1272,16 @@
 
 
     .comment-form .btn-primary,
-    .reply-form-container .btn-primary {
-        border-radius: 0;
-        padding: 10px 24px;
-    }
+    .reply-form-container .btn-primary { border-radius: 0; padding: 10px 24px; }
 
 
     .reply-form-container .btn-secondary { border-radius: 0 8px 8px 0; }
 
 
-    .empty-state {
-        text-align: center;
-        padding: 40px 20px;
-        color: #6c757d;
-    }
+    .empty-state { text-align: center; padding: 40px 20px; color: #6c757d; }
+    .empty-state i { display: block; margin-bottom: 12px; opacity: 0.5; }
 
 
-    .empty-state i {
-        display: block;
-        margin-bottom: 12px;
-        opacity: 0.5;
-    }
-
-
-    /* ==================== الشريط الجانبي ==================== */
     .sidebar-card {
         background: #fff;
         border-radius: 14px;
@@ -1201,11 +1301,7 @@
     }
 
 
-    .sidebar-card-header h6 {
-        font-size: 14px;
-        font-weight: 600;
-        color: #1a2332;
-    }
+    .sidebar-card-header h6 { font-size: 14px; font-weight: 600; color: #1a2332; }
 
 
     .sidebar-card-body { padding: 18px; }
@@ -1223,11 +1319,7 @@
     }
 
 
-    .prediction-value {
-        font-weight: 700;
-        line-height: 1;
-        margin-bottom: 4px;
-    }
+    .prediction-value { font-weight: 700; line-height: 1; margin-bottom: 4px; }
 
 
     .prediction-stat {
@@ -1241,19 +1333,10 @@
     .prediction-stat strong { font-size: 13px; }
 
 
-    .factor-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px 0;
-        font-size: 12px;
-    }
-
-
+    .factor-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; }
     .factor-item i { font-size: 11px; }
 
 
-    /* ==================== المخاطر في الشريط الجانبي ==================== */
     .risk-sidebar-item {
         padding: 12px;
         background: #fafbfc;
@@ -1263,31 +1346,10 @@
     }
 
 
-    .risk-sidebar-item:hover {
-        background: #f8f9fa;
-        border-color: #cfe2ff;
-    }
+    .risk-sidebar-item:hover { background: #f8f9fa; border-color: #cfe2ff; }
 
 
-    .risk-sidebar-item.highlighted {
-        animation: pulse-highlight 2s ease;
-        border-color: #007bff;
-        background: #e7f1ff;
-    }
-
-
-    @keyframes pulse-highlight {
-        0%, 100% { background: #e7f1ff; }
-        50% { background: #cfe2ff; }
-    }
-
-
-    .risk-title {
-        font-size: 13px;
-        font-weight: 600;
-        color: #1a2332;
-        line-height: 1.3;
-    }
+    .risk-title { font-size: 13px; font-weight: 600; color: #1a2332; line-height: 1.3; }
 
 
     .risk-stats-row {
@@ -1307,23 +1369,13 @@
     }
 
 
-    .risk-stat-box small {
-        display: block;
-        font-size: 9px;
-        color: #6c757d;
-    }
-
-
-    .risk-stat-box strong {
-        font-size: 14px;
-        display: block;
-        line-height: 1.2;
-    }
+    .risk-stat-box small { display: block; font-size: 9px; color: #6c757d; }
+    .risk-stat-box strong { font-size: 14px; display: block; line-height: 1.2; }
 
 
     .ai-recs-container-sidebar,
     .mitigations-container-sidebar {
-        max-height: 160px;
+        max-height: 240px;
         overflow-y: auto;
     }
 
@@ -1346,11 +1398,7 @@
     }
 
 
-    .btn-xs {
-        padding: 2px 6px;
-        font-size: 10px;
-        border-radius: 4px;
-    }
+    .btn-xs { padding: 2px 6px; font-size: 10px; border-radius: 4px; }
 
 
     .ai-recs-container-sidebar::-webkit-scrollbar,
@@ -1382,40 +1430,17 @@
     }
 
 
-    /* ==================== Responsive ==================== */
     @media (max-width: 992px) {
-        .task-meta-grid {
-            grid-template-columns: 1fr 1fr;
-        }
+        .task-meta-grid { grid-template-columns: 1fr 1fr; }
     }
 
 
     @media (max-width: 576px) {
-        .task-meta-grid {
-            grid-template-columns: 1fr;
-        }
-
-
-        .nav-tabs .nav-link {
-            padding: 10px 14px;
-            font-size: 13px;
-        }
-
-
-        .comment-text {
-            margin-left: 0;
-        }
-
-
-        .reply-btn,
-        .reply-form-container {
-            margin-left: 0;
-        }
-
-
-        .replies-container {
-            padding-left: 20px;
-        }
+        .task-meta-grid { grid-template-columns: 1fr; }
+        .nav-tabs .nav-link { padding: 10px 14px; font-size: 13px; }
+        .comment-text { margin-left: 0; }
+        .reply-btn, .reply-form-container { margin-left: 0; }
+        .replies-container { padding-left: 20px; }
     }
 </style>
 @endpush
@@ -1427,11 +1452,37 @@ var currentTaskId = {{ $taskId ?? 0 }};
 var currentMitigationIdToDelete = null;
 
 
+function sendTaskToReview(taskId) {
+    if (!confirm('هل أنت متأكد من إرسال المهمة إلى مرحلة المراجعة؟')) return;
+
+
+    var token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+
+    fetch('/operational/task/' + taskId + '/status', {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': token,
+            'Accept': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ status_id: 8 })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res.success) location.reload();
+        else alert('خطأ: ' + (res.error || res.detail || 'فشل التحديث'));
+    })
+    .catch(function(err) { alert('حدث خطأ: ' + err); });
+}
+
+
 function runPrediction() {
     var btn = document.getElementById('predictBtn');
-    var originalHtml = btn.innerHTML;
+    if (!btn) return;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جارٍ التحليل...';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
 
     var token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -1449,48 +1500,20 @@ function runPrediction() {
     .then(function(r) { return r.json(); })
     .then(function(res) {
         btn.disabled = false;
-        btn.innerHTML = originalHtml;
-
-
-        if (res.success) {
-            var data = res.data || {};
-            var msg = 'اكتمل التحليل:\n';
-            msg += '• احتمال التأخير: ' + Math.round((data.delay_probability || 0) * 100) + '%\n';
-            msg += '• مستوى الخطر: ' + (data.risk_level || 'غير محدد') + '\n';
-
-
-            if (data.is_currently_delayed) {
-                msg += '• المهمة متأخرة: ' + (data.days_overdue || 0) + ' يوم\n';
-            }
-
-
-            if (data.risk_detection && data.risk_detection.detected) {
-                var action = data.risk_detection.action === 'created' ? 'تم إنشاء خطر جديد' : 'تم تحديث الخطر';
-                msg += '• ' + action + '\n';
-            }
-
-
-            if (data.recommendations_result && data.recommendations_result.success) {
-                msg += '• تم توليد التوصيات الذكية';
-            }
-
-
-            alert(msg);
-            location.reload();
-        } else {
-            alert('خطأ: ' + (res.error || 'فشل التحليل'));
-        }
+        btn.innerHTML = '<i class="fas fa-magic"></i>';
+        if (res.success) location.reload();
+        else alert('خطأ: ' + (res.error || 'فشل التنبؤ'));
     })
     .catch(function(err) {
         btn.disabled = false;
-        btn.innerHTML = originalHtml;
+        btn.innerHTML = '<i class="fas fa-magic"></i>';
         alert('حدث خطأ: ' + err);
     });
 }
 
 
 function generateRecommendations(riskId) {
-    var btn = document.getElementById('genRecsBtn-' + riskId);
+    var btn       = document.getElementById('genRecsBtn-' + riskId);
     var container = document.getElementById('aiRecs-' + riskId);
 
 
@@ -1513,11 +1536,8 @@ function generateRecommendations(riskId) {
     .then(function(r) { return r.json(); })
     .then(function(res) {
         btn.disabled = false;
-        if (res.success) {
-            location.reload();
-        } else {
-            alert('خطأ: ' + (res.error || 'فشل التوليد'));
-        }
+        if (res.success) location.reload();
+        else alert('خطأ: ' + (res.error || 'فشل التوليد'));
     })
     .catch(function(err) {
         btn.disabled = false;
@@ -1527,32 +1547,24 @@ function generateRecommendations(riskId) {
 
 
 function showAddMitigation(riskId) {
-    document.getElementById('mitigationRiskId').value = riskId;
+    document.getElementById('mitigationRiskId').value        = riskId;
     document.getElementById('riskSelectorWrapper').style.display = 'none';
-    document.getElementById('mitigationAction').value = '';
-    document.getElementById('mitigationAssignedTo').value = '';
-    document.getElementById('mitigationDueDate').value = '';
-    document.getElementById('mitigationStatus').value = '';
-    document.getElementById('mitigationNotes').value = '';
-
-
-    var modal = new bootstrap.Modal(document.getElementById('addMitigationModal'));
-    modal.show();
+    document.getElementById('mitigationAction').value        = '';
+    document.getElementById('mitigationAssignedTo').value    = '';
+    document.getElementById('mitigationDueDate').value       = '';
+    document.getElementById('mitigationNotes').value         = '';
+    new bootstrap.Modal(document.getElementById('addMitigationModal')).show();
 }
 
 
 function showAddMitigationGeneral() {
-    document.getElementById('mitigationRiskId').value = '';
+    document.getElementById('mitigationRiskId').value        = '';
     document.getElementById('riskSelectorWrapper').style.display = 'block';
-    document.getElementById('mitigationAction').value = '';
-    document.getElementById('mitigationAssignedTo').value = '';
-    document.getElementById('mitigationDueDate').value = '';
-    document.getElementById('mitigationStatus').value = '';
-    document.getElementById('mitigationNotes').value = '';
-
-
-    var modal = new bootstrap.Modal(document.getElementById('addMitigationModal'));
-    modal.show();
+    document.getElementById('mitigationAction').value        = '';
+    document.getElementById('mitigationAssignedTo').value    = '';
+    document.getElementById('mitigationDueDate').value       = '';
+    document.getElementById('mitigationNotes').value         = '';
+    new bootstrap.Modal(document.getElementById('addMitigationModal')).show();
 }
 
 
@@ -1561,27 +1573,19 @@ function saveMitigation() {
     var action = document.getElementById('mitigationAction').value.trim();
 
 
-    if (!riskId) {
-        alert('الرجاء اختيار الخطر المرتبط');
-        return;
-    }
-
-
-    if (!action) {
-        alert('الرجاء إدخال الإجراء');
-        return;
-    }
+    if (!riskId) { alert('الرجاء اختيار الخطر المرتبط'); return; }
+    if (!action) { alert('الرجاء إدخال الإجراء'); return; }
 
 
     var token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
 
     var data = {
-        action: action,
+        action:      action,
         assigned_to: document.getElementById('mitigationAssignedTo').value || null,
-        due_date: document.getElementById('mitigationDueDate').value || null,
-        status_id: document.getElementById('mitigationStatus').value || null,
-        notes: document.getElementById('mitigationNotes').value || null
+        due_date:    document.getElementById('mitigationDueDate').value || null,
+        status_id:   41,
+        notes:       document.getElementById('mitigationNotes').value || null
     };
 
 
@@ -1597,23 +1601,14 @@ function saveMitigation() {
     })
     .then(function(r) { return r.json(); })
     .then(function(res) {
-        if (res.success) {
-            location.reload();
-        } else {
-            alert('خطأ: ' + (res.error || 'فشل الإضافة'));
-        }
+        if (res.success) location.reload();
+        else alert('خطأ: ' + (res.error || 'فشل الإضافة'));
     })
-    .catch(function(err) {
-        alert('حدث خطأ: ' + err);
-    });
+    .catch(function(err) { alert('حدث خطأ: ' + err); });
 }
 
 
-function updateMitigationStatus(selectEl) {
-    var mitigationId = selectEl.getAttribute('data-mitigation-id');
-    var statusId = selectEl.value;
-
-
+function updateMitigationStatus(mitigationId, statusId) {
     if (!statusId) return;
 
 
@@ -1632,22 +1627,16 @@ function updateMitigationStatus(selectEl) {
     })
     .then(function(r) { return r.json(); })
     .then(function(res) {
-        if (res.success) {
-            location.reload();
-        } else {
-            alert('خطأ: ' + (res.error || 'فشل التحديث'));
-        }
+        if (res.success) location.reload();
+        else alert('خطأ: ' + (res.error || 'فشل التحديث'));
     })
-    .catch(function(err) {
-        alert('حدث خطأ: ' + err);
-    });
+    .catch(function(err) { alert('حدث خطأ: ' + err); });
 }
 
 
 function deleteMitigation(mitigationId) {
     currentMitigationIdToDelete = mitigationId;
-    var modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('confirmDeleteModal')).show();
 }
 
 
@@ -1669,34 +1658,17 @@ function confirmDeleteMitigation() {
     })
     .then(function(r) { return r.json(); })
     .then(function(res) {
-        if (res.success) {
-            location.reload();
-        } else {
-            alert('خطأ: ' + (res.error || 'فشل الحذف'));
-        }
+        if (res.success) location.reload();
+        else alert('خطأ: ' + (res.error || 'فشل الحذف'));
     })
-    .catch(function(err) {
-        alert('حدث خطأ: ' + err);
-    });
-}
-
-
-function highlightRisk(riskId) {
-    var riskElement = document.getElementById('risk-' + riskId);
-    if (riskElement) {
-        riskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        riskElement.classList.add('highlighted');
-        setTimeout(function() {
-            riskElement.classList.remove('highlighted');
-        }, 2000);
-    }
+    .catch(function(err) { alert('حدث خطأ: ' + err); });
 }
 
 
 function submitComment(event, taskId) {
     event.preventDefault();
     var commentInput = document.getElementById('commentInput');
-    var comment = commentInput.value.trim();
+    var comment      = commentInput.value.trim();
     if (!comment) { alert('الرجاء إدخال تعليق'); return; }
 
 
@@ -1709,7 +1681,7 @@ function submitComment(event, taskId) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.success) { commentInput.value = ''; location.reload(); }
-        else { alert('خطأ: ' + (data.error || 'فشل')); }
+        else alert('خطأ: ' + (data.error || 'فشل'));
     })
     .catch(function(error) { alert('خطأ: ' + error); });
 }
@@ -1717,8 +1689,8 @@ function submitComment(event, taskId) {
 
 function submitReply(event, taskId, parentCommentId) {
     event.preventDefault();
-    var form = event.target;
-    var input = form.querySelector('input[type="text"]');
+    var form    = event.target;
+    var input   = form.querySelector('input[type="text"]');
     var comment = input.value.trim();
     if (!comment) { alert('الرجاء إدخال رد'); return; }
 
@@ -1771,7 +1743,7 @@ function deleteComment(commentId) {
         if (data.success) {
             var el = document.getElementById('comment-' + commentId);
             if (el) el.remove();
-        } else { alert('خطأ'); }
+        } else alert('خطأ');
     })
     .catch(function(error) { alert('خطأ: ' + error); });
 }

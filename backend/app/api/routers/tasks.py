@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from app.database import get_db
-from app.models import DictRoleType, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority, TaskComment, TaskDependency , TaskProgressLog , TaskAttachment , TaskAttachmentResponse , AttachmentEmployeeInfo , AIPrediction , RiskMitigation , Risk , AIRecommendation , DictRiskLevel , AiJob
+from app.models import DictRoleType, Initiative, OperationalTask, TaskAssignment, Employee, MajorTask, MajorTaskDepartment, Department, DictStatus, DictPriority, TaskComment, TaskDependency , TaskProgressLog , TaskAttachment , TaskAttachmentResponse  , AIPrediction , RiskMitigation , Risk , AIRecommendation , DictRiskLevel , AiJob 
 from pydantic import BaseModel
 from datetime import date as date_type, datetime
 from typing import Optional, List 
@@ -27,24 +27,90 @@ def get_priority_map(db: Session) -> dict:
     return {p.priority_id: p.name_ar for p in priorities}
 
 def format_task(task, db: Session, assigned_name=None, department_name=None):
-    status_map = get_status_map(db)
+    status_map   = get_status_map(db)
     priority_map = get_priority_map(db)
+
+
+    major_task_name = None
+    initiative_name = None
+
+
+    if task.major_task_id:
+        major = (
+            db.query(MajorTask)
+            .filter(MajorTask.major_task_id == task.major_task_id)
+            .first()
+        )
+        if major:
+            major_task_name = major.name
+            if major.initiative_id:
+                init = (
+                    db.query(Initiative)
+                    .filter(Initiative.initiative_id == major.initiative_id)
+                    .first()
+                )
+                if init:
+                    initiative_name = init.name
+
+
+    participants = []
+    roles_d = {r.role_type_id: r for r in db.query(DictRoleType).all()}
+    assignments = (
+        db.query(TaskAssignment, Employee)
+        .join(Employee, Employee.employee_id == TaskAssignment.employee_id)
+        .filter(
+            TaskAssignment.task_id == task.task_id,
+            TaskAssignment.is_active == True,
+        )
+        .all()
+    )
+    for a, e in assignments:
+        participants.append({
+            "employee_id":       e.employee_id,
+            "full_name":         e.full_name,
+            "job_title":         e.job_title,
+            "role_type_id":      a.role_type_id,
+            "role_type":         roles_d.get(a.role_type_id).name_ar if roles_d.get(a.role_type_id) else None,
+            "acceptance_status": a.acceptance_status,
+            "estimated_hours":   float(a.estimated_hours or 0),
+        })
+
+
+    latest_progress = (
+        db.query(TaskProgressLog.progress_percent)
+        .filter(TaskProgressLog.task_id == task.task_id)
+        .order_by(TaskProgressLog.log_time.desc())
+        .first()
+    )
+    progress_percent = float(latest_progress[0]) if latest_progress else 0.0
+
+
     return {
-        "id": task.task_id,
-        "task_name": task.title,
-        "title": task.title,
-        "description": task.description or "",
-        "status": task.status_id,
-        "status_name": status_map.get(task.status_id, str(task.status_id)),
-        "priority": task.priority_id,
-        "priority_name": priority_map.get(task.priority_id, str(task.priority_id)),
-        "progress": getattr(task, 'progress', 0) or 0,
-        "due_date": task.end_date.isoformat() if task.end_date else None,
-        "end_date": task.end_date.isoformat() if task.end_date else None,
-        "start_date": task.start_date.isoformat() if task.start_date else None,
+        "id":               task.task_id,
+        "task_id":          task.task_id,
+        "task_name":        task.title,
+        "title":            task.title,
+        "description":      task.description or "",
+        "status":           task.status_id,
+        "status_id":        task.status_id,
+        "status_name":      status_map.get(task.status_id, str(task.status_id)),
+        "priority":         task.priority_id,
+        "priority_id":      task.priority_id,
+        "priority_name":    priority_map.get(task.priority_id, str(task.priority_id)),
+        "progress":         getattr(task, 'progress', 0) or 0,
+        "progress_percent": progress_percent,
+        "due_date":         task.end_date.isoformat() if task.end_date else None,
+        "end_date":         task.end_date.isoformat() if task.end_date else None,
+        "start_date":       task.start_date.isoformat() if task.start_date else None,
+        "estimated_hours":  float(task.estimated_hours or 0),
+        "actual_hours":     float(task.actual_hours or 0),
         "assigned_to_name": assigned_name,
-        "department_name": department_name
+        "department_name":  department_name,
+        "major_task_name":  major_task_name,
+        "initiative_name":  initiative_name,
+        "participants":     participants,
     }
+
 
 def check_dependency_rules(task, new_status, db):
     dependencies = db.query(TaskDependency).filter(
@@ -516,21 +582,73 @@ async def get_task(
         OperationalTask.task_id == task_id,
         OperationalTask.is_active == True
     ).first()
-    
+
+
     if not task:
         raise HTTPException(404, "المهمة غير موجودة")
-    
+
+
     status = db.query(DictStatus).filter(
         DictStatus.status_id == task.status_id
     ).first()
-    
+
+
     priority = db.query(DictPriority).filter(
         DictPriority.priority_id == task.priority_id
     ).first()
-    
+
+
+    major_task_name = None
+    initiative_name = None
+    if task.major_task_id:
+        major = db.query(MajorTask).filter(
+            MajorTask.major_task_id == task.major_task_id
+        ).first()
+        if major:
+            major_task_name = major.name
+            if major.initiative_id:
+                init = db.query(Initiative).filter(
+                    Initiative.initiative_id == major.initiative_id
+                ).first()
+                if init:
+                    initiative_name = init.name
+
+
+    roles_d = {r.role_type_id: r for r in db.query(DictRoleType).all()}
+    assignments = (
+        db.query(TaskAssignment, Employee)
+        .join(Employee, Employee.employee_id == TaskAssignment.employee_id)
+        .filter(
+            TaskAssignment.task_id == task_id,
+            TaskAssignment.is_active == True,
+        )
+        .all()
+    )
+    participants = [{
+        "employee_id": e.employee_id,
+        "full_name": e.full_name,
+        "job_title": e.job_title,
+        "role_type_id": a.role_type_id,
+        "role_type": roles_d.get(a.role_type_id).name_ar if roles_d.get(a.role_type_id) else None,
+        "acceptance_status": a.acceptance_status,
+        "estimated_hours": float(a.estimated_hours or 0),
+    } for a, e in assignments]
+
+
+    latest = (
+        db.query(TaskProgressLog.progress_percent)
+        .filter(TaskProgressLog.task_id == task_id)
+        .order_by(desc(TaskProgressLog.log_time))
+        .first()
+    )
+    progress = float(latest[0]) if latest else 0.0
+
+
     result = {
         "task_id": task.task_id,
         "major_task_id": task.major_task_id,
+        "major_task_name": major_task_name,
+        "initiative_name": initiative_name,
         "department_id": task.department_id,
         "title": task.title,
         "description": task.description,
@@ -540,14 +658,17 @@ async def get_task(
         "priority_name": priority.name_ar if priority else None,
         "start_date": task.start_date.isoformat() if task.start_date else None,
         "end_date": task.end_date.isoformat() if task.end_date else None,
-        "estimated_hours": task.estimated_hours,
-        "actual_hours": task.actual_hours,
+        "estimated_hours": float(task.estimated_hours or 0),
+        "actual_hours": float(task.actual_hours or 0),
         "is_cross_functional": task.is_cross_functional,
-        "created_at": task.created_at.isoformat() if task.created_at else None
+        "progress_percent": progress,
+        "participants": participants,
+        "created_at": task.created_at.isoformat() if task.created_at else None,
     }
-    
-    db.commit()
+
+
     return {"success": True, "data": result}
+
 
 @router.get("/{task_id}/assignments")
 async def get_task_assignments(
@@ -1797,3 +1918,67 @@ async def predict_and_analyze_task(
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class SendToReviewPayload(BaseModel):
+    status_id: int
+
+
+
+
+@router.patch("/{task_id}/send-to-review")
+async def send_task_to_review(
+    task_id: int,
+    payload: SendToReviewPayload,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    
+    if payload.status_id != 8:
+        raise HTTPException(400, "الحالة المسموحة: مراجعة فقط")
+
+
+    task = db.query(OperationalTask).filter(
+        OperationalTask.task_id == task_id,
+        OperationalTask.is_active == True,
+    ).first()
+    if not task:
+        raise HTTPException(404, "المهمة غير موجودة")
+
+
+    if task.status_id != 6:
+        raise HTTPException(400, "لا يمكن إرسال المهمة للمراجعة إلا من حالة قيد التنفيذ")
+
+
+    is_responsible = (
+        db.query(TaskAssignment)
+        .filter(
+            TaskAssignment.task_id == task_id,
+            TaskAssignment.employee_id == current_user,
+            TaskAssignment.is_active == True,
+            TaskAssignment.acceptance_status == "accepted",
+            TaskAssignment.role_type_id.in_([1, 2]),  
+        )
+        .first()
+    )
+    if not is_responsible:
+        raise HTTPException(403, "غير مصرح — يجب أن تكون مسؤولًا عن المهمة")
+
+
+    task.status_id = 8
+    db.commit()
+
+
+    log = TaskProgressLog(
+        task_id=task_id,
+        employee_id=current_user,
+        progress_percent=100,
+        status_old=6,
+        status_new=8,
+        notes="تم إرسال المهمة للمراجعة",
+        log_time=datetime.utcnow(),
+    )
+    db.add(log)
+    db.commit()
+
+
+    return {"success": True, "data": {"status_id": 8}}

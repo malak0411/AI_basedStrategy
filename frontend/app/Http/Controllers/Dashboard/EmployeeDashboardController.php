@@ -21,25 +21,17 @@ class EmployeeDashboardController extends Controller
         $data     = $response['data'] ?? $response;
 
 
-        $notifResp     = $api->get('/api/notifications', $token);
-        $notifications = $notifResp['data'] ?? [];
-
-
         if (($response['status'] ?? 500) >= 400 || empty($data)) {
             return view('dashboard.employee', [
-                'data'          => [],
-                'notifications' => [],
-                'role'          => session('user_role', 'employee'),
-                'error'         => $response['detail'] ?? 'تعذر تحميل البيانات.',
+                'data'  => [],
+                'error' => $response['detail'] ?? 'تعذر تحميل البيانات.',
             ]);
         }
 
 
         return view('dashboard.employee', [
-            'data'          => $data,
-            'notifications' => $notifications,
-            'role'          => session('user_role', 'employee'),
-            'error'         => null,
+            'data'  => $data,
+            'error' => null,
         ]);
     }
 
@@ -60,7 +52,7 @@ class EmployeeDashboardController extends Controller
         if (($response['status'] ?? 500) >= 400) {
             return back()->with('error', $response['detail'] ?? 'تعذر قبول الإسناد.');
         }
-        return back()->with('success', 'تم قبول الإسناد بنجاح.');
+        return back()->with('success', 'تم قبول الإسناد.');
     }
 
 

@@ -17,21 +17,40 @@ class ManagerDashboardController extends Controller
 
 
         $response = $api->get('/api/dashboard/manager', $token);
-
-
-        // نفس نمط LoginController: البيانات قد تكون داخل 'data'
-        $data = $response['data'] ?? $response;
+        $data     = $response['data'] ?? $response;
 
 
         if (($response['status'] ?? 500) >= 400 || empty($data)) {
-            return back()->with('error', $response['detail'] ?? 'تعذر تحميل بيانات لوحة المدير.');
+            return view('dashboard.manager', [
+                'data'  => [],
+                'error' => $response['detail'] ?? 'تعذر تحميل البيانات.',
+            ]);
         }
 
 
-        // نفس نمط LoginController: نعتمد على session('user_role')
-        $role = session('user_role', 'employee');
-
-
-        return view('dashboard.manager', compact('data', 'role'));
+        return view('dashboard.manager', [
+            'data'  => $data,
+            'error' => null,
+        ]);
     }
+
+    public function employeeDetail($employeeId)
+{
+    $api   = new ApiClient();
+    $token = session('jwt_token');
+
+
+    $response = $api->get("/api/dashboard/employee/{$employeeId}/detail", $token);
+    $data     = $response['data'] ?? $response;
+
+
+    if (($response['status'] ?? 500) >= 400 || empty($data)) {
+        return redirect()->route('dashboard.manager')
+            ->with('error', $response['detail'] ?? 'تعذر تحميل تفاصيل الموظف.');
+    }
+
+
+    return view('dashboard.employee-detail', ['data' => $data]);
+}
+
 }

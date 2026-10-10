@@ -73,6 +73,10 @@ Route::middleware('check.jwt')->group(function () {
     Route::get('/dashboard/employee', [EmployeeDashboardController::class, 'index'])->name('dashboard.employee');
     Route::get('/dashboard/manager', [ManagerDashboardController::class, 'index'])->name('dashboard.manager');
     Route::get('/dashboard/minister', [MinisterDashboardController::class, 'index'])->name('dashboard.minister');
+    Route::get('/dashboard/manager/employee/{employeeId}',
+        [\App\Http\Controllers\Dashboard\ManagerDashboardController::class, 'employeeDetail'])
+        ->name('dashboard.manager.employee-detail');
+
 
     Route::prefix('tasks')->name('tasks.')->group(function () {
         Route::get('/', [TaskController::class, 'index'])->name('index');
@@ -84,7 +88,8 @@ Route::middleware('check.jwt')->group(function () {
     });
 
 
-    Route::get('/dashboard/employee', [\App\Http\Controllers\Dashboard\EmployeeDashboardController::class, 'index'])
+        Route::get('/dashboard/employee',
+        [\App\Http\Controllers\Dashboard\EmployeeDashboardController::class, 'index'])
         ->name('dashboard.employee');
 
 
@@ -96,6 +101,9 @@ Route::middleware('check.jwt')->group(function () {
     Route::post('/dashboard/employee/assignments/{assignmentId}/reject',
         [\App\Http\Controllers\Dashboard\EmployeeDashboardController::class, 'rejectAssignment'])
         ->name('employee.assignments.reject');
+
+
+    
 
 
     Route::middleware(['web', 'check.jwt'])->group(function () {
@@ -177,6 +185,10 @@ Route::middleware('check.jwt')->group(function () {
 
     Route::get('/operational-tasks/{taskId}/attachments', [OperationalTaskController::class, 'attachments'])
     ->name('task.attachments.index');
+
+    Route::patch('/operational/task/{id}/status',
+    [OperationalTaskController::class, 'sendToReview'])
+    ->name('operational.task.send-to-review');
 
     Route::get('/attachments/{attachmentId}/download', [OperationalTaskController::class, 'downloadAttachment'])
     ->name('task.attachments.download');

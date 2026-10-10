@@ -726,7 +726,6 @@ public function review(Request $request)
         );
 }
 
-
     public function showOperationalTask($id)
 {
     try {
@@ -1046,6 +1045,35 @@ public function updateTaskStatus(Request $request)
 
     return response()->json($response);
 }
+
+public function sendToReview(Request $request, $id)
+{
+    $request->validate([
+        'status_id' => 'required|integer|in:8',
+    ]);
+
+
+    $token = session('jwt_token');
+
+
+    $response = $this->apiClient->patch(
+        "/api/tasks/{$id}/send-to-review",
+        ['status_id' => 8],
+        $token
+    );
+
+
+    if (($response['status'] ?? 500) >= 400) {
+        return response()->json([
+            'success' => false,
+            'error'   => $response['detail'] ?? 'فشل إرسال المهمة للمراجعة',
+        ], 400);
+    }
+
+
+    return response()->json(['success' => true]);
+}
+
 
 public function kanbanBoard($majorTaskId = null)
 {
@@ -1757,15 +1785,36 @@ public function updateTaskMitigation(Request $request, $mitigationId)
         }
 
 
+        $request->validate([
+            'status_id'   => 'nullable|integer|in:41,42,43,44',
+            'notes'       => 'nullable|string|max:2000',
+            'due_date'    => 'nullable|date',
+            'assigned_to' => 'nullable|integer',
+            'action'      => 'nullable|string|max:1000',
+        ]);
+
+
         $data = [];
         foreach (['status_id', 'notes', 'due_date', 'assigned_to', 'action'] as $field) {
             if ($request->has($field)) {
-                $data[$field] = $request->$field;
+                $data[$field] = $request->input($field);
             }
         }
 
 
-        $response = $this->apiClient->put("/api/risks/mitigations/{$mitigationId}", $data, $token);
+        if (empty($data)) {
+            return response()->json([
+                'success' => false,
+                'error'   => 'لا توجد بيانات للتحديث'
+            ], 400);
+        }
+
+
+        $response = $this->apiClient->put(
+            "/api/risks/mitigations/{$mitigationId}",
+            $data,
+            $token
+        );
 
 
         if ($response['success'] ?? false) {
@@ -1775,13 +1824,16 @@ public function updateTaskMitigation(Request $request, $mitigationId)
 
         return response()->json([
             'success' => false,
-            'error' => $response['detail'] ?? 'فشل التحديث'
+            'error'   => $response['detail'] ?? 'فشل التحديث'
         ], 500);
 
 
     } catch (\Exception $e) {
-        Log::error('Update mitigation error: ' . $e->getMessage());
-        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        \Log::error('Update mitigation error: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'error'   => $e->getMessage()
+        ], 500);
     }
 }
 
