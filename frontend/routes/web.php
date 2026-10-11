@@ -77,6 +77,11 @@ Route::middleware('check.jwt')->group(function () {
         [\App\Http\Controllers\Dashboard\ManagerDashboardController::class, 'employeeDetail'])
         ->name('dashboard.manager.employee-detail');
 
+    Route::get('/dashboard/manager/task-timeline',
+    [\App\Http\Controllers\Dashboard\ManagerDashboardController::class, 'taskTimeline'])
+    ->name('dashboard.manager.task-timeline');
+
+
 
     Route::prefix('tasks')->name('tasks.')->group(function () {
         Route::get('/', [TaskController::class, 'index'])->name('index');

@@ -53,4 +53,13 @@ class ManagerDashboardController extends Controller
     return view('dashboard.employee-detail', ['data' => $data]);
 }
 
+public function taskTimeline()
+{
+    $api   = new ApiClient();
+    $token = session('jwt_token');
+    $data  = $api->get('/api/dashboard/manager/task-timeline', $token);
+    return response()->json($data['data'] ?? $data);
+}
+
+
 }

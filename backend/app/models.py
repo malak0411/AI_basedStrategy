@@ -193,6 +193,7 @@ class StrategicGoal(Base):
     weight = Column(Integer, default=1)
     valid_from = Column(Date)
     valid_until = Column(Date)
+    is_current = Column(Boolean, default=True)
     created_by = Column(Integer, ForeignKey("employees.employee_id"))
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())

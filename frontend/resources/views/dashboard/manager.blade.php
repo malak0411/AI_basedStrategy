@@ -42,6 +42,50 @@
     .mgr-hero .hero-stat .l { font-size: .72rem; color: #cdd6ee; margin-top: 4px; }
 
 
+    .quick-links {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+    .quick-link {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: .18s;
+    }
+    .quick-link:hover {
+        border-color: var(--blue-light);
+        box-shadow: 0 6px 18px rgba(13,27,62,.08);
+        transform: translateY(-2px);
+        color: inherit;
+    }
+    .quick-link .icon-box {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+    .quick-link .icon-box.blue   { background: #eff6ff; color: #1d4ed8; }
+    .quick-link .icon-box.red    { background: #fef2f2; color: #b91c1c; }
+    .quick-link .icon-box.green  { background: #ecfdf5; color: #047857; }
+    .quick-link .icon-box.amber  { background: #fffbeb; color: #b45309; }
+    .quick-link .icon-box.purple { background: #f5f3ff; color: #6d28d9; }
+    .quick-link .icon-box.gray   { background: #f3f4f6; color: #4b5563; }
+    .quick-link .label { font-weight: 700; color: var(--navy); font-size: .88rem; }
+    .quick-link .sub   { color: var(--gray); font-size: .72rem; margin-top: 2px; }
+
+
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 22px; }
     .kpi {
         background: #fff;
@@ -219,7 +263,6 @@
     @else
 
 
-    {{-- HERO --}}
     <div class="mgr-hero">
         <div class="row g-3 align-items-center">
             <div class="col-md-5">
@@ -237,16 +280,15 @@
                         <div class="l">مبادرات قيد التنفيذ</div>
                     </div>
                     <div class="col hero-stat">
-    <div class="v">{{ $k['major_tasks_count'] ?? 0 }}</div>
-    <div class="l">
-        مهام رئيسية
-        <br>
-        <small style="opacity:.75;font-size:.62rem;">
-            {{ $k['major_lead_count'] ?? 0 }} مسؤولة • {{ $k['major_support_count'] ?? 0 }} مساندة
-        </small>
-    </div>
-</div>
-
+                        <div class="v">{{ $k['major_tasks_count'] ?? 0 }}</div>
+                        <div class="l">
+                            مهام رئيسية
+                            <br>
+                            <small style="opacity:.75;font-size:.62rem;">
+                                {{ $k['major_lead_count'] ?? 0 }} مسؤولة • {{ $k['major_support_count'] ?? 0 }} مساندة
+                            </small>
+                        </div>
+                    </div>
                     <div class="col hero-stat">
                         <div class="v">{{ $k['operational_tasks_count'] ?? 0 }}</div>
                         <div class="l">مهام تشغيلية</div>
@@ -261,7 +303,44 @@
     </div>
 
 
-    {{-- KPIs --}}
+    <div class="quick-links">
+        <a href="{{ route('operational.major-tasks') }}" class="quick-link">
+            <div class="icon-box blue"><i class="fas fa-layer-group"></i></div>
+            <div>
+                <div class="label">المهام الرئيسية</div>
+                <div class="sub">عرض وإدارة المهام الرئيسية</div>
+            </div>
+        </a>
+
+
+        <a href="{{ route('operational.kanban') }}" class="quick-link">
+            <div class="icon-box green"><i class="fas fa-columns"></i></div>
+            <div>
+                <div class="label">لوحة المهام التشغيلية</div>
+                <div class="sub">عرض حسب الحالة</div>
+            </div>
+        </a>
+
+
+        <a href="{{ route('risks.index') }}" class="quick-link">
+            <div class="icon-box red"><i class="fas fa-exclamation-triangle"></i></div>
+            <div>
+                <div class="label">المخاطر</div>
+                <div class="sub">عرض وإدارة المخاطر</div>
+            </div>
+        </a>
+
+
+        <a href="{{ route('risks.create') }}" class="quick-link">
+            <div class="icon-box gray"><i class="fas fa-plus-circle"></i></div>
+            <div>
+                <div class="label">إضافة خطر جديد</div>
+                <div class="sub">تسجيل خطر</div>
+            </div>
+        </a>
+    </div>
+
+
     <div class="kpi-grid">
         <div class="kpi">
             <div class="icon blue"><i class="fas fa-tasks"></i></div>
@@ -286,7 +365,7 @@
         <div class="kpi">
             <div class="icon amber"><i class="fas fa-user-slash"></i></div>
             <div class="v" style="color:#b45309;">{{ $k['unassigned'] ?? 0 }}</div>
-            <div class="l">لم تُوزَّع بعد</div>
+            <div class="l">معلقة / لم تُوزَّع</div>
         </div>
         <div class="kpi">
             <div class="icon green"><i class="fas fa-percentage"></i></div>
@@ -296,7 +375,6 @@
     </div>
 
 
-    {{-- TABS --}}
     <ul class="nav mgr-tabs mb-3 flex-wrap" role="tablist">
         <li class="nav-item">
             <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-major" type="button">
@@ -318,7 +396,7 @@
         </li>
         <li class="nav-item">
             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-unassigned" type="button">
-                <i class="fas fa-user-slash me-1"></i> لم تُوزَّع
+                <i class="fas fa-user-slash me-1"></i> معلقة / لم تُوزَّع
                 <span class="cnt">{{ count($unassigned) }}</span>
             </button>
         </li>
@@ -339,7 +417,6 @@
     <div class="tab-content">
 
 
-        {{-- ═══ المهام الرئيسية ═══ --}}
         <div class="tab-pane fade show active" id="tab-major">
             @if(empty($majorTasks))
                 <div class="text-center text-muted py-5">لا توجد مهام رئيسية في نطاق الإدارة.</div>
@@ -349,6 +426,9 @@
                         @php
                             $pct = (float)($mt['progress'] ?? 0);
                             $cls = $pct >= 75 ? 'ok' : ($pct >= 40 ? '' : 'warn');
+                            $rAr = $mt['responsibility_ar'] ?? null;
+                            $rRaw = strtoupper($mt['responsibility_type'] ?? '');
+                            $rCls = $rRaw === 'LEAD' ? 'green' : ($rRaw === 'SUPPORT' ? 'amber' : 'purple');
                         @endphp
                         <div class="col-lg-4 col-md-6">
                             <a href="{{ url('/operational/major-task/' . $mt['major_task_id']) }}"
@@ -364,25 +444,21 @@
                                     {{ $mt['initiative_name'] ?? '—' }}
                                 </div>
                                 <div class="d-flex justify-content-between mb-2 flex-wrap gap-1">
-    @php
-        $roleAr = $mt['responsibility_ar'] ?? null;
-        $roleRaw = strtoupper($mt['responsibility_type'] ?? '');
-        $roleCls = $roleRaw === 'LEAD' ? 'green' : ($roleRaw === 'SUPPORT' ? 'amber' : 'purple');
-    @endphp
-    @if($roleAr)
-        <span class="pill {{ $roleCls }}">
-            <i class="fas fa-{{ $roleRaw === 'LEAD' ? 'star' : 'hands-helping' }} me-1"></i>
-            {{ $roleAr }}
-        </span>
-    @endif
-    @if(!empty($mt['priority_name']))
-        <span class="pill blue">{{ $mt['priority_name'] }}</span>
-    @endif
-    <span class="meta">
-        {{ $mt['completed_tasks'] }} / {{ $mt['total_tasks'] }} مهمة
-    </span>
-</div>
-
+                                    @if($rAr)
+                                        <span class="pill {{ $rCls }}">
+                                            <i class="fas fa-{{ $rRaw === 'LEAD' ? 'star' : 'hands-helping' }} me-1"></i>
+                                            {{ $rAr }}
+                                        </span>
+                                    @endif
+                                    @if(!empty($mt['priority_name']))
+                                        <span class="pill blue">{{ $mt['priority_name'] }}</span>
+                                    @endif
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="meta">
+                                        {{ $mt['completed_tasks'] }} / {{ $mt['total_tasks'] }} مهمة
+                                    </span>
+                                </div>
                                 <div class="progress-thin {{ $cls }}">
                                     <span style="width: {{ $pct }}%"></span>
                                 </div>
@@ -398,7 +474,6 @@
         </div>
 
 
-        {{-- ═══ المهام التشغيلية ═══ --}}
         <div class="tab-pane fade" id="tab-op">
             @if(empty($opTasks))
                 <div class="text-center text-muted py-5">لا توجد مهام تشغيلية.</div>
@@ -416,7 +491,7 @@
                                     <th>الموعد</th>
                                     <th style="min-width:130px;">التقدم</th>
                                     <th>الحالة</th>
-                                    <th></th>
+                                    <th>الإجراء</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -461,9 +536,15 @@
                                         <small class="text-muted">{{ $pct }}%</small>
                                     </td>
                                     <td><span class="pill blue">{{ $t['status_name'] ?? '—' }}</span></td>
-                                    <td>
-                                        <a href="{{ url('/operational/task/' . $t['task_id']) }}"
-                                           class="btn btn-sm btn-outline-primary">عرض</a>
+                                    <td class="text-nowrap">
+                                        <a href="{{ route('operational.task-detail', $t['task_id']) }}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{{ route('operational.assign', $t['task_id']) }}"
+                                           class="btn btn-sm btn-success">
+                                            <i class="fas fa-user-plus"></i> توزيع
+                                        </a>
                                     </td>
                                 </tr>
                             @endforeach
@@ -475,7 +556,6 @@
         </div>
 
 
-        {{-- ═══ قيد المراجعة ═══ --}}
         <div class="tab-pane fade" id="tab-review">
             @if(empty($reviewTasks))
                 <div class="text-center text-muted py-5">لا توجد مهام قيد المراجعة.</div>
@@ -490,7 +570,7 @@
                                     <th>المسؤولون</th>
                                     <th>الموعد</th>
                                     <th>التقدم</th>
-                                    <th></th>
+                                    <th>الإجراء</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -515,8 +595,10 @@
                                         </div>
                                     </td>
                                     <td>
-                                        <a href="{{ url('/operational/task/' . $t['task_id']) }}"
-                                           class="btn btn-sm btn-outline-primary">مراجعة</a>
+                                        <a href="{{ route('operational.task-detail', $t['task_id']) }}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i> عرض التفاصيل
+                                        </a>
                                     </td>
                                 </tr>
                             @endforeach
@@ -528,7 +610,6 @@
         </div>
 
 
-        {{-- ═══ لم تُوزَّع ═══ --}}
         <div class="tab-pane fade" id="tab-unassigned">
             @if(empty($unassigned))
                 <div class="text-center text-muted py-5">
@@ -547,11 +628,13 @@
                                     <th>الأولوية</th>
                                     <th>الموعد</th>
                                     <th>الساعات المقدرة</th>
-                                    <th></th>
+                                    <th>السبب</th>
+                                    <th>الإجراء</th>
                                 </tr>
                             </thead>
                             <tbody>
                             @foreach($unassigned as $t)
+                                @php $isOnHold = ($t['status_id'] ?? 0) == 16; @endphp
                                 <tr>
                                     <td class="fw-semibold">{{ $t['title'] }}</td>
                                     <td class="text-muted small">{{ $t['major_task_name'] ?? '—' }}</td>
@@ -568,7 +651,18 @@
                                     <td class="text-muted small">{{ $t['end_date'] ?? '—' }}</td>
                                     <td>{{ $t['estimated_hours'] ?? 0 }} س</td>
                                     <td>
-                                        <a href="{{ url('/operational/assign/' . $t['task_id']) }}"
+                                        @if($isOnHold)
+                                            <span class="pill amber">
+                                                <i class="fas fa-pause-circle me-1"></i> معلقة - توزيع غير مكتمل
+                                            </span>
+                                        @else
+                                            <span class="pill gray">
+                                                <i class="fas fa-user-slash me-1"></i> بلا إسنادات مقبولة
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <a href="{{ route('operational.assign', $t['task_id']) }}"
                                            class="btn btn-sm btn-primary">
                                             <i class="fas fa-user-plus"></i> توزيع
                                         </a>
@@ -583,7 +677,6 @@
         </div>
 
 
-        {{-- ═══ الموظفون ═══ --}}
         <div class="tab-pane fade" id="tab-emp">
             @if(empty($employees))
                 <div class="text-center text-muted py-5">لا يوجد موظفون.</div>
@@ -624,8 +717,90 @@
         </div>
 
 
-        {{-- ═══ أداء الإدارة ═══ --}}
         <div class="tab-pane fade" id="tab-perf">
+            <div class="row g-3 mb-3">
+                <div class="col-lg-8">
+                    <div class="card-soft">
+                        <div class="h"><i class="fas fa-layer-group text-primary me-2"></i> أداء المهام الرئيسية</div>
+                        <div class="table-responsive">
+                            <table class="table tbl-clean align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>المهمة الرئيسية</th>
+                                        <th>الدور</th>
+                                        <th>المبادرة</th>
+                                        <th>المهام</th>
+                                        <th>مكتملة</th>
+                                        <th style="min-width:150px;">الإنجاز</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @forelse($majorTasks as $mt)
+                                    @php
+                                        $pct = (float)($mt['progress'] ?? 0);
+                                        $cls = $pct >= 75 ? 'ok' : ($pct >= 40 ? '' : 'warn');
+                                        $rAr = $mt['responsibility_ar'] ?? '—';
+                                        $rRaw = strtoupper($mt['responsibility_type'] ?? '');
+                                        $rCls = $rRaw === 'LEAD' ? 'green' : ($rRaw === 'SUPPORT' ? 'amber' : 'purple');
+                                    @endphp
+                                    <tr>
+                                        <td class="fw-semibold">{{ $mt['name'] }}</td>
+                                        <td><span class="pill {{ $rCls }}">{{ $rAr }}</span></td>
+                                        <td class="text-muted small">{{ $mt['initiative_name'] ?? '—' }}</td>
+                                        <td>{{ $mt['total_tasks'] }}</td>
+                                        <td><span class="text-success fw-semibold">{{ $mt['completed_tasks'] }}</span></td>
+                                        <td>
+                                            <div class="progress-thin {{ $cls }}">
+                                                <span style="width: {{ $pct }}%"></span>
+                                            </div>
+                                            <small class="text-muted">{{ $pct }}%</small>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="6" class="text-center text-muted py-4">لا توجد مهام رئيسية.</td></tr>
+                                @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card-soft h-100">
+                        <div class="h"><i class="fas fa-chart-line text-success me-2"></i> الإنجاز العام</div>
+                        <div class="text-center my-3">
+                            <div class="display-5 fw-bold text-success">{{ $k['completion_rate'] ?? 0 }}%</div>
+                            <div class="text-muted small">نسبة الإنجاز الكلية</div>
+                            <div class="progress-thin mt-3" style="height:12px;">
+                                <span style="width: {{ $k['completion_rate'] ?? 0 }}%"></span>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between py-2">
+                            <span class="text-muted">متوسط التقدم</span>
+                            <strong>{{ $k['avg_progress'] ?? 0 }}%</strong>
+                        </div>
+                        <div class="d-flex justify-content-between py-2">
+                            <span class="text-muted">المهام المكتملة</span>
+                            <strong class="text-success">{{ $k['completed'] ?? 0 }} / {{ $k['operational_tasks_count'] ?? 0 }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between py-2">
+                            <span class="text-muted">قيد التنفيذ</span>
+                            <strong class="text-primary">{{ $k['in_progress'] ?? 0 }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between py-2">
+                            <span class="text-muted">متأخرة</span>
+                            <strong class="text-danger">{{ $k['delayed'] ?? 0 }}</strong>
+                        </div>
+                        <div class="mt-3">
+                            <a href="{{ route('risks.index') }}" class="btn btn-outline-danger w-100">
+                                <i class="fas fa-exclamation-triangle"></i> عرض مخاطر الإدارة
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
             <div class="row g-3">
                 <div class="col-lg-7">
                     <div class="card-soft">
@@ -641,8 +816,68 @@
                 </div>
                 <div class="col-12">
                     <div class="card-soft">
-                        <div class="h"><i class="fas fa-chart-bar text-primary me-2"></i> مقارنة: نسبة الإنجاز vs متوسط التقدم</div>
-                        <div class="chart-wrap" style="height:320px;"><canvas id="chartEmpCompare"></canvas></div>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="h mb-0"><i class="fas fa-clock text-primary me-2"></i> التحليل الزمني لسير المهام التشغيلية</div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="loadTaskTimeline()">
+                                <i class="fas fa-sync"></i> تحديث التحليل
+                            </button>
+                        </div>
+
+
+                        <div id="timeline-loading" class="text-center py-5" style="display:none;">
+                            <div class="spinner-border text-primary"></div>
+                        </div>
+
+
+                        <div id="timeline-content">
+                            <div class="row g-3 mb-3" id="timeline-kpis"></div>
+
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-lg-6">
+                                    <div class="border rounded p-3">
+                                        <div class="fw-bold mb-2" style="color:#0D1B3E;font-size:.88rem;">
+                                            <i class="fas fa-chart-bar text-primary me-1"></i> المدة المخططة vs الفعلية (بالأيام)
+                                        </div>
+                                        <div style="position:relative;height:280px;"><canvas id="chartTimelineCompare"></canvas></div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="border rounded p-3">
+                                        <div class="fw-bold mb-2" style="color:#0D1B3E;font-size:.88rem;">
+                                            <i class="fas fa-hourglass-half text-warning me-1"></i> توزيع الوقت حسب الحالة
+                                        </div>
+                                        <div style="position:relative;height:280px;"><canvas id="chartStatusTime"></canvas></div>
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            <div class="table-responsive">
+                                <table class="table tbl-clean align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>المهمة</th>
+                                            <th>البداية المخططة</th>
+                                            <th>النهاية المخططة</th>
+                                            <th>البداية الفعلية</th>
+                                            <th>النهاية الفعلية</th>
+                                            <th>مدة مخططة</th>
+                                            <th>مدة فعلية</th>
+                                            <th>وقت التنفيذ</th>
+                                            <th>وقت التعليق</th>
+                                            <th>التأخر</th>
+                                            <th>الحالة</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="timeline-tbody">
+                                        <tr><td colspan="11" class="text-center text-muted py-4">
+                                            اضغط "تحديث التحليل" لتحميل البيانات
+                                        </td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="col-lg-6">
@@ -664,7 +899,7 @@
                             <span class="text-muted">متأخرة</span><strong class="text-danger">{{ $k['delayed'] ?? 0 }}</strong>
                         </div>
                         <div class="d-flex justify-content-between py-2 border-bottom">
-                            <span class="text-muted">لم تُوزَّع بعد</span><strong style="color:#b45309;">{{ $k['unassigned'] ?? 0 }}</strong>
+                            <span class="text-muted">معلقة / لم تُوزَّع</span><strong style="color:#b45309;">{{ $k['unassigned'] ?? 0 }}</strong>
                         </div>
                         <div class="d-flex justify-content-between py-2">
                             <span class="text-muted">متوسط التقدم</span><strong>{{ $k['avg_progress'] ?? 0 }}%</strong>
@@ -688,7 +923,7 @@
 
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ asset('vendor/chartjs/chart.umd.min.js') }}"></script>
 <script>
 (function () {
     const statusDist   = @json($charts['status_distribution'] ?? []);
@@ -746,36 +981,6 @@
     }
 
 
-    const cd3 = document.getElementById('chartEmpCompare');
-    if (cd3 && allEmployees.length) {
-        new Chart(cd3, {
-            type: 'bar',
-            data: {
-                labels: allEmployees.map(e => e.full_name),
-                datasets: [
-                    {
-                        label: 'نسبة الإنجاز %',
-                        data: allEmployees.map(e => e.completion_rate),
-                        backgroundColor: 'rgba(76,175,80,.75)',
-                        borderRadius: 5,
-                    },
-                    {
-                        label: 'متوسط التقدم %',
-                        data: allEmployees.map(e => e.avg_progress),
-                        backgroundColor: 'rgba(59,130,246,.75)',
-                        borderRadius: 5,
-                    }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } },
-                scales: { y: { beginAtZero: true, max: 100 } }
-            }
-        });
-    }
-
-
     const cd4 = document.getElementById('chartEmpDist');
     if (cd4 && allEmployees.length) {
         let high = 0, mid = 0, low = 0;
@@ -801,5 +1006,152 @@
         });
     }
 })();
+
+
+let timelineChartCompare = null;
+let timelineChartStatus  = null;
+
+
+function loadTaskTimeline() {
+    const loader  = document.getElementById('timeline-loading');
+    const content = document.getElementById('timeline-content');
+    loader.style.display  = 'block';
+    content.style.display = 'none';
+
+
+    fetch('{{ route("dashboard.manager.task-timeline") }}', {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin'
+    })
+    .then(r => r.json())
+    .then(res => {
+        loader.style.display  = 'none';
+        content.style.display = 'block';
+
+
+        const k = res.kpis || {};
+        const timeline = res.timeline || [];
+
+
+        document.getElementById('timeline-kpis').innerHTML = `
+            <div class="col-md-3"><div class="kpi"><div class="v">${k.total_tasks || 0}</div><div class="l">إجمالي المهام</div></div></div>
+            <div class="col-md-3"><div class="kpi"><div class="v text-success">${k.completed || 0}</div><div class="l">مكتملة</div></div></div>
+            <div class="col-md-3"><div class="kpi"><div class="v text-danger">${k.delayed || 0}</div><div class="l">متأخرة</div></div></div>
+            <div class="col-md-3"><div class="kpi"><div class="v text-warning">${k.on_hold || 0}</div><div class="l">تعليق في مرحلة</div></div></div>
+            <div class="col-md-4"><div class="kpi"><div class="v text-primary">${k.avg_planned_days || 0}</div><div class="l">متوسط المدة المخططة (يوم)</div></div></div>
+            <div class="col-md-4"><div class="kpi"><div class="v" style="color:#0891b2;">${k.avg_actual_days || 0}</div><div class="l">متوسط المدة الفعلية (يوم)</div></div></div>
+            <div class="col-md-4"><div class="kpi"><div class="v text-danger">${k.avg_delay_days || 0}</div><div class="l">متوسط التأخر النهائي (يوم)</div></div></div>
+        `;
+
+
+        const tbody = document.getElementById('timeline-tbody');
+        if (!timeline.length) {
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-4">لا توجد بيانات.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = timeline.map(t => {
+            const delayBadge = t.delay_days > 0
+                ? `<span class="pill red">+${t.delay_days} يوم</span>`
+                : (t.final_delay_days > 0 ? `<span class="pill amber">+${t.final_delay_days} يوم</span>` : `<span class="pill green">في الوقت</span>`);
+            const onHold = t.time_on_hold_days > 0
+                ? `<span class="pill amber">${t.time_on_hold_days} يوم</span>`
+                : '<span class="text-muted small">—</span>';
+            return `
+                <tr>
+                    <td class="fw-semibold">${t.title}</td>
+                    <td class="small text-muted">${t.planned_start || '—'}</td>
+                    <td class="small text-muted">${t.planned_end || '—'}</td>
+                    <td class="small text-muted">${t.actual_start || '—'}</td>
+                    <td class="small text-muted">${t.actual_end || '—'}</td>
+                    <td>${t.planned_days ?? '—'}</td>
+                    <td>${t.actual_days ?? '—'}</td>
+                    <td><span class="pill blue">${t.time_in_progress_days} يوم</span></td>
+                    <td>${onHold}</td>
+                    <td>${delayBadge}</td>
+                    <td><span class="pill gray">${t.status_name || '—'}</span></td>
+                </tr>
+            `;
+        }).join('');
+
+
+        const cd1 = document.getElementById('chartTimelineCompare');
+        if (cd1) {
+            if (timelineChartCompare) timelineChartCompare.destroy();
+            const withActual = timeline.filter(t => t.actual_days !== null);
+            timelineChartCompare = new Chart(cd1, {
+                type: 'bar',
+                data: {
+                    labels: withActual.map(t => t.title.length > 25 ? t.title.substring(0, 25) + '…' : t.title),
+                    datasets: [
+                        {
+                            label: 'المدة المخططة (يوم)',
+                            data: withActual.map(t => t.planned_days || 0),
+                            backgroundColor: 'rgba(59,130,246,.75)',
+                            borderRadius: 5,
+                        },
+                        {
+                            label: 'المدة الفعلية (يوم)',
+                            data: withActual.map(t => t.actual_days || 0),
+                            backgroundColor: 'rgba(76,175,80,.75)',
+                            borderRadius: 5,
+                        },
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+
+        const cd2 = document.getElementById('chartStatusTime');
+        if (cd2) {
+            if (timelineChartStatus) timelineChartStatus.destroy();
+            const totalInProgress = timeline.reduce((s, t) => s + (t.time_in_progress_days || 0), 0);
+            const totalOnHold     = timeline.reduce((s, t) => s + (t.time_on_hold_days     || 0), 0);
+            const totalReview     = timeline.reduce((s, t) => s + (t.time_in_review_days   || 0), 0);
+            const totalPending    = timeline.reduce((s, t) => s + (t.time_pending_days     || 0), 0);
+
+
+            timelineChartStatus = new Chart(cd2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['قيد التنفيذ', 'معلقة مؤقتًا', 'قيد المراجعة', 'معلقة'],
+                    datasets: [{
+                        data: [totalInProgress, totalOnHold, totalReview, totalPending],
+                        backgroundColor: ['#3b82f6', '#f59e0b', '#8b5cf6', '#9ca3af'],
+                        borderWidth: 2,
+                        borderColor: '#fff',
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    cutout: '60%',
+                }
+            });
+        }
+    })
+    .catch(err => {
+        loader.innerHTML = '<div class="alert alert-danger">فشل تحميل التحليل</div>';
+        console.error(err);
+    });
+}
+
+
+document.addEventListener('DOMContentLoaded', function () {
+    const perfTab = document.querySelector('[data-bs-target="#tab-perf"]');
+    if (perfTab) {
+        perfTab.addEventListener('shown.bs.tab', function () {
+            const content = document.getElementById('timeline-content');
+            if (content && !content.dataset.loaded) {
+                loadTaskTimeline();
+                content.dataset.loaded = '1';
+            }
+        });
+    }
+});
 </script>
 @endpush
