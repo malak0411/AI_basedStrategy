@@ -1,318 +1,571 @@
 @extends('layouts.app')
 
+
 @section('title', 'تفاصيل البرنامج')
+
 
 @push('styles')
 <style>
-    .initiative-card {
-        background: #fff;
-        border-radius: 12px;
-        padding: 16px;
-        cursor: pointer;
+    .initiative-item {
+        background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 10px;
+        border: 1px solid #e2e8f0; transition: all 0.2s; cursor: pointer;
+    }
+    .initiative-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); transform: translateX(-2px); }
+
+
+    .empty-state { text-align: center; padding: 60px 20px; }
+    .empty-state i { font-size: 64px; color: #cbd5e0; margin-bottom: 16px; }
+
+
+    .status-badge { padding: 6px 14px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+
+
+    .strategic-path {
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        padding: 10px; background: #f7fafc; border-radius: 8px; margin-bottom: 8px;
+    }
+    .strategic-path .node {
+        padding: 5px 12px; border-radius: 8px; font-size: 12px;
+        background: #fff; border: 1px solid #e2e8f0;
+    }
+    .strategic-path .node.pillar { border-color: #dd6b20; color: #dd6b20; }
+    .strategic-path .node.goal   { border-color: #e53e3e; color: #e53e3e; }
+    .strategic-path .node.program{ border-color: #3182ce; color: #3182ce; background: #ebf8ff; font-weight: 600; }
+
+
+    .progress-bar-custom { height: 6px; background: #edf2f7; border-radius: 3px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #3182ce, #4299e1); }
+
+
+    .progress-circle {
+        width: 100px; height: 100px; border-radius: 50%;
+        background: conic-gradient(#3182ce var(--p), #edf2f7 0);
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto;
+    }
+    .progress-circle-inner {
+        width: 78px; height: 78px; border-radius: 50%; background: #fff;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px; font-weight: 700; color: #2b6cb0;
+    }
+
+
+    .stat-box {
+        background: #f7fafc; border-radius: 10px; padding: 12px; text-align: center;
         border: 1px solid #e2e8f0;
-        transition: all 0.2s;
-        border-right: 4px solid #dd6b20;
-        margin-bottom: 12px;
     }
-    .initiative-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    .stat-box .value { font-size: 20px; font-weight: 700; color: #1a202c; }
+    .stat-box .label { font-size: 11px; color: #718096; margin-top: 4px; }
+
+
+    .budget-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 10px 12px; border-radius: 8px; margin-bottom: 6px;
+        background: #f7fafc; border-right: 3px solid #3182ce;
     }
-    .initiative-card.inactive {
-        opacity: 0.5;
-        border-right-color: #ccc;
+    .budget-row.program   { border-right-color: #3182ce; }
+    .budget-row.initiative{ border-right-color: #dd6b20; }
+    .budget-row.major     { border-right-color: #805ad5; }
+    .budget-row.operation { border-right-color: #38a169; }
+
+
+    .budget-row .name { font-weight: 600; font-size: 13px; }
+    .budget-row .amounts { font-size: 12px; color: #4a5568; }
+    .budget-row .amounts strong { color: #1a202c; }
+
+
+    .tx-table th { font-size: 12px; color: #718096; font-weight: 600; }
+    .tx-table td { font-size: 12px; vertical-align: middle; }
+    .tx-type-badge {
+        display: inline-block; padding: 2px 8px; border-radius: 10px;
+        font-size: 10px; font-weight: 600;
     }
-    .program-info {
-        background: #fff;
-        border-radius: 16px;
-        padding: 24px;
-        border: 1px solid #e2e8f0;
-        margin-bottom: 24px;
-    }
-    .text-danger {
-        font-size: 12px;
-        display: none;
+    .tx-in  { background: #c6f6d5; color: #22543d; }
+    .tx-out { background: #fed7d7; color: #822727; }
+    .tx-related {
+        display: inline-block; padding: 2px 8px; border-radius: 10px;
+        font-size: 10px; font-weight: 600; background: #e2e8f0; color: #4a5568;
     }
 </style>
 @endpush
 
+
 @section('content')
 <div class="container-fluid px-4">
-    <div class="mb-3">
-        <a href="{{ route('strategic.programs.index') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-right"></i> العودة للبرامج
-        </a>
-        <a href="{{ route('strategic.goals.show', $program['goal_id'] ?? 0) }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-right"></i> العودة للهدف
-        </a>
-    </div>
 
-    @if(session('success')) <div class="alert alert-success">{{ session('success') }}</div> @endif
-    @if(session('error')) <div class="alert alert-danger">{{ session('error') }}</div> @endif
 
-    @php
-        $programId = $program['id'] ?? 0;
-        $programTitle = $program['name'] ?? $program['title'] ?? '';
-        $programDesc = $program['description'] ?? '';
-        $isActive = $program['is_active'] ?? true;
-        $initiatives = $program['initiatives'] ?? [];
-        $goalName = $program['goal_name'] ?? $program['goal']['name'] ?? '';
-        $budget = $program['budget_estimate'] ?? $program['budget'] ?? 0;
-        $startDate = $program['start_date'] ?? '-';
-        $endDate = $program['end_date'] ?? '-';
-        $status = $program['status'] ?? 'active';
-        $createdAt = $program['created_at'] ?? date('Y-m-d');
-    @endphp
+    <a href="{{ route('strategic.programs.index') }}" class="btn btn-outline-secondary mb-3">
+        <i class="fas fa-arrow-right"></i> العودة للبرامج
+    </a>
 
-    <div class="program-info">
-        <div class="d-flex justify-content-between align-items-start">
-            <div>
-                <h4>{{ $programTitle }}</h4>
-                <p class="text-muted">{{ $programDesc }}</p>
-            </div>
-            <span class="badge bg-{{ $isActive ? 'success' : 'secondary' }} fs-6">
-                {{ $isActive ? 'نشط' : 'غير نشط' }}
-            </span>
-        </div>
-        <div class="row mt-3">
-            <div class="col-md-3">
-                <small class="text-muted">الهدف</small>
-                <div><strong>{{ $goalName }}</strong></div>
-            </div>
-            <div class="col-md-3">
-                <small class="text-muted">الميزانية</small>
-                <div><strong>{{ number_format($budget) }}</strong></div>
-            </div>
-            <div class="col-md-3">
-                <small class="text-muted">تاريخ البداية</small>
-                <div><strong>{{ $startDate }}</strong></div>
-            </div>
-            <div class="col-md-3">
-                <small class="text-muted">تاريخ النهاية</small>
-                <div><strong>{{ $endDate }}</strong></div>
-            </div>
-            <div class="col-md-3">
-                <small class="text-muted">الحالة</small>
-                <div>
-                    <span class="badge bg-{{ $status == 'active' ? 'success' : 'secondary' }}">
-                        {{ $status == 'active' ? 'نشط' : 'غير نشط' }}
-                    </span>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <small class="text-muted">تاريخ الإنشاء</small>
-                <div><strong>{{ $createdAt }}</strong></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5>
-            <i class="fas fa-lightbulb ml-2"></i>
-            المبادرات المرتبطة ({{ count($initiatives) }})
-        </h5>
-        <button class="btn-gold" data-bs-toggle="modal" data-bs-target="#addInitiativeModal">
-            <i class="fas fa-plus"></i> مبادرة جديدة
-        </button>
-    </div>
-
-    @if(empty($initiatives))
-    <div class="card-custom text-center py-5">
-        <i class="fas fa-lightbulb fa-3x text-muted mb-3"></i>
-        <h5>لا توجد مبادرات مرتبطة بهذا البرنامج</h5>
-        <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addInitiativeModal">
-            <i class="fas fa-plus"></i> إضافة أول مبادرة
-        </button>
-    </div>
-    @else
-    @foreach($initiatives as $initiative)
-    @php $iActive = $initiative['is_active'] ?? true; @endphp
-    <div class="initiative-card {{ $iActive ? '' : 'inactive' }}" 
-         onclick="window.location='{{ route('strategic.initiatives.show', $initiative['id']) }}'">
-        <div class="d-flex justify-content-between align-items-start">
-            <div>
-                <h6>{{ $initiative['name'] ?? $initiative['title'] ?? '' }}</h6>
-                <p class="text-muted small mb-0">{{ Str::limit($initiative['description'] ?? '', 100) }}</p>
-            </div>
-            <span class="badge bg-{{ $iActive ? 'success' : 'secondary' }}">
-                {{ $iActive ? 'نشط' : 'غير نشط' }}
-            </span>
-        </div>
-        <div class="mt-2">
-            @if(!empty($initiative['priority']))
-            <small class="text-muted">
-                <i class="fas fa-flag"></i> الأولوية: 
-                <span class="badge bg-{{ $initiative['priority'] == 'high' ? 'danger' : ($initiative['priority'] == 'medium' ? 'warning' : 'info') }}">
-                    {{ $initiative['priority'] == 'high' ? 'عالية' : ($initiative['priority'] == 'medium' ? 'متوسطة' : 'منخفضة') }}
-                </span>
-            </small>
-            @endif
-            @if(!empty($initiative['start_date']))
-            <small class="text-muted me-3">
-                <i class="fas fa-calendar-alt"></i> {{ $initiative['start_date'] }} 
-                <i class="fas fa-arrow-left mx-1"></i> {{ $initiative['end_date'] ?? 'غير محدد' }}
-            </small>
-            @endif
-        </div>
-    </div>
-    @endforeach
-    @endif
-
-    <div class="modal fade" id="addInitiativeModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">
-                        <i class="fas fa-plus-circle ml-2"></i>إضافة مبادرة جديدة
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" action="{{ route('strategic.initiatives.store') }}" onsubmit="return validateInitiativeForm()">
-                    @csrf
-                    <input type="hidden" name="program_id" value="{{ $programId }}">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">اسم المبادرة <span class="text-danger">*</span></label>
-                            <input type="text" name="name" id="initiativeName" class="form-control" required maxlength="255">
-                            <div class="text-danger" id="nameError" style="font-size:12px;display:none;">اسم المبادرة مطلوب</div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">الوصف</label>
-                            <textarea name="description" class="form-control" rows="3"></textarea>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">تاريخ البداية</label>
-                                <input type="date" name="start_date" id="initiativeStart" class="form-control">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">تاريخ النهاية</label>
-                                <input type="date" name="end_date" id="initiativeEnd" class="form-control">
-                                <div class="text-danger" id="dateError" style="font-size:12px;display:none;">تاريخ النهاية يجب أن يكون بعد تاريخ البداية</div>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">الأولوية</label>
-                                <select name="priority" class="form-control">
-                                    <option value="low">منخفضة</option>
-                                    <option value="medium" selected>متوسطة</option>
-                                    <option value="high">عالية</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">الحالة</label>
-                                <select name="status" class="form-control">
-                                    <option value="active">نشط</option>
-                                    <option value="inactive">غير نشط</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                        <button type="submit" class="btn btn-primary">إضافة المبادرة</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-@endsection
-
-@push('scripts')
-<script>
-    function validateInitiativeForm() {
-        const name = document.getElementById('initiativeName').value.trim();
-        const nameError = document.getElementById('nameError');
-        
-        if (!name) {
-            nameError.style.display = 'block';
-            document.getElementById('initiativeName').classList.add('is-invalid');
-            return false;
-        }
-        
-        nameError.style.display = 'none';
-        document.getElementById('initiativeName').classList.remove('is-invalid');
-        
-        const startDate = document.getElementById('initiativeStart').value;
-        const endDate = document.getElementById('initiativeEnd').value;
-        const dateError = document.getElementById('dateError');
-        
-        if (startDate && endDate && endDate < startDate) {
-            dateError.style.display = 'block';
-            document.getElementById('initiativeEnd').classList.add('is-invalid');
-            return false;
-        }
-        
-        dateError.style.display = 'none';
-        document.getElementById('initiativeEnd').classList.remove('is-invalid');
-        
-        return true;
-    }
-
-    document.getElementById('initiativeName').addEventListener('input', function() {
-        const error = document.getElementById('nameError');
-        if (this.value.trim()) {
-            error.style.display = 'none';
-            this.classList.remove('is-invalid');
-        } else {
-            error.style.display = 'block';
-            this.classList.add('is-invalid');
-        }
-    });
-
-    document.getElementById('initiativeEnd').addEventListener('change', function() {
-        const startDate = document.getElementById('initiativeStart').value;
-        const endDate = this.value;
-        const error = document.getElementById('dateError');
-        
-        if (startDate && endDate && endDate < startDate) {
-            error.style.display = 'block';
-            this.classList.add('is-invalid');
-        } else {
-            error.style.display = 'none';
-            this.classList.remove('is-invalid');
-        }
-    });
-
-    document.getElementById('initiativeStart').addEventListener('change', function() {
-        const endDate = document.getElementById('initiativeEnd').value;
-        const startDate = this.value;
-        const error = document.getElementById('dateError');
-        
-        if (startDate && endDate && endDate < startDate) {
-            error.style.display = 'block';
-            document.getElementById('initiativeEnd').classList.add('is-invalid');
-        } else {
-            error.style.display = 'none';
-            document.getElementById('initiativeEnd').classList.remove('is-invalid');
-        }
-    });
 
     @if(session('success'))
-        $(document).ready(function() {
-            if (typeof toastr !== 'undefined') {
-                toastr.success('{{ session('success') }}');
-            }
-        });
+        <div class="alert alert-success alert-dismissible fade show">{{ session('success') }}<button class="btn-close" data-bs-dismiss="alert"></button></div>
     @endif
-
     @if(session('error'))
-        $(document).ready(function() {
-            if (typeof toastr !== 'undefined') {
-                toastr.error('{{ session('error') }}');
-            }
-        });
+        <div class="alert alert-danger alert-dismissible fade show">{{ session('error') }}<button class="btn-close" data-bs-dismiss="alert"></button></div>
     @endif
 
-    @if($errors->any())
-        $(document).ready(function() {
-            @foreach($errors->all() as $error)
-                if (typeof toastr !== 'undefined') {
-                    toastr.error('{{ $error }}');
-                }
-            @endforeach
-        });
-    @endif
-</script>
-@endpush
+
+    @php
+        $statusId    = $program['status_id'] ?? 1;
+        $statusName  = $program['status_name'] ?? 'غير محدد';
+        $statusColor = $program['status_color'] ?? '#6c757d';
+        $progress    = (int) ($program['progress'] ?? 0);
+        $userRole    = $userRole ?? session('user_role', 'employee');
+        $canApprove  = ($userRole === 'minister') && !in_array($statusId, [17, 4]);
+        $canAddInit  = in_array($statusId, [17, 2]);
+        $budget      = $budgetDetails ?? [];
+        $statusesCount = $program['statuses_count'] ?? [];
+    @endphp
+
+
+    <div class="card-custom mb-4">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <h4 class="mb-0">{{ $program['name'] ?? $program['title'] ?? '' }}</h4>
+                    <span class="status-badge"
+                          style="background: {{ $statusColor }}22; color: {{ $statusColor }}; border: 1px solid {{ $statusColor }}55;">
+                        {{ $statusName }}
+                    </span>
+                </div>
+                <p class="text-muted mb-0">{{ $program['description'] ?? '' }}</p>
+            </div>
+
+
+            <div class="d-flex gap-2 flex-wrap">
+
+
+                @if($statusId === 1 && $userRole === 'minister')
+                    <form action="{{ route('strategic.programs.change-status', $program['id']) }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('اعتماد البرنامج؟')">
+                        @csrf
+                        <input type="hidden" name="status_id" value="17">
+                        <button type="submit" class="btn-gold">
+                            <i class="fas fa-check-circle"></i> اعتماد
+                        </button>
+                    </form>
+                @endif
+
+
+                @if($statusId === 17 && $userRole === 'manager')
+                    <form action="{{ route('strategic.programs.change-status', $program['id']) }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('بدء تنفيذ البرنامج؟')">
+                        @csrf
+                        <input type="hidden" name="status_id" value="2">
+                        <button type="submit" class="btn btn-info">
+                            <i class="fas fa-play"></i> بدء التنفيذ
+                        </button>
+                    </form>
+                @endif
+
+
+                @if($statusId === 2 && $userRole === 'manager')
+                    <form action="{{ route('strategic.programs.change-status', $program['id']) }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('تعليم البرنامج كمكتمل؟')">
+                        @csrf
+                        <input type="hidden" name="status_id" value="3">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-flag-checkered"></i> إكمال
+                        </button>
+                    </form>
+                @endif
+
+
+                @if(!in_array($statusId, [4, 3]) && $userRole === 'minister')
+                    <form action="{{ route('strategic.programs.change-status', $program['id']) }}" method="POST" class="d-inline"
+                          onsubmit="return confirm('هل أنت متأكد من إلغاء البرنامج؟')">
+                        @csrf
+                        <input type="hidden" name="status_id" value="4">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-times-circle"></i> إلغاء
+                        </button>
+                    </form>
+                @endif
+
+
+                <a href="{{ route('strategic.programs.edit', $program['id']) }}"
+                   class="btn btn-outline-warning">
+                    <i class="fas fa-edit"></i> تعديل
+                </a>
+
+
+            </div>
+        </div>
+
+
+        @if(in_array($statusId, [17, 2, 3]))
+            <div class="alert alert-warning mt-3 mb-0 py-2">
+                <small>
+                    <i class="fas fa-exclamation-triangle"></i>
+                    أي تعديل على البرنامج سيعيد حالته إلى <strong>"معلق"</strong> وتحتاج لإعادة اعتماد الوزير.
+                </small>
+            </div>
+        @endif
+    </div>
+
+
+    <div class="row mb-4">
+        <div class="col-md-3 mb-2">
+            <div class="stat-box">
+                <div class="value text-primary">{{ $program['initiatives_count'] ?? 0 }}</div>
+                <div class="label"><i class="fas fa-lightbulb ml-1"></i> المبادرات</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="stat-box">
+                <div class="value text-purple" style="color: #805ad5;">{{ $program['major_tasks_count'] ?? 0 }}</div>
+                <div class="label"><i class="fas fa-tasks ml-1"></i> المهام الرئيسية</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="stat-box">
+                <div class="value text-success">{{ $program['total_operational_completed'] ?? 0 }}/{{ $program['total_operational_tasks'] ?? 0 }}</div>
+                <div class="label"><i class="fas fa-cog ml-1"></i> المهام التشغيلية المكتملة</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-2">
+            <div class="stat-box">
+                <div class="value" style="color: #dd6b20;">{{ number_format($program['budget_estimate'] ?? 0) }}</div>
+                <div class="label"><i class="fas fa-coins ml-1"></i> الميزانية التقديرية</div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="row">
+        <div class="col-lg-8">
+
+
+            <div class="card-custom mb-4">
+                <h6 class="mb-3"><i class="fas fa-sitemap text-primary ml-2"></i>الخريطة الاستراتيجية</h6>
+                <div class="strategic-path">
+                    <span class="node pillar">
+                        <i class="fas fa-layer-group"></i> {{ $program['pillar_name'] ?? '—' }}
+                    </span>
+                    <i class="fas fa-arrow-left text-muted"></i>
+                    <span class="node goal">
+                        <i class="fas fa-bullseye"></i> {{ $program['goal_name'] ?? '—' }}
+                    </span>
+                    <i class="fas fa-arrow-left text-muted"></i>
+                    <span class="node program">
+                        <i class="fas fa-project-diagram"></i> {{ $program['name'] ?? '—' }}
+                    </span>
+                </div>
+
+
+                @if(!empty($program['goal_description']))
+                    <div class="mt-3 p-3" style="background: #fef5e7; border-radius: 8px; border-right: 3px solid #dd6b20;">
+                        <small class="text-muted d-block mb-1"><i class="fas fa-bullseye ml-1"></i> وصف الهدف الاستراتيجي</small>
+                        <div style="font-size: 13px;">{{ $program['goal_description'] }}</div>
+                        @if($program['goal_target_date'])
+                            <small class="text-muted d-block mt-2">
+                                <i class="far fa-calendar ml-1"></i>
+                                التاريخ المستهدف: <strong>{{ $program['goal_target_date'] }}</strong>
+                            </small>
+                        @endif
+                    </div>
+                @endif
+
+
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">تاريخ بداية البرنامج</small>
+                        <strong>{{ $program['start_date'] ?? '—' }}</strong>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">تاريخ نهاية البرنامج</small>
+                        <strong>{{ $program['end_date'] ?? '—' }}</strong>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">حالة المبادرات</small>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                            @if(($statusesCount['draft'] ?? 0) > 0)
+                                <span class="badge bg-secondary">مسودة: {{ $statusesCount['draft'] }}</span>
+                            @endif
+                            @if(($statusesCount['approved'] ?? 0) > 0)
+                                <span class="badge bg-primary">معتمد: {{ $statusesCount['approved'] }}</span>
+                            @endif
+                            @if(($statusesCount['in_progress'] ?? 0) > 0)
+                                <span class="badge bg-info">قيد التنفيذ: {{ $statusesCount['in_progress'] }}</span>
+                            @endif
+                            @if(($statusesCount['completed'] ?? 0) > 0)
+                                <span class="badge bg-success">مكتمل: {{ $statusesCount['completed'] }}</span>
+                            @endif
+                            @if(($statusesCount['pending'] ?? 0) > 0)
+                                <span class="badge bg-warning text-dark">معلق: {{ $statusesCount['pending'] }}</span>
+                            @endif
+                            @if(($statusesCount['cancelled'] ?? 0) > 0)
+                                <span class="badge bg-danger">ملغي: {{ $statusesCount['cancelled'] }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">
+                    <i class="fas fa-lightbulb ml-2"></i>
+                    المبادرات التابعة للبرنامج ({{ count($initiatives) }})
+                </h5>
+                <div class="d-flex gap-2">
+                    @if($canAddInit)
+                        <a href="{{ route('strategic.initiatives.create') }}?program_id={{ $program['id'] }}" class="btn-gold btn-sm">
+                            <i class="fas fa-plus"></i> مبادرة جديدة
+                        </a>
+                    @else
+                        <span class="badge bg-secondary py-2 px-3">
+                            <i class="fas fa-lock"></i>
+                            يجب اعتماد البرنامج أولاً لإنشاء المبادرات
+                        </span>
+                    @endif
+                </div>
+            </div>
+
+
+            @if(empty($initiatives))
+                <div class="empty-state card-custom">
+                    <i class="fas fa-lightbulb"></i>
+                    @if($statusId === 17 || $statusId === 2)
+                        <h5>لا توجد مبادرات لهذا البرنامج</h5>
+                        <p class="text-muted">يمكنك إنشاء مبادرة جديدة من الزر أعلاه</p>
+                    @else
+                        <h5>🔒 لا يمكن إنشاء مبادرات قبل اعتماد البرنامج</h5>
+                        <p class="text-muted">يرجى اعتماد البرنامج من قِبل الوزير أولاً</p>
+                    @endif
+                </div>
+            @else
+                @foreach($initiatives as $initiative)
+                @php
+                    $initStatusColor = $initiative['status_color'] ?? '#6c757d';
+                    $initStatusName  = $initiative['status_name'] ?? 'غير محدد';
+                    $initProgress    = (int) ($initiative['progress'] ?? 0);
+                @endphp
+
+
+                <div class="initiative-item" onclick="window.location='{{ route('strategic.initiatives.show', $initiative['id']) }}'">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <h6 class="mb-0">{{ $initiative['name'] ?? '' }}</h6>
+                                <span class="status-badge"
+                                      style="background: {{ $initStatusColor }}22; color: {{ $initStatusColor }}; border: 1px solid {{ $initStatusColor }}55; font-size: 11px; padding: 3px 10px;">
+                                    {{ $initStatusName }}
+                                </span>
+                            </div>
+                            <p class="text-muted small mb-2">{{ Str::limit($initiative['description'] ?? '', 150) }}</p>
+
+
+                            <div class="d-flex gap-3 flex-wrap">
+                                <small class="text-muted">
+                                    <i class="fas fa-tasks ml-1"></i>
+                                    مهام رئيسية: {{ $initiative['major_tasks_count'] ?? 0 }}
+                                </small>
+                                <small class="text-muted">
+                                    <i class="fas fa-cog ml-1"></i>
+                                    تشغيلية: {{ $initiative['operational_completed'] ?? 0 }}/{{ $initiative['operational_count'] ?? 0 }}
+                                </small>
+                                <small class="text-primary">
+                                    <i class="fas fa-chart-line ml-1"></i>
+                                    التقدم: {{ $initProgress }}%
+                                </small>
+                                <small class="text-muted">
+                                    <i class="fas fa-coins ml-1"></i>
+                                    {{ number_format($initiative['budget_estimate'] ?? 0) }}
+                                </small>
+                            </div>
+
+
+                            <div class="progress-bar-custom mt-2">
+                                <div class="progress-bar-fill" style="width: {{ $initProgress }}%"></div>
+                            </div>
+                        </div>
+
+
+                        <div class="ms-2">
+                            <i class="fas fa-chevron-left text-muted"></i>
+                        </div>
+                    </div>
+                </div>
+                @endforeach
+            @endif
+
+
+        </div>
+
+
+        <div class="col-lg-4">
+
+
+            <div class="card-custom mb-4 text-center">
+                <h6 class="mb-3">نسبة التقدم الكلية</h6>
+                <div class="progress-circle" style="--p: {{ $progress }}%">
+                    <div class="progress-circle-inner">{{ $progress }}%</div>
+                </div>
+                <small class="text-muted d-block mt-2">
+                    متوسط تقدم المبادرات التابعة
+                </small>
+            </div>
+
+
+            <div class="card-custom mb-4">
+                <h6 class="mb-3"><i class="fas fa-wallet text-primary ml-1"></i> الميزانية التفصيلية</h6>
+
+
+                @php
+                    $bProgram = $budget['program'] ?? ['allocated'=>0,'spent'=>0,'remaining'=>0];
+                    $bInit    = $budget['initiatives'] ?? ['allocated'=>0,'spent'=>0,'remaining'=>0,'count'=>0];
+                    $bMajor   = $budget['major_tasks'] ?? ['allocated'=>0,'spent'=>0,'remaining'=>0,'count'=>0];
+                    $bOps     = $budget['operations'] ?? ['allocated'=>0,'spent'=>0,'remaining'=>0,'count'=>0];
+                    $bTotal   = $budget['total'] ?? ['allocated'=>0,'spent'=>0,'remaining'=>0];
+                @endphp
+
+
+                <div class="budget-row program">
+                    <div>
+                        <div class="name"><i class="fas fa-project-diagram ml-1"></i> البرنامج (مباشر)</div>
+                    </div>
+                    <div class="amounts text-end">
+                        <div>مخصص: <strong>{{ number_format($bProgram['allocated']) }}</strong></div>
+                        <div>منفق: <strong class="text-danger">{{ number_format($bProgram['spent']) }}</strong></div>
+                    </div>
+                </div>
+
+
+                <div class="budget-row initiative">
+                    <div>
+                        <div class="name"><i class="fas fa-lightbulb ml-1"></i> المبادرات ({{ $bInit['count'] ?? 0 }})</div>
+                    </div>
+                    <div class="amounts text-end">
+                        <div>مخصص: <strong>{{ number_format($bInit['allocated']) }}</strong></div>
+                        <div>منفق: <strong class="text-danger">{{ number_format($bInit['spent']) }}</strong></div>
+                    </div>
+                </div>
+
+
+                <div class="budget-row major">
+                    <div>
+                        <div class="name"><i class="fas fa-tasks ml-1"></i> المهام الرئيسية ({{ $bMajor['count'] ?? 0 }})</div>
+                    </div>
+                    <div class="amounts text-end">
+                        <div>مخصص: <strong>{{ number_format($bMajor['allocated']) }}</strong></div>
+                        <div>منفق: <strong class="text-danger">{{ number_format($bMajor['spent']) }}</strong></div>
+                    </div>
+                </div>
+
+
+                <div class="budget-row operation">
+                    <div>
+                        <div class="name"><i class="fas fa-cog ml-1"></i> المهام التشغيلية ({{ $bOps['count'] ?? 0 }})</div>
+                    </div>
+                    <div class="amounts text-end">
+                        <div>مخصص: <strong>{{ number_format($bOps['allocated']) }}</strong></div>
+                        <div>منفق: <strong class="text-danger">{{ number_format($bOps['spent']) }}</strong></div>
+                    </div>
+                </div>
+
+
+                <hr>
+
+
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted">إجمالي المخصص</span>
+                    <strong class="text-primary">{{ number_format($bTotal['allocated'] ?? 0) }}</strong>
+                </div>
+                <div class="d-flex justify-content-between py-2 border-bottom">
+                    <span class="text-muted">إجمالي المنفق</span>
+                    <strong class="text-danger">{{ number_format($bTotal['spent'] ?? 0) }}</strong>
+                </div>
+                <div class="d-flex justify-content-between py-2">
+                    <span class="text-muted">المتبقي</span>
+                    <strong class="text-success">{{ number_format($bTotal['remaining'] ?? 0) }}</strong>
+                </div>
+            </div>
+
+
+            <div class="card-custom mb-4">
+                <h6 class="mb-3">
+                    <i class="fas fa-history text-warning ml-1"></i>
+                    سجل الحركات المالية
+                    @if(!empty($budget['transactions']))
+                        <span class="badge bg-secondary">{{ count($budget['transactions']) }}</span>
+                    @endif
+                </h6>
+                @if(!empty($budget['transactions']))
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm tx-table mb-0">
+                            <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                                <tr>
+                                    <th>التاريخ</th>
+                                    <th>النوع</th>
+                                    <th>المبلغ</th>
+                                    <th>مرتبط بـ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($budget['transactions'] as $tx)
+                                <tr>
+                                    <td><small>{{ $tx['date'] ? \Carbon\Carbon::parse($tx['date'])->format('Y-m-d') : '—' }}</small></td>
+                                    <td>
+                                        @php
+                                            $sign = $tx['type_sign'] ?? 1;
+                                            $typeClass = ($sign > 0) ? 'tx-in' : 'tx-out';
+                                        @endphp
+                                        <span class="tx-type-badge {{ $typeClass }}">
+                                            {{ $tx['type_name'] ?? '—' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <strong class="{{ $sign > 0 ? 'text-success' : 'text-danger' }}">
+                                            {{ number_format($tx['amount'] ?? 0) }}
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        @php
+                                            $typeLabels = [
+                                                'program' => 'برنامج',
+                                                'initiative' => 'مبادرة',
+                                                'major_task' => 'مهمة رئيسية',
+                                                'operational_task' => 'مهمة تشغيلية',
+                                            ];
+                                            $typeLabel = $typeLabels[$tx['budgetable_type'] ?? ''] ?? '';
+                                        @endphp
+                                        @if($typeLabel)
+                                            <div><span class="tx-related">{{ $typeLabel }}</span></div>
+                                        @endif
+                                        <small class="text-muted">{{ $tx['budgetable_name'] ?? '' }}</small>
+                                    </td>
+                                </tr>
+                                @if(!empty($tx['description']))
+                                <tr>
+                                    <td colspan="4" class="border-0 pt-0">
+                                        <small class="text-muted"><i class="fas fa-comment ml-1"></i>{{ $tx['description'] }}</small>
+                                    </td>
+                                </tr>
+                                @endif
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="text-center py-4">
+                        <i class="fas fa-receipt text-muted" style="font-size: 32px;"></i>
+                        <p class="text-muted small mt-2 mb-0">
+                            لا توجد حركات مالية مسجلة على البرنامج أو عناصره التابعة
+                        </p>
+                        <small class="text-muted">
+                            (المبادرات / المهام الرئيسية / المهام التشغيلية)
+                        </small>
+                    </div>
+                @endif
+            </div>
+
+
+        </div>
+    </div>
+
+
+</div>
+@endsection

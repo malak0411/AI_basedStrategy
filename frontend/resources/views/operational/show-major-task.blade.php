@@ -278,8 +278,6 @@
         title="تعديل">
     <i class="fas fa-edit"></i>
 </button>
-
-                    <i class="fas fa-edit"></i>
                 </button>
                 <form action="{{ route('operational.destroy', $task['id'] ?? 0) }}" method="POST" onsubmit="return confirm('متأكد من حذف هذه المهمة؟')" style="display:inline;">
                     @csrf @method('DELETE')

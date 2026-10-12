@@ -1,60 +1,118 @@
 @extends('layouts.app')
 
-@section('title', 'تحرير تحليل SWOT')
+
+@section('title', 'تعديل تحليل SWOT')
+
+
+@push('styles')
+<style>
+    .swot-form-box {
+        background: #fff; border-radius: 12px; padding: 20px;
+        border: 1px solid #e2e8f0; height: 100%;
+        border-top: 4px solid #e2e8f0;
+    }
+    .swot-form-box.strengths     { border-top-color: #38a169; }
+    .swot-form-box.weaknesses    { border-top-color: #e53e3e; }
+    .swot-form-box.opportunities { border-top-color: #3182ce; }
+    .swot-form-box.threats       { border-top-color: #dd6b20; }
+
+
+    .swot-form-title {
+        font-size: 15px; font-weight: 700; margin-bottom: 12px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .swot-form-box.strengths     .swot-form-title { color: #38a169; }
+    .swot-form-box.weaknesses    .swot-form-title { color: #e53e3e; }
+    .swot-form-box.opportunities .swot-form-title { color: #3182ce; }
+    .swot-form-box.threats       .swot-form-title { color: #dd6b20; }
+</style>
+@endpush
+
 
 @section('content')
 <div class="container-fluid px-4">
+
+
     <a href="{{ route('strategic.swot.index') }}" class="btn btn-outline-secondary mb-3">
-        <i class="fas fa-arrow-right"></i> العودة للعرض
+        <i class="fas fa-arrow-right"></i> العودة للتحليل
     </a>
 
+
     @if(session('error'))
-        <div class="alert alert-danger">{{ session('error') }}</div>
+        <div class="alert alert-danger alert-dismissible fade show">{{ session('error') }}<button class="btn-close" data-bs-dismiss="alert"></button></div>
     @endif
 
+
     <div class="card-custom">
-        <h4 class="mb-4"><i class="fas fa-edit ml-2"></i>تحرير تحليل SWOT</h4>
+        <h4 class="mb-4"><i class="fas fa-edit text-warning ml-2"></i>تعديل تحليل SWOT</h4>
+
 
         <form method="POST" action="{{ route('strategic.swot.update') }}">
             @csrf
             @method('PUT')
-            <div class="row">
-                <div class="col-md-6 mb-4">
-                    <label class="form-label fw-bold text-success">
-                        <i class="fas fa-check-circle ml-1"></i> نقاط القوة (Strengths)
-                    </label>
-                    <textarea name="strengths" class="form-control" rows="6" 
-                        placeholder="ما الذي نقوم به بشكل جيد؟&#10;ما هي مواردنا الفريدة؟&#10;ما هي ميزتنا التنافسية؟">{{ $swot['strengths'] ?? '' }}</textarea>
+
+
+            <div class="row g-3">
+
+
+                <div class="col-md-6">
+                    <div class="swot-form-box strengths">
+                        <div class="swot-form-title">
+                            <i class="fas fa-plus-circle"></i> نقاط القوة
+                        </div>
+                        <textarea name="strengths" class="form-control" rows="6"
+                                  placeholder="اكتب كل نقطة في سطر منفصل...">{{ old('strengths', $swot['strengths'] ?? '') }}</textarea>
+                    </div>
                 </div>
-                <div class="col-md-6 mb-4">
-                    <label class="form-label fw-bold text-danger">
-                        <i class="fas fa-exclamation-circle ml-1"></i> نقاط الضعف (Weaknesses)
-                    </label>
-                    <textarea name="weaknesses" class="form-control" rows="6"
-                        placeholder="ما الذي يمكن تحسينه؟&#10;ما الذي يجب تجنبه؟&#10;أين تنقصنا الموارد؟">{{ $swot['weaknesses'] ?? '' }}</textarea>
+
+
+                <div class="col-md-6">
+                    <div class="swot-form-box weaknesses">
+                        <div class="swot-form-title">
+                            <i class="fas fa-minus-circle"></i> نقاط الضعف
+                        </div>
+                        <textarea name="weaknesses" class="form-control" rows="6"
+                                  placeholder="اكتب كل نقطة في سطر منفصل...">{{ old('weaknesses', $swot['weaknesses'] ?? '') }}</textarea>
+                    </div>
                 </div>
-                <div class="col-md-6 mb-4">
-                    <label class="form-label fw-bold text-info">
-                        <i class="fas fa-lightbulb ml-1"></i> الفرص (Opportunities)
-                    </label>
-                    <textarea name="opportunities" class="form-control" rows="6"
-                        placeholder="ما هي الفرص المتاحة؟&#10;ما هي التوجهات الجديدة؟&#10;كيف يمكننا التوسع؟">{{ $swot['opportunities'] ?? '' }}</textarea>
+
+
+                <div class="col-md-6">
+                    <div class="swot-form-box opportunities">
+                        <div class="swot-form-title">
+                            <i class="fas fa-lightbulb"></i> الفرص
+                        </div>
+                        <textarea name="opportunities" class="form-control" rows="6"
+                                  placeholder="اكتب كل فرصة في سطر منفصل...">{{ old('opportunities', $swot['opportunities'] ?? '') }}</textarea>
+                    </div>
                 </div>
-                <div class="col-md-6 mb-4">
-                    <label class="form-label fw-bold text-warning">
-                        <i class="fas fa-exclamation-triangle ml-1"></i> التهديدات (Threats)
-                    </label>
-                    <textarea name="threats" class="form-control" rows="6"
-                        placeholder="ما هي التهديدات المحتملة؟&#10;ماذا يفعل المنافسون؟&#10;ما هي العوائق الخارجية؟">{{ $swot['threats'] ?? '' }}</textarea>
+
+
+                <div class="col-md-6">
+                    <div class="swot-form-box threats">
+                        <div class="swot-form-title">
+                            <i class="fas fa-exclamation-triangle"></i> التهديدات
+                        </div>
+                        <textarea name="threats" class="form-control" rows="6"
+                                  placeholder="اكتب كل تهديد في سطر منفصل...">{{ old('threats', $swot['threats'] ?? '') }}</textarea>
+                    </div>
                 </div>
-                <div class="col-12">
-                    <button type="submit" class="btn-gold btn-lg">
-                        <i class="fas fa-save ml-1"></i> حفظ التحليل
-                    </button>
-                    <a href="{{ route('strategic.swot.index') }}" class="btn btn-outline-secondary btn-lg mr-3">إلغاء</a>
-                </div>
+
+
+            </div>
+
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn-gold">
+                    <i class="fas fa-save"></i> حفظ التحليل
+                </button>
+                <a href="{{ route('strategic.swot.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> إلغاء
+                </a>
             </div>
         </form>
     </div>
+
+
 </div>
 @endsection

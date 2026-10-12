@@ -312,21 +312,24 @@ Route::put('/operational/risks/mitigations/{mitigationId}', [OperationalTaskCont
 
     Route::prefix('strategic')->name('strategic.')->group(function () {
         Route::get('/vision', [VisionController::class, 'index'])->name('vision.index');
+        Route::get('/vision/edit', [VisionController::class, 'edit'])->name('vision.edit');
         Route::put('/vision', [VisionController::class, 'update'])->name('vision.update');
 
-        Route::get('/pillars', [PillarController::class, 'index'])->name('pillars.index');
-        Route::get('/pillars/{id}', [PillarController::class, 'show'])->name('pillars.show');
-        Route::post('/pillars', [PillarController::class, 'store'])->name('pillars.store');
-        Route::put('/pillars/{id}', [PillarController::class, 'update'])->name('pillars.update');
-        Route::delete('/pillars/{id}', [PillarController::class, 'destroy'])->name('pillars.destroy');
 
-        Route::get('/goals', [GoalController::class, 'index'])->name('goals.index');
+        Route::get('/pillars', [PillarController::class, 'index'])->name('pillars.index');
+        Route::get('/pillars/create', [PillarController::class, 'create'])->name('pillars.create');
+        Route::post('/pillars', [PillarController::class, 'store'])->name('pillars.store');
+        Route::get('/pillars/{id}', [PillarController::class, 'show'])->name('pillars.show');
+        Route::get('/pillars/{id}/edit', [PillarController::class, 'edit'])->name('pillars.edit');
+        Route::put('/pillars/{id}', [PillarController::class, 'update'])->name('pillars.update');
+
+
+        Route::get('/goals', [GoalController::class, 'index'])->name('goals.index');    
         Route::get('/goals/create', [GoalController::class, 'create'])->name('goals.create');
         Route::post('/goals', [GoalController::class, 'store'])->name('goals.store');
         Route::get('/goals/{id}', [GoalController::class, 'show'])->name('goals.show');
         Route::get('/goals/{id}/edit', [GoalController::class, 'edit'])->name('goals.edit');
         Route::put('/goals/{id}', [GoalController::class, 'update'])->name('goals.update');
-        Route::delete('/goals/{id}', [GoalController::class, 'destroy'])->name('goals.destroy');
 
         Route::get('/programs', [ProgramController::class, 'index'])->name('programs.index');
         Route::get('/programs/create', [ProgramController::class, 'create'])->name('programs.create');
@@ -334,7 +337,8 @@ Route::put('/operational/risks/mitigations/{mitigationId}', [OperationalTaskCont
         Route::get('/programs/{id}', [ProgramController::class, 'show'])->name('programs.show');
         Route::get('/programs/{id}/edit', [ProgramController::class, 'edit'])->name('programs.edit');
         Route::put('/programs/{id}', [ProgramController::class, 'update'])->name('programs.update');
-        Route::delete('/programs/{id}', [ProgramController::class, 'destroy'])->name('programs.destroy');
+        Route::post('/programs/{id}/change-status', [ProgramController::class, 'changeStatus'])->name('programs.change-status');
+
 
         Route::get('/initiatives', [InitiativeController::class, 'index'])->name('initiatives.index');
         Route::get('/initiatives/create', [InitiativeController::class, 'create'])->name('initiatives.create');
@@ -342,15 +346,20 @@ Route::put('/operational/risks/mitigations/{mitigationId}', [OperationalTaskCont
         Route::get('/initiatives/{id}', [InitiativeController::class, 'show'])->name('initiatives.show');
         Route::get('/initiatives/{id}/edit', [InitiativeController::class, 'edit'])->name('initiatives.edit');
         Route::put('/initiatives/{id}', [InitiativeController::class, 'update'])->name('initiatives.update');
-        Route::delete('/initiatives/{id}', [InitiativeController::class, 'destroy'])->name('initiatives.destroy');
+        Route::post('/initiatives/{id}/change-status', [InitiativeController::class, 'changeStatus'])->name('initiatives.change-status');
+        Route::post('/initiatives/{id}/approve', [InitiativeController::class, 'approve'])->name('initiatives.approve');
+        Route::post('/initiatives/{id}/major-tasks', [InitiativeController::class, 'storeMajorTask'])->name('initiatives.major-tasks.store');
+
 
         Route::get('/swot', [SwotController::class, 'index'])->name('swot.index');
         Route::get('/swot/edit', [SwotController::class, 'edit'])->name('swot.edit');
         Route::put('/swot', [SwotController::class, 'update'])->name('swot.update');
 
+
         Route::get('/pestel', [PestelController::class, 'index'])->name('pestel.index');
         Route::get('/pestel/edit', [PestelController::class, 'edit'])->name('pestel.edit');
         Route::put('/pestel', [PestelController::class, 'update'])->name('pestel.update');
+
     });
 
     Route::prefix('ai')->name('ai.')->group(function () {
