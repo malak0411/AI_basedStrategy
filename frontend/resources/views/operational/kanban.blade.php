@@ -10,8 +10,8 @@
             <p class="text-muted mb-0">اسحب وأفلت المهام بين الأعمدة لتغيير حالتها</p>
         </div>
         <div>
-            <a href="{{ route('operational.show-major-task', $majorTaskId ?? 0) }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-right"></i> العودة للمهمة الرئيسية
+            <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-right"></i> العودة
             </a>
         </div>
     </div>

@@ -14,7 +14,7 @@
                class="btn btn-success me-2">
                 <i class="fas fa-download"></i> تحميل
             </a>
-            <a href="{{ url()->previous() }}" class="btn btn-outline-secondary">
+            <a href="javascript:history.back()" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-right"></i> العودة
             </a>
         </div>

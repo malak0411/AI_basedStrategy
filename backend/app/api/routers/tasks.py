@@ -743,7 +743,6 @@ async def assign_employee_to_task(
     if not employee:
         raise HTTPException(404, "الموظف غير موجود")
     
-    # منع وجود أكثر من مسؤول نهائي
     if role_type_id == 2:
         existing_responsible = db.query(TaskAssignment).filter(
             TaskAssignment.task_id == task_id,
@@ -753,7 +752,6 @@ async def assign_employee_to_task(
         if existing_responsible:
             raise HTTPException(400, "يوجد مسؤول نهائي لهذه المهمة بالفعل")
     
-    # التحقق من وجود توزيع نشط لنفس الموظف والمهمة
     existing = db.query(TaskAssignment).filter(
         TaskAssignment.task_id == task_id,
         TaskAssignment.employee_id == employee_id,
@@ -775,7 +773,6 @@ async def assign_employee_to_task(
             "data": {"assignment_id": existing.assignment_id}
         }
     
-    # التحقق من وجود توزيع غير نشط لنفس الموظف والمهمة (إعادة تفعيل)
     inactive = db.query(TaskAssignment).filter(
         TaskAssignment.task_id == task_id,
         TaskAssignment.employee_id == employee_id,
@@ -798,7 +795,6 @@ async def assign_employee_to_task(
             "data": {"assignment_id": inactive.assignment_id}
         }
     
-    # إنشاء توزيع جديد
     assignment = TaskAssignment(
         task_id=task_id,
         employee_id=employee_id,
@@ -863,6 +859,40 @@ async def update_assignment_hours(
     db.commit()
     
     return {"success": True, "message": "تم تحديث الساعات المقدرة"}
+
+@router.post("/assignments/{assignment_id}/force-assign")
+async def force_assign_assignment(
+    assignment_id: int,
+    current_user: Employee = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    assignment = db.query(TaskAssignment).filter(
+        TaskAssignment.assignment_id == assignment_id,
+        TaskAssignment.is_active == True
+    ).first()
+
+
+    if not assignment:
+        raise HTTPException(404, "التوزيع غير موجود")
+
+
+    assignment.acceptance_status = "accepted"
+    assignment.rejection_reason = None
+    assignment.assigned_by = current_user
+    assignment.assigned_at = datetime.now()
+
+
+    db.commit()
+    db.refresh(assignment)
+
+
+    return {
+        "success": True,
+        "message": "تم الإسناد الإجباري بنجاح",
+        "data": {"assignment_id": assignment.assignment_id}
+    }
+
+
 
 @router.put("/{task_id}/update-status")
 async def update_task_status(
@@ -1982,3 +2012,4 @@ async def send_task_to_review(
 
 
     return {"success": True, "data": {"status_id": 8}}
+

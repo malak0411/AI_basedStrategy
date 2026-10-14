@@ -4,9 +4,9 @@
 
 @section('content')
 <div class="container-fluid px-4">
-    <a href="{{ route('operational.index') }}" class="btn btn-outline-secondary mb-3">
-        <i class="fas fa-arrow-right"></i> العودة
-    </a>
+    <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-right"></i> العودة
+            </a>
 
     @if(empty($task))
     <div class="alert alert-info">المهمة غير موجودة</div>

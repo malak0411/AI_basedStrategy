@@ -9,8 +9,8 @@
             <i class="fas fa-paperclip text-primary me-2"></i>
             مرفقات المهمة: {{ data_get($task, 'task_name', data_get($task, 'title', '#' . ($taskId ?? 0))) }}
         </h4>
-        <a href="{{ route('operational.kanban') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-right me-1"></i> العودة للوحة
+        <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-right"></i> العودة
         </a>
     </div>
 

@@ -136,8 +136,8 @@
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-            <a href="{{ route('operational.major-tasks') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-right"></i> العودة للمهام الرئيسية
+            <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-right"></i> العودة
             </a>
         </div>
         @if($isLeadDepartment ?? true)

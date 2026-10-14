@@ -904,6 +904,40 @@ public function assignEmployees($taskId)
         }
     }
 
+    foreach ($rejectedAssignments as &$assign) {
+    if (!isset($assign['employee']) || empty($assign['employee'])) {
+        $empId = $assign['employee_id'] ?? null;
+        if ($empId) {
+            $empResponse = $this->apiClient->get(
+                "/api/employees/{$empId}",
+                $token
+            );
+            $empData = $empResponse['data'] ?? $empResponse ?? [];
+            $assign['employee'] = [
+                'employee_id' => $empId,
+                'full_name'   => $empData['full_name'] ?? $empData['name'] ?? $assign['employee_name'] ?? 'غير محدد',
+                'job_title'   => $empData['job_title'] ?? $empData['title'] ?? 'موظف',
+            ];
+        }
+    }
+
+
+    if (isset($assign['employee'])) {
+        $empId = $assign['employee']['employee_id'] ?? $assign['employee_id'] ?? null;
+        if ($empId) {
+            $statsResponse = $this->apiClient->get(
+                "/api/employees/{$empId}/task-stats",
+                $token
+            );
+            $stats = $statsResponse['data'] ?? [];
+            $assign['employee']['total_tasks'] = $stats['total_tasks'] ?? 0;
+            $assign['employee']['total_hours'] = $stats['total_hours'] ?? 0;
+        }
+    }
+}
+unset($assign);
+
+
     $roleTypes = $this->apiClient->get('/api/dict/role-types', $token);
 
     $hasResponsible = count($responsibleAssignments) > 0;
@@ -977,6 +1011,7 @@ public function assignEmployees($taskId)
         return response()->json($response);
     }
 
+
     public function removeTaskAssignment(Request $request)
     {
         if (!$this->isManager()) {
@@ -996,6 +1031,34 @@ public function assignEmployees($taskId)
 
         return response()->json($response);
     }
+
+    
+    public function forceAssign(Request $request)
+{
+    if (!$this->isManager()) {
+        return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+    }
+
+
+    $request->validate([
+        'assignment_id' => 'required|integer'
+    ]);
+
+
+    $token = session('jwt_token');
+
+
+    $response = $this->apiClient->post(
+        "/api/tasks/assignments/{$request->assignment_id}/force-assign",
+        [],
+        $token
+    );
+
+
+    return response()->json($response);
+}
+
+
 
     public function finalizeTask(Request $request)
     {

@@ -95,9 +95,9 @@
 
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <a href="{{ route('operational.kanban') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-right"></i> العودة للوحة المهام
-        </a>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-right"></i> العودة
+            </a>
         <div class="d-flex gap-2 flex-wrap">
             @if($canSendToReview)
                 <button type="button" class="btn btn-warning"
@@ -641,151 +641,172 @@
 
 
             <div class="sidebar-card mb-4">
-                <div class="sidebar-card-header">
-                    <h6 class="mb-0">
-                        <i class="fas fa-exclamation-triangle text-danger me-1"></i>
-                        المخاطر
-                        <span class="badge bg-danger ms-1">{{ $risksCount }}</span>
-                    </h6>
-                </div>
-                <div class="sidebar-card-body">
-                    @if(empty($risks))
-                        <div class="text-center py-3 text-muted">
-                            <i class="fas fa-shield-alt fa-2x d-block mb-2 opacity-25"></i>
-                            <p class="mb-1 small">لا توجد مخاطر</p>
+    <div class="sidebar-card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">
+            <i class="fas fa-exclamation-triangle text-danger me-1"></i>
+            المخاطر
+            <span class="badge bg-danger ms-1">{{ $risksCount }}</span>
+        </h6>
+        @if($isManager)
+    <a href="{{ route('risks.create') }}"
+       class="btn btn-sm btn-outline-danger"
+       style="padding:2px 8px;font-size:11px;">
+        <i class="fas fa-plus"></i> إضافة
+    </a>
+@endif
+    </div>
+    <div class="sidebar-card-body">
+        @if(empty($risks))
+            <div class="text-center py-3 text-muted">
+                <i class="fas fa-shield-alt fa-2x d-block mb-2 opacity-25"></i>
+                <p class="mb-1 small">لا توجد مخاطر</p>
+                @if($isManager)
+                    <small style="font-size:11px;">شغّل التنبؤ لكشف المخاطر أو أضف يدوياً</small>
+                @endif
+            </div>
+        @else
+            @foreach($risks as $risk)
+                @php
+                    $riskId      = $risk['risk_id'] ?? 0;
+                    $level       = $risk['risk_level'] ?? [];
+                    $levelColor  = $level['color_hex'] ?? '#6c757d';
+                    $status      = $risk['status'] ?? [];
+                    $statusColor = $status['color_hex'] ?? '#6c757d';
+                    $mitigations = $risk['mitigations'] ?? [];
+                    $aiRecs      = $risk['ai_recommendations'] ?? [];
+                    $score       = (int)($risk['risk_score'] ?? 0);
+                    $scoreColor  = $score >= 60 ? 'danger' : ($score >= 40 ? 'warning' : 'success');
+                @endphp
+
+
+                <div class="risk-sidebar-item mb-3"
+                     id="risk-{{ $riskId }}"
+                     @if($isManager)
+                     onclick="goToRiskDetails({{ $riskId }})"
+                     @endif
+                     style="cursor:pointer; transition: all 0.2s;"
+                     onmouseover="this.style.transform='translateX(-3px)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';"
+                     onmouseout="this.style.transform='translateX(0)'; this.style.boxShadow='none';">
+
+
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div class="flex-grow-1">
+                            <span class="badge mb-1"
+                                  style="background-color: {{ $levelColor }}; color: #fff; font-size:10px;">
+                                {{ $level['name_ar'] ?? 'غير محدد' }}
+                            </span>
+                            <div class="risk-title d-flex justify-content-between align-items-center">
+                                <span>{{ $risk['name'] ?? '' }}</span>
+                                <i class="fas fa-chevron-left text-muted" style="font-size:10px;"></i>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="risk-stats-row">
+                        <div class="risk-stat-box">
+                            <small>احتمال</small>
+                            <strong>{{ $risk['probability'] ?? 0 }}</strong>
+                        </div>
+                        <div class="risk-stat-box">
+                            <small>تأثير</small>
+                            <strong>{{ $risk['impact'] ?? 0 }}</strong>
+                        </div>
+                        <div class="risk-stat-box">
+                            <small>درجة</small>
+                            <strong class="text-{{ $scoreColor }}">{{ $score }}</strong>
+                        </div>
+                    </div>
+
+
+                    <div class="mt-2">
+                        <span class="badge"
+                              style="background-color: {{ $statusColor }}; color: #fff; font-size:10px;">
+                            {{ $status['name_ar'] ?? 'غير محدد' }}
+                        </span>
+                    </div>
+
+
+                    <div class="mt-3" onclick="event.stopPropagation();">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <small class="text-muted">
+                                <i class="fas fa-robot"></i> التوصيات
+                                <span class="badge bg-secondary" style="font-size:9px;">{{ count($aiRecs) }}</span>
+                            </small>
                             @if($isManager)
-                                <small style="font-size:11px;">شغّل التنبؤ لكشف المخاطر</small>
+                                <button class="btn btn-xs btn-outline-primary"
+                                        onclick="generateRecommendations({{ $riskId }})"
+                                        id="genRecsBtn-{{ $riskId }}"
+                                        style="padding:2px 6px;font-size:10px;">
+                                    <i class="fas fa-magic"></i> توليد
+                                </button>
                             @endif
                         </div>
-                    @else
-                        @foreach($risks as $risk)
-                            @php
-                                $riskId      = $risk['risk_id'] ?? 0;
-                                $level       = $risk['risk_level'] ?? [];
-                                $levelColor  = $level['color_hex'] ?? '#6c757d';
-                                $status      = $risk['status'] ?? [];
-                                $statusColor = $status['color_hex'] ?? '#6c757d';
-                                $mitigations = $risk['mitigations'] ?? [];
-                                $aiRecs      = $risk['ai_recommendations'] ?? [];
-                                $score       = (int) ($risk['risk_score'] ?? 0);
-                                $scoreColor  = $score >= 60 ? 'danger' : ($score >= 40 ? 'warning' : 'success');
-                            @endphp
-                            <div class="risk-sidebar-item mb-3" id="risk-{{ $riskId }}">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div class="flex-grow-1">
-                                        <span class="badge mb-1"
-                                              style="background-color: {{ $levelColor }}; color: #fff; font-size:10px;">
-                                            {{ $level['name_ar'] ?? 'غير محدد' }}
-                                        </span>
-                                        <div class="risk-title">{{ $risk['name'] ?? '' }}</div>
+                        <div class="ai-recs-container-sidebar" id="aiRecs-{{ $riskId }}">
+                            @if(!empty($aiRecs))
+                                @foreach($aiRecs as $rec)
+                                    <div class="ai-rec-item">
+                                        <div style="font-size:11px;font-weight:500;">{{ $rec['text'] ?? '' }}</div>
                                     </div>
+                                @endforeach
+                            @else
+                                <div class="text-muted text-center py-1" style="font-size:10px;">
+                                    لا توجد توصيات
                                 </div>
+                            @endif
+                        </div>
+                    </div>
 
 
-                                <div class="risk-stats-row">
-                                    <div class="risk-stat-box">
-                                        <small>احتمال</small>
-                                        <strong>{{ $risk['probability'] ?? 0 }}</strong>
-                                    </div>
-                                    <div class="risk-stat-box">
-                                        <small>تأثير</small>
-                                        <strong>{{ $risk['impact'] ?? 0 }}</strong>
-                                    </div>
-                                    <div class="risk-stat-box">
-                                        <small>درجة</small>
-                                        <strong class="text-{{ $scoreColor }}">{{ $score }}</strong>
-                                    </div>
-                                </div>
-
-
-                                <div class="mt-2">
-                                    <span class="badge"
-                                          style="background-color: {{ $statusColor }}; color: #fff; font-size:10px;">
-                                        {{ $status['name_ar'] ?? 'غير محدد' }}
-                                    </span>
-                                </div>
-
-
-                                <div class="mt-3">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <small class="text-muted">
-                                            <i class="fas fa-robot"></i> التوصيات
-                                            <span class="badge bg-secondary" style="font-size:9px;">{{ count($aiRecs) }}</span>
-                                        </small>
-                                        @if($isManager)
-                                            <button class="btn btn-xs btn-outline-primary"
-                                                    onclick="generateRecommendations({{ $riskId }})"
-                                                    id="genRecsBtn-{{ $riskId }}"
-                                                    style="padding:2px 6px;font-size:10px;">
-                                                <i class="fas fa-magic"></i> توليد
-                                            </button>
-                                        @endif
-                                    </div>
-                                    <div class="ai-recs-container-sidebar" id="aiRecs-{{ $riskId }}">
-                                        @if(!empty($aiRecs))
-                                            @foreach($aiRecs as $rec)
-                                                <div class="ai-rec-item">
-                                                    <div style="font-size:11px;font-weight:500;">{{ $rec['text'] ?? '' }}</div>
-                                                </div>
-                                            @endforeach
-                                        @else
-                                            <div class="text-muted text-center py-1" style="font-size:10px;">
-                                                لا توجد توصيات
+                    <div class="mt-3" onclick="event.stopPropagation();">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <small class="text-muted">
+                                <i class="fas fa-tasks"></i> الإجراءات
+                                <span class="badge bg-secondary" style="font-size:9px;">{{ count($mitigations) }}</span>
+                            </small>
+                            @if($isManager)
+                                <button class="btn btn-xs btn-outline-info"
+                                        onclick="showAddMitigation({{ $riskId }})"
+                                        style="padding:2px 6px;font-size:10px;">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            @endif
+                        </div>
+                        <div class="mitigations-container-sidebar">
+                            @if(!empty($mitigations))
+                                @foreach($mitigations as $mit)
+                                    @php
+                                        $mStatus      = $mit['status'] ?? [];
+                                        $mStatusColor = $mStatus['color_hex'] ?? '#6c757d';
+                                    @endphp
+                                    <div class="mitigation-item-sidebar">
+                                        <div style="font-size:11px;">{{ $mit['action'] ?? '' }}</div>
+                                        @if(!empty($mit['assigned_to']['full_name']))
+                                            <div class="text-muted" style="font-size:10px;">
+                                                <i class="fas fa-user"></i>
+                                                {{ $mit['assigned_to']['full_name'] }}
                                             </div>
                                         @endif
+                                        <div class="mt-1">
+                                            <span class="badge"
+                                                  style="background-color: {{ $mStatusColor }}; color: #fff; font-size:9px;">
+                                                {{ $mStatus['name_ar'] ?? '' }}
+                                            </span>
+                                        </div>
                                     </div>
+                                @endforeach
+                            @else
+                                <div class="text-muted text-center py-1" style="font-size:10px;">
+                                    لا توجد إجراءات
                                 </div>
-
-
-                                <div class="mt-3">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <small class="text-muted">
-                                            <i class="fas fa-tasks"></i> الإجراءات
-                                            <span class="badge bg-secondary" style="font-size:9px;">{{ count($mitigations) }}</span>
-                                        </small>
-                                        @if($isManager)
-                                            <button class="btn btn-xs btn-outline-info"
-                                                    onclick="showAddMitigation({{ $riskId }})"
-                                                    style="padding:2px 6px;font-size:10px;">
-                                                <i class="fas fa-plus"></i>
-                                            </button>
-                                        @endif
-                                    </div>
-                                    <div class="mitigations-container-sidebar">
-                                        @if(!empty($mitigations))
-                                            @foreach($mitigations as $mit)
-                                                @php
-                                                    $mStatus      = $mit['status'] ?? [];
-                                                    $mStatusColor = $mStatus['color_hex'] ?? '#6c757d';
-                                                @endphp
-                                                <div class="mitigation-item-sidebar">
-                                                    <div style="font-size:11px;">{{ $mit['action'] ?? '' }}</div>
-                                                    @if(!empty($mit['assigned_to']['full_name']))
-                                                        <div class="text-muted" style="font-size:10px;">
-                                                            <i class="fas fa-user"></i>
-                                                            {{ $mit['assigned_to']['full_name'] }}
-                                                        </div>
-                                                    @endif
-                                                    <div class="mt-1">
-                                                        <span class="badge"
-                                                              style="background-color: {{ $mStatusColor }}; color: #fff; font-size:9px;">
-                                                            {{ $mStatus['name_ar'] ?? '' }}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        @else
-                                            <div class="text-muted text-center py-1" style="font-size:10px;">
-                                                لا توجد إجراءات
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                        @endforeach
-                    @endif
+                            @endif
+                        </div>
+                    </div>
                 </div>
-            </div>
+            @endforeach
+        @endif
+    </div>
+</div>
         </div>
     </div>
     @endif
@@ -858,6 +879,86 @@
         </div>
     </div>
 </div>
+
+{{-- Modal إضافة خطر جديد --}}
+@if($isManager)
+<div class="modal fade" id="addRiskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle me-1"></i> إضافة خطر جديد
+                </h5>
+                <button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form id="addRiskForm" onsubmit="submitAddRisk(event)">
+                @csrf
+                <div class="modal-body">
+                    <input type="hidden" name="major_task_id" value="{{ $majorTask->id ?? '' }}">
+
+
+                    <div class="mb-3">
+                        <label class="form-label">اسم الخطر <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control" required maxlength="255">
+                    </div>
+
+
+                    <div class="mb-3">
+                        <label class="form-label">الوصف</label>
+                        <textarea name="description" class="form-control" rows="3"></textarea>
+                    </div>
+
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">الاحتمال (1-5) <span class="text-danger">*</span></label>
+                            <input type="number" name="probability" class="form-control"
+                                   min="1" max="5" value="3" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">التأثير (1-5) <span class="text-danger">*</span></label>
+                            <input type="number" name="impact" class="form-control"
+                                   min="1" max="5" value="3" required>
+                        </div>
+                    </div>
+
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">مستوى الخطر</label>
+                            <select name="risk_level_id" class="form-select">
+                                <option value="">-- اختر --</option>
+                                @foreach($riskLevels ?? [] as $lvl)
+                                    <option value="{{ $lvl->id }}">{{ $lvl->name_ar }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">الحالة</label>
+                            <select name="status_id" class="form-select">
+                                <option value="">-- اختر --</option>
+                                @foreach($statuses ?? [] as $st)
+                                    <option value="{{ $st->id }}">{{ $st->name_ar }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+
+                    <div id="addRiskError" class="alert alert-danger d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger" id="addRiskSubmitBtn">
+                        <i class="fas fa-save"></i> حفظ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
 
 
 <div class="modal fade" id="confirmDeleteModal" tabindex="-1">
@@ -1746,6 +1847,11 @@ function deleteComment(commentId) {
         } else alert('خطأ');
     })
     .catch(function(error) { alert('خطأ: ' + error); });
+}
+
+function goToRiskDetails(riskId) {
+    if (!riskId) return;
+    window.location.href = `/risks/${riskId}`;
 }
 </script>
 @endpush
