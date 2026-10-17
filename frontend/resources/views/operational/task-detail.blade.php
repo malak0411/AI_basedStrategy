@@ -9,7 +9,6 @@
     $userRole      = session('user_role', 'employee');
     $isManager     = in_array($userRole, ['manager','general_manager','deputy','minister','super_admin']);
 
-
     $comments = [];
     try {
         $token  = session('jwt_token');
@@ -29,8 +28,6 @@
     $commentsCount = count($comments);
     $logsCount     = is_array($logs ?? null) ? count($logs) : 0;
     $risksCount    = is_array($risks ?? null) ? count($risks) : 0;
-
-
     $participantsList = [];
     if (!empty($participants) && is_array($participants)) {
         $participantsList = $participants;
@@ -62,7 +59,6 @@
 
     $taskStatusId    = (int) ($task['status_id'] ?? ($task['status'] ?? 0));
     $canSendToReview = $isTaskResponsible && $taskStatusId === 6;
-
 
     $progress = (float) ($task['progress_percent'] ?? 0);
     if ($progress <= 0 && !empty($logs) && is_array($logs)) {
@@ -97,7 +93,14 @@
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <a href="javascript:history.back()" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-right"></i> العودة
-            </a>
+        </a>
+        @if($isManager)
+            <div>
+                <a href="{{ route('operational.kanban', $task['major_task_id'] ?? 0) }}" class="btn-kanban">
+                    <i class="fas fa-columns"></i> لوحة ادارة المهام
+                </a>
+            </div>
+        @endif
         <div class="d-flex gap-2 flex-wrap">
             @if($canSendToReview)
                 <button type="button" class="btn btn-warning"

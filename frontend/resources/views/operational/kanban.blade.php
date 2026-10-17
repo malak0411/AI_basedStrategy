@@ -1,6 +1,8 @@
 @extends('layouts.app')
 
+
 @section('title', 'لوحة المهام التشغيلية')
+
 
 @section('content')
 <div class="container-fluid px-4">
@@ -16,8 +18,10 @@
         </div>
     </div>
 
+
     @if(session('success')) <div class="alert alert-success">{{ session('success') }}</div> @endif
     @if(session('error')) <div class="alert alert-danger">{{ session('error') }}</div> @endif
+
 
     <div class="task-info-bar">
         <div class="d-flex justify-content-between align-items-start flex-wrap">
@@ -54,44 +58,52 @@
         </div>
     </div>
 
+
     <div class="kanban-container">
         <div class="kanban-column" data-status="16">
             <div class="kanban-column-header">
-                <h6><span class="column-color color-unassigned"></span>جاهزة للتوزيع</h6>
+                <h6><span class="column-color color-unassigned"></span>معلقة مؤقتاً (غير موزعة)</h6>
                 <span class="task-count">{{ count($unassignedTasks ?? []) }}</span>
             </div>
             <div class="drop-zone" id="drop-16">
                 @forelse($unassignedTasks ?? [] as $task)
-                @php $taskId = $task['task_id'] ?? $task['id'] ?? 0; @endphp
+                @php 
+                    $taskId = $task['task_id'] ?? $task['id'] ?? 0; 
+                    $priority = $task['priority'] ?? 'medium';
+                @endphp
                 <div class="kanban-task" data-task-id="{{ $taskId }}" onclick="goToAssign({{ $taskId }})">
                     <div class="task-title">{{ $task['title'] ?? 'غير محدد' }}</div>
                     <div class="task-meta">
                         <span><i class="far fa-clock ml-1"></i> {{ $task['end_date'] ?? 'غير محدد' }}</span>
-                        <span class="task-badge badge-priority-{{ $task['priority'] ?? 'medium' }}">
-                            {{ ($task['priority'] ?? 'medium') == 'high' ? 'عالي' : (($task['priority'] ?? 'medium') == 'medium' ? 'متوسط' : 'منخفض') }}
+                        <span class="task-badge badge-priority-{{ $priority }}">
+                            {{ $priority == 'high' ? 'عالي' : ($priority == 'medium' ? 'متوسط' : 'منخفض') }}
                         </span>
                     </div>
                 </div>
                 @empty
-                <div class="empty-message">لا توجد مهام غير موزعة</div>
+                <div class="empty-message">لا توجد مهام معلقة</div>
                 @endforelse
             </div>
         </div>
 
+
         <div class="kanban-column" data-status="26">
             <div class="kanban-column-header">
-                <h6><span class="column-color color-ready"></span>جاهزة للتنفيذ</h6>
+                <h6><span class="column-color color-ready"></span>جاهزة للعمل</h6>
                 <span class="task-count">{{ count($readyTasks ?? []) }}</span>
             </div>
             <div class="drop-zone" id="drop-26">
                 @forelse($readyTasks ?? [] as $task)
-                @php $taskId = $task['task_id'] ?? $task['id'] ?? 0; @endphp
+                @php 
+                    $taskId = $task['task_id'] ?? $task['id'] ?? 0; 
+                    $priority = $task['priority'] ?? 'medium';
+                @endphp
                 <div class="kanban-task draggable" draggable="true" data-task-id="{{ $taskId }}" onclick="goToTaskDetail({{ $taskId }})">
                     <div class="task-title">{{ $task['title'] ?? 'غير محدد' }}</div>
                     <div class="task-meta">
                         <span><i class="far fa-calendar-alt ml-1"></i> {{ $task['end_date'] ?? 'غير محدد' }}</span>
-                        <span class="task-badge badge-priority-{{ $task['priority'] ?? 'medium' }}">
-                            {{ ($task['priority'] ?? 'medium') == 'high' ? 'عالي' : (($task['priority'] ?? 'medium') == 'medium' ? 'متوسط' : 'منخفض') }}
+                        <span class="task-badge badge-priority-{{ $priority }}">
+                            {{ $priority == 'high' ? 'عالي' : ($priority == 'medium' ? 'متوسط' : 'منخفض') }}
                         </span>
                     </div>
                     <div class="task-assignee">
@@ -105,10 +117,11 @@
                     </div>
                 </div>
                 @empty
-                <div class="empty-message">لا توجد مهام جاهزة للتنفيذ</div>
+                <div class="empty-message">لا توجد مهام جاهزة للعمل</div>
                 @endforelse
             </div>
         </div>
+
 
         <div class="kanban-column" data-status="6">
             <div class="kanban-column-header">
@@ -117,13 +130,16 @@
             </div>
             <div class="drop-zone" id="drop-6">
                 @forelse($inProgressTasks ?? [] as $task)
-                @php $taskId = $task['task_id'] ?? $task['id'] ?? 0; @endphp
+                @php 
+                    $taskId = $task['task_id'] ?? $task['id'] ?? 0; 
+                    $priority = $task['priority'] ?? 'medium';
+                @endphp
                 <div class="kanban-task draggable" draggable="true" data-task-id="{{ $taskId }}" onclick="goToTaskDetail({{ $taskId }})">
                     <div class="task-title">{{ $task['title'] ?? 'غير محدد' }}</div>
                     <div class="task-meta">
                         <span><i class="far fa-calendar-alt ml-1"></i> {{ $task['end_date'] ?? 'غير محدد' }}</span>
-                        <span class="task-badge badge-priority-{{ $task['priority'] ?? 'medium' }}">
-                            {{ ($task['priority'] ?? 'medium') == 'high' ? 'عالي' : (($task['priority'] ?? 'medium') == 'medium' ? 'متوسط' : 'منخفض') }}
+                        <span class="task-badge badge-priority-{{ $priority }}">
+                            {{ $priority == 'high' ? 'عالي' : ($priority == 'medium' ? 'متوسط' : 'منخفض') }}
                         </span>
                     </div>
                     <div class="task-assignee">
@@ -142,20 +158,24 @@
             </div>
         </div>
 
+
         <div class="kanban-column" data-status="5">
             <div class="kanban-column-header">
-                <h6><span class="column-color color-hold"></span>موقفة</h6>
+                <h6><span class="column-color color-hold"></span>معلق</h6>
                 <span class="task-count">{{ count($holdTasks ?? []) }}</span>
             </div>
             <div class="drop-zone" id="drop-5">
                 @forelse($holdTasks ?? [] as $task)
-                @php $taskId = $task['task_id'] ?? $task['id'] ?? 0; @endphp
+                @php 
+                    $taskId = $task['task_id'] ?? $task['id'] ?? 0; 
+                    $priority = $task['priority'] ?? 'medium';
+                @endphp
                 <div class="kanban-task draggable" draggable="true" data-task-id="{{ $taskId }}" onclick="goToTaskDetail({{ $taskId }})">
                     <div class="task-title">{{ $task['title'] ?? 'غير محدد' }}</div>
                     <div class="task-meta">
                         <span><i class="far fa-calendar-alt ml-1"></i> {{ $task['end_date'] ?? 'غير محدد' }}</span>
-                        <span class="task-badge badge-priority-{{ $task['priority'] ?? 'medium' }}">
-                            {{ ($task['priority'] ?? 'medium') == 'high' ? 'عالي' : (($task['priority'] ?? 'medium') == 'medium' ? 'متوسط' : 'منخفض') }}
+                        <span class="task-badge badge-priority-{{ $priority }}">
+                            {{ $priority == 'high' ? 'عالي' : ($priority == 'medium' ? 'متوسط' : 'منخفض') }}
                         </span>
                     </div>
                     <div class="task-assignee">
@@ -169,25 +189,29 @@
                     </div>
                 </div>
                 @empty
-                <div class="empty-message">لا توجد مهام موقفة</div>
+                <div class="empty-message">لا توجد مهام معلقة</div>
                 @endforelse
             </div>
         </div>
 
+
         <div class="kanban-column" data-status="8">
             <div class="kanban-column-header">
-                <h6><span class="column-color color-review"></span>قيد المراجعة</h6>
+                <h6><span class="column-color color-review"></span>مراجعة</h6>
                 <span class="task-count">{{ count($reviewTasks ?? []) }}</span>
             </div>
             <div class="drop-zone" id="drop-8">
                 @forelse($reviewTasks ?? [] as $task)
-                @php $taskId = $task['task_id'] ?? $task['id'] ?? 0; @endphp
+                @php 
+                    $taskId = $task['task_id'] ?? $task['id'] ?? 0; 
+                    $priority = $task['priority'] ?? 'medium';
+                @endphp
                 <div class="kanban-task draggable" draggable="true" data-task-id="{{ $taskId }}" onclick="goToTaskDetail({{ $taskId }})">
                     <div class="task-title">{{ $task['title'] ?? 'غير محدد' }}</div>
                     <div class="task-meta">
                         <span><i class="far fa-calendar-alt ml-1"></i> {{ $task['end_date'] ?? 'غير محدد' }}</span>
-                        <span class="task-badge badge-priority-{{ $task['priority'] ?? 'medium' }}">
-                            {{ ($task['priority'] ?? 'medium') == 'high' ? 'عالي' : (($task['priority'] ?? 'medium') == 'medium' ? 'متوسط' : 'منخفض') }}
+                        <span class="task-badge badge-priority-{{ $priority }}">
+                            {{ $priority == 'high' ? 'عالي' : ($priority == 'medium' ? 'متوسط' : 'منخفض') }}
                         </span>
                     </div>
                     <div class="task-assignee">
@@ -206,20 +230,24 @@
             </div>
         </div>
 
+
         <div class="kanban-column" data-status="19">
             <div class="kanban-column-header">
-                <h6><span class="column-color color-accepted"></span>مقبولة</h6>
+                <h6><span class="column-color color-accepted"></span>مكتملة</h6>
                 <span class="task-count">{{ count($acceptedTasks ?? []) }}</span>
             </div>
             <div class="drop-zone" id="drop-19">
                 @forelse($acceptedTasks ?? [] as $task)
-                @php $taskId = $task['task_id'] ?? $task['id'] ?? 0; @endphp
+                @php 
+                    $taskId = $task['task_id'] ?? $task['id'] ?? 0; 
+                    $priority = $task['priority'] ?? 'medium';
+                @endphp
                 <div class="kanban-task" data-task-id="{{ $taskId }}" onclick="goToTaskDetail({{ $taskId }})">
                     <div class="task-title">{{ $task['title'] ?? 'غير محدد' }}</div>
                     <div class="task-meta">
                         <span><i class="far fa-calendar-alt ml-1"></i> {{ $task['end_date'] ?? 'غير محدد' }}</span>
-                        <span class="task-badge badge-priority-{{ $task['priority'] ?? 'medium' }}">
-                            {{ ($task['priority'] ?? 'medium') == 'high' ? 'عالي' : (($task['priority'] ?? 'medium') == 'medium' ? 'متوسط' : 'منخفض') }}
+                        <span class="task-badge badge-priority-{{ $priority }}">
+                            {{ $priority == 'high' ? 'عالي' : ($priority == 'medium' ? 'متوسط' : 'منخفض') }}
                         </span>
                     </div>
                     <div class="task-assignee">
@@ -231,12 +259,13 @@
                     </div>
                 </div>
                 @empty
-                <div class="empty-message">لا توجد مهام مقبولة</div>
+                <div class="empty-message">لا توجد مهام مكتملة</div>
                 @endforelse
             </div>
         </div>
     </div>
 </div>
+
 
 <div class="modal fade" id="statusModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog">
@@ -252,16 +281,6 @@
                     <textarea id="taskComment" class="form-control" rows="3" placeholder="أدخل تعليقاً على تغيير الحالة..."></textarea>
                     <div class="text-danger" id="commentError" style="font-size:12px;display:none;">التعليق مطلوب</div>
                 </div>
-                <div class="mb-3" id="progressContainer" style="display:none;">
-                    <label class="form-label fw-bold">نسبة الإنجاز <span class="text-danger">*</span></label>
-                    <div class="d-flex align-items-center gap-3">
-                        <input type="range" id="taskProgress" class="form-range" min="0" max="100" value="50" style="flex:1;">
-                        <input type="number" id="taskProgressValue" class="form-control" style="width:80px;" min="0" max="100" value="50">
-                        <span class="fw-bold">%</span>
-                    </div>
-                    <div class="text-muted small" id="progressHint">أدخل نسبة الإنجاز</div>
-                    <div class="text-danger" id="progressError" style="font-size:12px;display:none;"></div>
-                </div>
                 <input type="hidden" id="targetStatusId" value="">
                 <input type="hidden" id="targetTaskId" value="">
             </div>
@@ -273,10 +292,12 @@
     </div>
 </div>
 
+
 <div class="loading-overlay" id="loadingOverlay">
     <div class="spinner-border text-primary" role="status"><span class="visually-hidden">جاري...</span></div>
 </div>
 @endsection
+
 
 @push('styles')
 <style>
@@ -287,14 +308,12 @@
         margin-bottom: 24px;
         border: 1px solid #dee2e6;
     }
-
     .task-info-bar .task-title {
         font-size: 18px;
         font-weight: 600;
         color: #2d3748;
         margin-bottom: 8px;
     }
-
     .task-info-bar .task-meta {
         display: flex;
         flex-wrap: wrap;
@@ -302,22 +321,18 @@
         font-size: 14px;
         color: #6c757d;
     }
-
     .task-info-bar .task-meta .item {
         display: inline-flex;
         align-items: center;
     }
-
     .task-info-bar .task-meta .item i {
         margin-left: 6px;
         width: 16px;
         text-align: center;
     }
-
     .task-info-bar .task-meta .item strong {
         color: #2d3748;
     }
-
     .kanban-container {
         display: grid;
         grid-template-columns: repeat(6, 1fr);
@@ -326,7 +341,6 @@
         min-height: 500px;
         padding-bottom: 16px;
     }
-
     .kanban-column {
         background: #f8f9fa;
         border-radius: 12px;
@@ -336,7 +350,6 @@
         flex-direction: column;
         max-height: 70vh;
     }
-
     .kanban-column-header {
         background: #fff;
         border-radius: 12px 12px 0 0;
@@ -347,7 +360,6 @@
         align-items: center;
         flex-shrink: 0;
     }
-
     .kanban-column-header h6 {
         margin: 0;
         font-size: 14px;
@@ -357,7 +369,6 @@
         align-items: center;
         gap: 8px;
     }
-
     .column-color {
         display: inline-block;
         width: 12px;
@@ -365,14 +376,12 @@
         border-radius: 4px;
         margin-left: 6px;
     }
-
     .color-unassigned { background: #6c757d; }
     .color-ready { background: #17a2b8; }
     .color-progress { background: #007bff; }
     .color-hold { background: #ffc107; }
     .color-review { background: #fd7e14; }
     .color-accepted { background: #28a745; }
-
     .task-count {
         background: #e9ecef;
         padding: 2px 10px;
@@ -381,7 +390,6 @@
         font-weight: 600;
         color: #495057;
     }
-
     .drop-zone {
         flex: 1;
         padding: 8px;
@@ -391,13 +399,11 @@
         flex-direction: column;
         gap: 8px;
     }
-
     .drop-zone.drag-over {
         background: rgba(0, 123, 255, 0.05);
         border: 2px dashed #007bff;
         border-radius: 8px;
     }
-
     .kanban-task {
         background: #fff;
         border-radius: 8px;
@@ -408,21 +414,17 @@
         transition: all 0.2s ease;
         position: relative;
     }
-
     .kanban-task:hover {
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         transform: translateY(-1px);
         border-color: #007bff;
     }
-
     .kanban-task.draggable {
         cursor: grab;
     }
-
     .kanban-task.draggable:active {
         cursor: grabbing;
     }
-
     .kanban-task .task-title {
         font-size: 14px;
         font-weight: 500;
@@ -433,7 +435,6 @@
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
-
     .kanban-task .task-meta {
         display: flex;
         justify-content: space-between;
@@ -443,39 +444,32 @@
         flex-wrap: wrap;
         gap: 4px;
     }
-
     .kanban-task .task-meta span {
         display: inline-flex;
         align-items: center;
     }
-
     .kanban-task .task-meta i {
         margin-left: 4px;
         font-size: 11px;
     }
-
     .task-badge {
         padding: 2px 8px;
         border-radius: 4px;
         font-size: 10px;
         font-weight: 600;
     }
-
     .badge-priority-high {
         background: #dc3545;
         color: #fff;
     }
-
     .badge-priority-medium {
         background: #ffc107;
         color: #212529;
     }
-
     .badge-priority-low {
         background: #28a745;
         color: #fff;
     }
-
     .task-assignee {
         display: flex;
         align-items: center;
@@ -486,7 +480,6 @@
         padding-top: 6px;
         border-top: 1px solid #f1f3f5;
     }
-
     .task-assignee .avatar {
         display: inline-flex;
         align-items: center;
@@ -500,7 +493,6 @@
         font-weight: 600;
         flex-shrink: 0;
     }
-
     .task-progress {
         margin-top: 8px;
         background: #e9ecef;
@@ -509,7 +501,6 @@
         overflow: hidden;
         position: relative;
     }
-
     .task-progress .progress-bar {
         height: 100%;
         background: linear-gradient(90deg, #17a2b8, #007bff);
@@ -523,11 +514,9 @@
         color: #fff;
         white-space: nowrap;
     }
-
     .task-progress .progress-bar.bg-success {
         background: linear-gradient(90deg, #28a745, #20c997);
     }
-
     .empty-message {
         text-align: center;
         padding: 24px 8px;
@@ -537,7 +526,6 @@
         border-radius: 8px;
         border: 1px dashed #dee2e6;
     }
-
     .loading-overlay {
         display: none;
         position: fixed;
@@ -550,39 +538,32 @@
         align-items: center;
         justify-content: center;
     }
-
     .loading-overlay .spinner-border {
         width: 48px;
         height: 48px;
     }
-
     @media (max-width: 1400px) {
         .kanban-container {
             grid-template-columns: repeat(4, 1fr);
         }
     }
-
     @media (max-width: 992px) {
         .kanban-container {
             grid-template-columns: repeat(3, 1fr);
         }
     }
-
     @media (max-width: 768px) {
         .kanban-container {
             grid-template-columns: repeat(2, 1fr);
         }
-
         .task-info-bar .task-meta {
             flex-direction: column;
             gap: 4px;
         }
-
         .kanban-column {
             min-width: 160px;
         }
     }
-
     @media (max-width: 480px) {
         .kanban-container {
             grid-template-columns: 1fr;
@@ -591,108 +572,81 @@
 </style>
 @endpush
 
+
 @push('scripts')
 <script>
     var currentTaskId = null;
     var currentStatusId = null;
 
+
     document.addEventListener('DOMContentLoaded', function() {
-        var range = document.getElementById('taskProgress');
-        var input = document.getElementById('taskProgressValue');
-
-        if (range && input) {
-            range.addEventListener('input', function() {
-                input.value = this.value;
-            });
-
-            input.addEventListener('input', function() {
-                var val = parseInt(this.value) || 0;
-                var min = parseInt(range.min) || 0;
-                var max = parseInt(range.max) || 100;
-                if (val < min) val = min;
-                if (val > max) val = max;
-                range.value = val;
-                this.value = val;
-            });
-        }
-
         document.querySelectorAll('.drop-zone').forEach(function(zone) {
             zone.addEventListener('dragover', dragOverHandler);
             zone.addEventListener('drop', dropHandler);
         });
+
 
         document.querySelectorAll('.kanban-task.draggable').forEach(function(task) {
             task.addEventListener('dragstart', dragStartHandler);
         });
     });
 
+
     function getStatusName(statusId) {
         var names = {
-            16: 'جاهزة للتوزيع',
-            26: 'جاهزة للتنفيذ',
+            16: 'معلقة مؤقتاً',
+            26: 'جاهزة للعمل',
             6: 'قيد التنفيذ',
-            5: 'موقفة',
+            5: 'معلق',
             7: 'متأخرة',
-            8: 'قيد المراجعة',
-            19: 'مقبولة'
+            8: 'مراجعة',
+            19: 'مكتملة'
         };
         return names[statusId] || 'غير معروفة';
     }
+
 
     function openStatusModal(taskId, statusId) {
         currentTaskId = taskId;
         currentStatusId = statusId;
 
+
         document.getElementById('targetTaskId').value = taskId;
         document.getElementById('targetStatusId').value = statusId;
-
         document.getElementById('taskComment').value = '';
-        document.getElementById('taskProgress').value = 50;
-        document.getElementById('taskProgressValue').value = 50;
         document.getElementById('commentError').style.display = 'none';
-        document.getElementById('progressError').style.display = 'none';
 
-        var requiresProgress = [6, 8].indexOf(statusId) !== -1;
-
-        document.getElementById('progressContainer').style.display = requiresProgress ? 'block' : 'none';
 
         var infoText = 'نقل المهمة إلى حالة: ' + getStatusName(statusId);
-        var progressRange = document.getElementById('taskProgress');
-
         if (statusId === 6) {
-            infoText += ' (نسبة الإنجاز: 20% - 70%)';
-            document.getElementById('progressHint').textContent = 'نسبة الإنجاز يجب أن تكون بين 20% و 70%';
-            progressRange.min = 20;
-            progressRange.max = 70;
-            progressRange.value = 45;
-            document.getElementById('taskProgressValue').value = 45;
-        } else if (statusId === 8) {
-            infoText += ' (نسبة الإنجاز: 0% - 85%)';
-            document.getElementById('progressHint').textContent = 'نسبة الإنجاز لا يمكن أن تتجاوز 85%';
-            progressRange.min = 0;
-            progressRange.max = 85;
-            progressRange.value = 50;
-            document.getElementById('taskProgressValue').value = 50;
-        } else if (statusId === 5 || statusId === 7) {
-            infoText += ' (نسبة الإنجاز ثابتة)';
-        } else if (statusId === 19) {
-            infoText += ' (نسبة الإنجاز: 100% تلقائياً)';
+            infoText += ' (ستصبح نسبة التقدم تلقائياً: 25%)';
         } else if (statusId === 26) {
-            infoText += ' (نسبة الإنجاز: 0% تلقائياً)';
+            infoText += ' (ستصبح نسبة التقدم تلقائياً: 10%)';
+        } else if (statusId === 16) {
+            infoText += ' (ستصبح نسبة التقدم تلقائياً: 0%)';
+        } else if (statusId === 5 || statusId === 7) {
+            infoText += ' (ستحتفظ بنسبة التقدم الحالية)';
+        } else if (statusId === 8) {
+            infoText += ' (ستصبح نسبة التقدم تلقائياً: 80%)';
+        } else if (statusId === 19) {
+            infoText += ' (ستصبح نسبة التقدم تلقائياً: 100%)';
         }
+
 
         document.getElementById('actionInfo').textContent = infoText;
         document.getElementById('statusModalTitle').textContent = 'تغيير حالة المهمة #' + taskId;
+
 
         var modal = new bootstrap.Modal(document.getElementById('statusModal'));
         modal.show();
     }
 
+
     function confirmStatusChange() {
         var taskId = document.getElementById('targetTaskId').value;
         var statusId = parseInt(document.getElementById('targetStatusId').value);
         var comment = document.getElementById('taskComment').value.trim();
-        var progressPercent = parseInt(document.getElementById('taskProgressValue').value) || 0;
+
 
         if (!comment) {
             document.getElementById('commentError').style.display = 'block';
@@ -700,28 +654,19 @@
         }
         document.getElementById('commentError').style.display = 'none';
 
-        var requiresProgress = [6, 8].indexOf(statusId) !== -1;
-        if (requiresProgress) {
-            var min = parseInt(document.getElementById('taskProgress').min) || 0;
-            var max = parseInt(document.getElementById('taskProgress').max) || 100;
-            if (progressPercent < min || progressPercent > max) {
-                document.getElementById('progressError').textContent = 'نسبة الإنجاز يجب أن تكون بين ' + min + '% و ' + max + '%';
-                document.getElementById('progressError').style.display = 'block';
-                return;
-            }
-        }
-        document.getElementById('progressError').style.display = 'none';
 
         document.getElementById('loadingOverlay').style.display = 'flex';
+
 
         var data = {
             task_id: parseInt(taskId),
             status_id: statusId,
-            comment: comment,
-            progress_percent: requiresProgress ? progressPercent : null
+            comment: comment
         };
 
+
         var token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
 
         fetch('/operational/update-status', {
             method: 'PUT',
@@ -753,6 +698,7 @@
         });
     }
 
+
     function dragStartHandler(e) {
         var task = e.target.closest('.kanban-task');
         if (task) {
@@ -764,6 +710,7 @@
         }
     }
 
+
     function dragOverHandler(e) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
@@ -773,16 +720,20 @@
         }
     }
 
+
     function dropHandler(e) {
         e.preventDefault();
         var zone = e.currentTarget;
         zone.classList.remove('drag-over');
 
+
         var targetColumn = zone.closest('.kanban-column');
         if (!targetColumn) return;
 
+
         var targetStatus = parseInt(targetColumn.dataset.status);
         var taskId = e.dataTransfer.getData('text/plain');
+
 
         if (taskId && targetStatus) {
             var dragElement = document.querySelector('[data-task-id="' + taskId + '"]');
@@ -799,11 +750,13 @@
         }
     }
 
+
     function goToAssign(taskId) {
         if (taskId > 0) {
             window.location.href = '/operational/assign/' + taskId;
         }
     }
+
 
     function goToTaskDetail(taskId) {
         if (taskId > 0) {
@@ -812,3 +765,5 @@
     }
 </script>
 @endpush
+
+

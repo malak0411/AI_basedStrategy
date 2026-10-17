@@ -6,6 +6,7 @@ use App\Services\ApiClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use carbon\Carbon;
 
 class OperationalTaskController extends Controller
 {
@@ -775,7 +776,6 @@ public function review(Request $request)
         $employeesResponse = $this->apiClient->get("/api/employees/department/{$departmentId}", $token);
         $employees = $employeesResponse['data'] ?? [];
 
-
         return view('operational.task-detail', [
             'task' => $task,
             'logs' => $logs,
@@ -1139,122 +1139,150 @@ public function sendToReview(Request $request, $id)
 
 
 public function kanbanBoard($majorTaskId = null)
-{
-    if (!$this->isManager()) {
-        return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
-    }
-
-    $token = session('jwt_token');
-    $currentDepartmentId = $this->getDepartmentId();
-
-    if (!$majorTaskId) {
-        $majorTaskId = session('current_major_task_id');
-    }
-
-    if (!$majorTaskId) {
-        $departmentId = $this->getDepartmentId();
-        $tasksResponse = $this->apiClient->get(
-            "/api/tasks/major-tasks/by-department/{$departmentId}",
-            $token
-        );
-        $tasks = $tasksResponse['data'] ?? [];
-        if (!empty($tasks)) {
-            $majorTaskId = $tasks[0]['id'] ?? 0;
-            session(['current_major_task_id' => $majorTaskId]);
+    {
+        if (!$this->isManager()) {
+            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
         }
-    }
 
-    if (!$majorTaskId) {
-        return redirect()->route('operational.major-tasks')->with('error', 'لا توجد مهام رئيسية');
-    }
 
-    $majorTaskResponse = $this->apiClient->get("/api/tasks/major-tasks/{$majorTaskId}/details", $token);
-    $majorTask = $majorTaskResponse['data'] ?? [];
+        $token = session('jwt_token');
+        $currentDepartmentId = $this->getDepartmentId();
 
-    $initiativeName = $majorTask['initiative_name'] ?? 'غير محدد';
-    $initiativeStart = $majorTask['initiative_start_date'] ?? null;
-    $initiativeEnd = $majorTask['initiative_end_date'] ?? null;
-    $estimatedDays = $majorTask['estimated_duration_days'] ?? 0;
 
-    $majorTaskEndDate = null;
-    if ($initiativeStart && $estimatedDays) {
-        $majorTaskEndDate = \Carbon\Carbon::parse($initiativeStart)->addDays($estimatedDays)->toDateString();
-    } else {
-        $majorTaskEndDate = $majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days'));
-    }
-
-    $allOperationalResponse = $this->apiClient->get("/api/tasks/by-major-task/{$majorTaskId}", $token);
-    $allTasks = $allOperationalResponse['data'] ?? [];
-
-    $filteredTasks = array_filter($allTasks, function($task) use ($currentDepartmentId) {
-        return isset($task['department_id']) && (int)$task['department_id'] === (int)$currentDepartmentId;
-    });
-    $filteredTasks = array_values($filteredTasks);
-
-    $calculatedEnd = null;
-    if ($initiativeStart && $estimatedDays) {
-        $calculatedEnd = \Carbon\Carbon::parse($initiativeStart)->addDays($estimatedDays)->toDateString();
-    }
-
-    foreach ($filteredTasks as &$task) {
-        $task['calculated_end_date'] = $calculatedEnd;
-        $task['initiative_start'] = $initiativeStart;
-        $task['initiative_end'] = $initiativeEnd;
-    }
-
-    $unassignedTasks = [];
-    $readyTasks = [];
-    $inProgressTasks = [];
-    $holdTasks = [];
-    $reviewTasks = [];
-    $acceptedTasks = [];
-
-    foreach ($filteredTasks as $task) {
-        $statusId = (int) ($task['status'] ?? 16);
-
-        switch ($statusId) {
-            case 16:
-                $unassignedTasks[] = $task;
-                break;
-            case 26:
-                $readyTasks[] = $task;
-                break;
-            case 6:
-                $inProgressTasks[] = $task;
-                break;
-            case 5:
-                $holdTasks[] = $task;
-                break;
-            case 8:
-                $reviewTasks[] = $task;
-                break;
-            case 19:
-                $acceptedTasks[] = $task;
-                break;
-            default:
-                $unassignedTasks[] = $task;
-                break;
+        if (!$majorTaskId) {
+            $majorTaskId = session('current_major_task_id');
         }
-    }
 
-    return view('operational.kanban', [
-        'majorTaskId' => $majorTaskId,
-        'majorTaskTitle' => $majorTask['name'] ?? $majorTask['title'] ?? 'المهمة الرئيسية',
-        'majorTaskEndDate' => $majorTaskEndDate,
-        'initiativeName' => $initiativeName,
-        'initiativeStart' => $initiativeStart,
-        'initiativeEnd' => $initiativeEnd,
-        'estimatedDays' => $estimatedDays,
-        'calculatedEnd' => $calculatedEnd,
-        'majorTaskIsActive' => $majorTask['is_active'] ?? true,
-        'unassignedTasks' => $unassignedTasks,
-        'readyTasks' => $readyTasks,
-        'inProgressTasks' => $inProgressTasks,
-        'holdTasks' => $holdTasks,
-        'reviewTasks' => $reviewTasks,
-        'acceptedTasks' => $acceptedTasks,
-        'allTasks' => $filteredTasks,
-    ]);
+
+        if (!$majorTaskId) {
+            $departmentId = $this->getDepartmentId();
+            $tasksResponse = $this->apiClient->get(
+                "/api/tasks/major-tasks/by-department/{$departmentId}",
+                $token
+            );
+            $tasks = $tasksResponse['data'] ?? [];
+            if (!empty($tasks)) {
+                $majorTaskId = $tasks[0]['id'] ?? 0;
+                session(['current_major_task_id' => $majorTaskId]);
+            }
+        }
+
+
+        if (!$majorTaskId) {
+            return redirect()->route('operational.major-tasks')->with('error', 'لا توجد مهام رئيسية');
+        }
+
+
+        $majorTaskResponse = $this->apiClient->get("/api/tasks/major-tasks/{$majorTaskId}/details", $token);
+        $majorTask = $majorTaskResponse['data'] ?? [];
+
+
+        $initiativeName = $majorTask['initiative_name'] ?? 'غير محدد';
+        $initiativeStart = $majorTask['initiative_start_date'] ?? null;
+        $initiativeEnd = $majorTask['initiative_end_date'] ?? null;
+        $estimatedDays = $majorTask['estimated_duration_days'] ?? 0;
+
+
+        $majorTaskEndDate = null;
+        if ($initiativeStart && $estimatedDays) {
+            $majorTaskEndDate = Carbon::parse($initiativeStart)->addDays($estimatedDays)->toDateString();
+        } else {
+            $majorTaskEndDate = $majorTask['end_date'] ?? date('Y-m-d', strtotime('+30 days'));
+        }
+
+
+        $allOperationalResponse = $this->apiClient->get("/api/tasks/by-major-task/{$majorTaskId}", $token);
+        $allTasks = $allOperationalResponse['data'] ?? [];
+
+
+        $filteredTasks = array_filter($allTasks, function($task) use ($currentDepartmentId) {
+            return isset($task['department_id']) && (int)$task['department_id'] === (int)$currentDepartmentId;
+        });
+        $filteredTasks = array_values($filteredTasks);
+
+
+        $calculatedEnd = null;
+        if ($initiativeStart && $estimatedDays) {
+            $calculatedEnd = Carbon::parse($initiativeStart)->addDays($estimatedDays)->toDateString();
+        }
+
+
+        foreach ($filteredTasks as &$task) {
+            $task['calculated_end_date'] = $calculatedEnd;
+            $task['initiative_start'] = $initiativeStart;
+            $task['initiative_end'] = $initiativeEnd;
+            if (!isset($task['task_id']) && isset($task['id'])) {
+                $task['task_id'] = $task['id'];
+            }
+            if (!isset($task['status']) && isset($task['status_id'])) {
+                $task['status'] = $task['status_id'];
+            }
+        }
+        unset($task);
+
+
+        $unassignedTasks = [];
+        $readyTasks = [];
+        $inProgressTasks = [];
+        $holdTasks = [];
+        $reviewTasks = [];
+        $acceptedTasks = [];
+        $delayedTasks = [];
+
+
+        foreach ($filteredTasks as $task) {
+            $statusId = (int) ($task['status'] ?? $task['status_id'] ?? 16);
+
+
+            switch ($statusId) {
+                case 16:
+                    $unassignedTasks[] = $task;
+                    break;
+                case 26:
+                    $readyTasks[] = $task;
+                    break;
+                case 6:
+                    $inProgressTasks[] = $task;
+                    break;
+                case 5:
+                    $holdTasks[] = $task;
+                    break;
+                case 7:
+                    $delayedTasks[] = $task;
+                    break;
+                case 8:
+                    $reviewTasks[] = $task;
+                    break;
+                case 19:
+                    $acceptedTasks[] = $task;
+                    break;
+                default:
+                    $unassignedTasks[] = $task;
+                    break;
+            }
+        }
+
+
+        return view('operational.kanban', [
+            'majorTaskId' => $majorTaskId,
+            'majorTaskTitle' => $majorTask['name'] ?? $majorTask['title'] ?? 'المهمة الرئيسية',
+            'majorTaskEndDate' => $majorTaskEndDate,
+            'initiativeName' => $initiativeName,
+            'initiativeStart' => $initiativeStart,
+            'initiativeEnd' => $initiativeEnd,
+            'estimatedDays' => $estimatedDays,
+            'calculatedEnd' => $calculatedEnd,
+            'majorTaskIsActive' => $majorTask['is_active'] ?? true,
+            'unassignedTasks' => $unassignedTasks,
+            'readyTasks' => $readyTasks,
+            'inProgressTasks' => $inProgressTasks,
+            'holdTasks' => $holdTasks,
+            'reviewTasks' => $reviewTasks,
+            'acceptedTasks' => $acceptedTasks,
+            'delayedTasks' => $delayedTasks,
+            'allTasks' => $filteredTasks,
+        ]);
+
 }
 
 private function isLeadDepartment($majorTaskId): bool
@@ -1274,159 +1302,6 @@ private function isLeadDepartment($majorTaskId): bool
             }
         }
         return false;
-    }
-
-
-    public function dependencies($majorTaskId)
-    {
-        if (!$this->isManager()) {
-            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
-        }
-
-        if (!$this->isLeadDepartment($majorTaskId)) {
-            return redirect()
-                ->route('operational.show-major-task', $majorTaskId)
-                ->with('error', 'إدارتك ليست المسؤولة الرئيسية عن هذه المهمة');
-        }
-
-        $token = session('jwt_token');
-
-        $majorTaskResponse = $this->apiClient->get("/api/tasks/major-tasks/{$majorTaskId}/details", $token);
-        $majorTask = $majorTaskResponse['data'] ?? [];
-
-        $tasksResponse = $this->apiClient->get("/api/tasks/major/{$majorTaskId}/dependencies", $token);
-        $tasks = $tasksResponse['data'] ?? [];
-
-        $dependencyTypes = [
-            ['value' => 'FS', 'label' => 'Finish to Start (انتهاء → بدء)'],
-            ['value' => 'SS', 'label' => 'Start to Start (بدء → بدء)'],
-            ['value' => 'FF', 'label' => 'Finish to Finish (انتهاء → انتهاء)'],
-            ['value' => 'SF', 'label' => 'Start to Finish (بدء → انتهاء)']
-        ];
-
-        return view('operational.dependencies', [
-            'majorTaskId' => $majorTaskId,
-            'majorTaskTitle' => $majorTask['name'] ?? $majorTask['title'] ?? 'المهمة الرئيسية',
-            'tasks' => $tasks,
-            'taskCount' => count($tasks),
-            'dependencyTypes' => $dependencyTypes
-        ]);
-    }
-
-    public function getDependenciesData($majorTaskId)
-    {
-        if (!$this->isManager()) {
-            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
-        }
-
-        $token = session('jwt_token');
-        $response = $this->apiClient->get("/api/tasks/major/{$majorTaskId}/dependencies", $token);
-
-        return response()->json($response);
-    }
-
-    public function addDependency(Request $request)
-    {
-        if (!$this->isManager()) {
-            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
-        }
-
-        $request->validate([
-            'task_id' => 'required|integer',
-            'depends_on_task_id' => 'required|integer',
-            'dependency_type' => 'required|string|in:FS,SS,FF,SF',
-            'lag_days' => 'nullable|integer|min:0'
-        ]);
-
-        $token = session('jwt_token');
-
-        $response = $this->apiClient->post(
-            "/api/tasks/dependencies",
-            [
-                'task_id' => (int) $request->task_id,
-                'depends_on_task_id' => (int) $request->depends_on_task_id,
-                'dependency_type' => $request->dependency_type,
-                'lag_days' => (int) ($request->lag_days ?? 0)
-            ],
-            $token
-        );
-
-        return response()->json($response);
-    }
-
-    public function updateDependency(Request $request, $id)
-    {
-        if (!$this->isManager()) {
-            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
-        }
-
-        $request->validate([
-            'dependency_type' => 'nullable|string|in:FS,SS,FF,SF',
-            'lag_days' => 'nullable|integer|min:0'
-        ]);
-
-        $token = session('jwt_token');
-
-        $data = [];
-        if ($request->filled('dependency_type')) {
-            $data['dependency_type'] = $request->dependency_type;
-        }
-        if ($request->filled('lag_days')) {
-            $data['lag_days'] = (int) $request->lag_days;
-        }
-
-        if (empty($data)) {
-            return response()->json(['success' => false, 'message' => 'لا توجد بيانات للتحديث'], 400);
-        }
-
-        $response = $this->apiClient->put(
-            "/api/tasks/dependencies/{$id}",
-            $data,
-            $token
-        );
-
-        return response()->json($response);
-    }
-
-    public function deleteDependency($id)
-    {
-        if (!$this->isManager()) {
-            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
-        }
-
-        $token = session('jwt_token');
-
-        $response = $this->apiClient->delete(
-            "/api/tasks/dependencies/{$id}",
-            $token
-        );
-
-        return response()->json($response);
-    }
-
-    public function checkCycle(Request $request)
-    {
-        if (!$this->isManager()) {
-            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
-        }
-
-        $request->validate([
-            'task_id' => 'required|integer',
-            'depends_on_task_id' => 'required|integer'
-        ]);
-
-        $token = session('jwt_token');
-
-        $response = $this->apiClient->post(
-            "/api/tasks/dependencies/check-cycle",
-            [
-                'task_id' => (int) $request->task_id,
-                'depends_on_task_id' => (int) $request->depends_on_task_id
-            ],
-            $token
-        );
-
-        return response()->json($response);
     }
 
 
@@ -1899,6 +1774,188 @@ public function updateTaskMitigation(Request $request, $mitigationId)
         ], 500);
     }
 }
+
+public function dependencies($majorTaskId)
+    {
+        if (!$this->isManager()) {
+            return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+        }
+
+
+        if (!$this->isLeadDepartment($majorTaskId)) {
+            return redirect()
+                ->route('operational.show-major-task', $majorTaskId)
+                ->with('error', 'إدارتك ليست المسؤولة الرئيسية عن هذه المهمة');
+        }
+
+
+        $token = session('jwt_token');
+
+
+        $majorTaskResponse = $this->apiClient->get("/api/tasks/major-tasks/{$majorTaskId}/details", $token);
+        $majorTask = $majorTaskResponse['data'] ?? [];
+
+
+        $tasksResponse = $this->apiClient->get("/api/tasks/major/{$majorTaskId}/dependencies", $token);
+        $tasks = $tasksResponse['data'] ?? [];
+
+
+        $dependencyTypes = [
+            ['value' => 'FS', 'label' => 'Finish to Start (انتهاء → بدء)'],
+            ['value' => 'SS', 'label' => 'Start to Start (بدء → بدء)'],
+            ['value' => 'FF', 'label' => 'Finish to Finish (انتهاء → انتهاء)'],
+            ['value' => 'SF', 'label' => 'Start to Finish (بدء → انتهاء)']
+        ];
+
+
+        return view('operational.dependencies', [
+            'majorTaskId' => $majorTaskId,
+            'majorTaskTitle' => $majorTask['name'] ?? $majorTask['title'] ?? 'المهمة الرئيسية',
+            'tasks' => $tasks,
+            'taskCount' => count($tasks),
+            'dependencyTypes' => $dependencyTypes
+        ]);
+    }
+
+
+    public function getDependenciesData($majorTaskId)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+
+        $token = session('jwt_token');
+        $response = $this->apiClient->get("/api/tasks/major/{$majorTaskId}/dependencies", $token);
+
+
+        return response()->json($response);
+    }
+
+
+    public function addDependency(Request $request)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+
+        $request->validate([
+            'task_id' => 'required|integer',
+            'depends_on_task_id' => 'required|integer',
+            'dependency_type' => 'required|string|in:FS,SS,FF,SF',
+            'lag_days' => 'nullable|integer|min:0'
+        ]);
+
+
+        $token = session('jwt_token');
+
+
+        $response = $this->apiClient->post(
+            "/api/tasks/dependencies",
+            [
+                'task_id' => (int) $request->task_id,
+                'depends_on_task_id' => (int) $request->depends_on_task_id,
+                'dependency_type' => $request->dependency_type,
+                'lag_days' => (int) ($request->lag_days ?? 0)
+            ],
+            $token
+        );
+
+
+        return response()->json($response);
+    }
+
+
+    public function updateDependency(Request $request, $id)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+
+        $request->validate([
+            'dependency_type' => 'nullable|string|in:FS,SS,FF,SF',
+            'lag_days' => 'nullable|integer|min:0'
+        ]);
+
+
+        $token = session('jwt_token');
+
+
+        $data = [];
+        if ($request->filled('dependency_type')) {
+            $data['dependency_type'] = $request->dependency_type;
+        }
+        if ($request->filled('lag_days')) {
+            $data['lag_days'] = (int) $request->lag_days;
+        }
+
+
+        if (empty($data)) {
+            return response()->json(['success' => false, 'message' => 'لا توجد بيانات للتحديث'], 400);
+        }
+
+
+        $response = $this->apiClient->put(
+            "/api/tasks/dependencies/{$id}",
+            $data,
+            $token
+        );
+
+
+        return response()->json($response);
+    }
+
+
+    public function deleteDependency($id)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+
+        $token = session('jwt_token');
+
+
+        $response = $this->apiClient->delete(
+            "/api/tasks/dependencies/{$id}",
+            $token
+        );
+
+
+        return response()->json($response);
+    }
+
+
+    public function checkCycle(Request $request)
+    {
+        if (!$this->isManager()) {
+            return response()->json(['success' => false, 'error' => 'غير مصرح'], 403);
+        }
+
+
+        $request->validate([
+            'task_id' => 'required|integer',
+            'depends_on_task_id' => 'required|integer'
+        ]);
+
+
+        $token = session('jwt_token');
+
+
+        $response = $this->apiClient->post(
+            "/api/tasks/dependencies/check-cycle",
+            [
+                'task_id' => (int) $request->task_id,
+                'depends_on_task_id' => (int) $request->depends_on_task_id
+            ],
+            $token
+        );
+
+
+        return response()->json($response);
+    }
 
 }
 
