@@ -1,136 +1,138 @@
 @extends('layouts.app')
 
-@section('title', 'التقارير')
+
+@section('title', 'مركز التقارير')
+
 
 @push('styles')
 <style>
-    .report-section {
-        margin-bottom: 30px;
-    }
-    .report-card {
-        background: #fff;
-        border-radius: 16px;
-        padding: 20px;
-        border: 1px solid #e2e8f0;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        text-align: center;
-    }
-    .report-card:hover {
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        transform: translateY(-2px);
-    }
-    .report-card i {
-        font-size: 40px;
-        margin-bottom: 12px;
-    }
-    .report-card h5 {
-        font-weight: 700;
-        margin-bottom: 8px;
-    }
-    .report-card .stat {
-        font-size: 28px;
-        font-weight: 800;
-        color: var(--primary-dark);
-    }
+    .kpi-card { border-radius: 12px; border: 1px solid #e2e8f0; transition: 0.3s; background: #fff; }
+    .kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); transform: translateY(-2px); }
+    .kpi-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    .bg-soft-primary { background: #ebf8ff; color: #3182ce; }
+    .bg-soft-success { background: #f0fff4; color: #38a169; }
+    .bg-soft-warning { background: #fffaf0; color: #dd6b20; }
+    .bg-soft-danger { background: #fff5f5; color: #e53e3e; }
+    
+    .report-nav-card { border-radius: 12px; border: 1px solid #e2e8f0; transition: 0.2s; cursor: pointer; text-decoration: none; color: inherit; }
+    .report-nav-card:hover { background: #f8fafc; border-color: #cbd5e0; color: inherit; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
 </style>
 @endpush
 
+
 @section('content')
-<div class="container-fluid px-4">
-    <h3 class="mb-4"><i class="fas fa-file-alt ml-2"></i>التقارير</h3>
+<div class="container-fluid px-4 py-4" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="fas fa-chart-pie text-primary ml-2"></i> مركز التقارير والتحليلات</h3>
+            <p class="text-muted mb-0">مؤشرات الأداء والبيانات المالية الدقيقة</p>
+        </div>
+    </div>
 
-    {{-- بطاقات التقارير --}}
-    <div class="row">
-        {{-- تقرير المهام --}}
-        <div class="col-md-4 mb-4">
-            <div class="report-card" onclick="showReport('tasks')">
-                <i class="fas fa-tasks text-primary"></i>
-                <h5>تقرير المهام</h5>
-                <div class="stat">{{ $reports['tasks']['total'] ?? 0 }}</div>
-                <small class="text-muted">إجمالي المهام</small>
-                <div class="mt-2">
-                    <span class="badge bg-success">{{ $reports['tasks']['completed'] ?? 0 }} مكتملة</span>
-                    <span class="badge bg-warning">{{ $reports['tasks']['pending'] ?? 0 }} معلقة</span>
-                    <span class="badge bg-danger">{{ $reports['tasks']['delayed'] ?? 0 }} متأخرة</span>
+
+    <!-- المالية -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="kpi-card p-3 d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-soft-primary"><i class="fas fa-wallet"></i></div>
+                <div>
+                    <div class="text-muted small">إجمالي الميزانية (البرامج)</div>
+                    <h4 class="fw-bold mb-0">{{ number_format($data['financials']['total_allocated'] ?? 0, 2) }} <small class="text-muted">ريال</small></h4>
                 </div>
             </div>
         </div>
-
-        {{-- تقرير الميزانية --}}
-        <div class="col-md-4 mb-4">
-            <div class="report-card" onclick="showReport('budget')">
-                <i class="fas fa-money-bill-wave text-success"></i>
-                <h5>تقرير الميزانية</h5>
-                <div class="stat">{{ number_format($reports['budget']['total'] ?? 0) }}</div>
-                <small class="text-muted">إجمالي الميزانية</small>
-                <div class="mt-2">
-                    <span class="badge bg-info">مستخدم: {{ number_format($reports['budget']['used'] ?? 0) }}</span>
-                    <span class="badge bg-success">متبقي: {{ number_format($reports['budget']['remaining'] ?? 0) }}</span>
+        <div class="col-md-3">
+            <div class="kpi-card p-3 d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-soft-danger"><i class="fas fa-money-bill-wave"></i></div>
+                <div>
+                    <div class="text-muted small">إجمالي المصروفات</div>
+                    <h4 class="fw-bold mb-0">{{ number_format($data['financials']['total_spent'] ?? 0, 2) }} <small class="text-muted">ريال</small></h4>
                 </div>
             </div>
         </div>
-
-        {{-- تقرير المخاطر --}}
-        <div class="col-md-4 mb-4">
-            <div class="report-card" onclick="showReport('risks')">
-                <i class="fas fa-exclamation-triangle text-warning"></i>
-                <h5>تقرير المخاطر</h5>
-                <div class="stat">{{ $reports['risks']['total'] ?? 0 }}</div>
-                <small class="text-muted">إجمالي المخاطر</small>
-                <div class="mt-2">
-                    <span class="badge bg-danger">{{ $reports['risks']['high'] ?? 0 }} عالية</span>
-                    <span class="badge bg-warning">{{ $reports['risks']['medium'] ?? 0 }} متوسطة</span>
-                    <span class="badge bg-success">{{ $reports['risks']['low'] ?? 0 }} منخفضة</span>
+        <div class="col-md-3">
+            <div class="kpi-card p-3 d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-soft-success"><i class="fas fa-hand-holding-usd"></i></div>
+                <div>
+                    <div class="text-muted small">الرصيد المتبقي</div>
+                    <h4 class="fw-bold mb-0">{{ number_format($data['financials']['total_remaining'] ?? 0, 2) }} <small class="text-muted">ريال</small></h4>
                 </div>
             </div>
         </div>
-
-        {{-- تقرير مؤشرات الأداء --}}
-        <div class="col-md-4 mb-4">
-            <div class="report-card" onclick="showReport('kpis')">
-                <i class="fas fa-chart-line text-info"></i>
-                <h5>تقرير مؤشرات الأداء</h5>
-                <div class="stat">{{ $reports['kpis']['total'] ?? 0 }}</div>
-                <small class="text-muted">إجمالي المؤشرات</small>
-                <div class="mt-2">
-                    <span class="badge bg-success">{{ $reports['kpis']['on_target'] ?? 0 }} محقق</span>
-                    <span class="badge bg-warning">{{ $reports['kpis']['below_target'] ?? 0 }} دون المستهدف</span>
-                </div>
-            </div>
-        </div>
-
-        {{-- تقرير الإدارات --}}
-        <div class="col-md-4 mb-4">
-            <div class="report-card" onclick="showReport('departments')">
-                <i class="fas fa-building text-primary"></i>
-                <h5>تقرير الإدارات</h5>
-                <div class="stat">{{ $reports['departments']['total'] ?? 0 }}</div>
-                <small class="text-muted">إجمالي الإدارات</small>
-            </div>
-        </div>
-
-        {{-- تقرير الموظفين --}}
-        <div class="col-md-4 mb-4">
-            <div class="report-card" onclick="showReport('employees')">
-                <i class="fas fa-users text-success"></i>
-                <h5>تقرير الموظفين</h5>
-                <div class="stat">{{ $reports['employees']['total'] ?? 0 }}</div>
-                <small class="text-muted">إجمالي الموظفين</small>
-                <div class="mt-2">
-                    <span class="badge bg-success">{{ $reports['employees']['active'] ?? 0 }} نشط</span>
-                    <span class="badge bg-secondary">{{ $reports['employees']['inactive'] ?? 0 }} غير نشط</span>
+        <div class="col-md-3">
+            <div class="kpi-card p-3 d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-soft-warning"><i class="fas fa-tachometer-alt"></i></div>
+                <div>
+                    <div class="text-muted small">نسبة التنفيذ المالي</div>
+                    <h4 class="fw-bold mb-0">{{ $data['financials']['execution_pct'] ?? 0 }}%</h4>
                 </div>
             </div>
         </div>
     </div>
+
+
+    <!-- الأعداد -->
+    <div class="row g-3 mb-5">
+        @php
+            $counts = [
+                ['label' => 'الركائز', 'val' => $data['counts']['pillars'] ?? 0, 'color' => 'text-navy'],
+                ['label' => 'الأهداف', 'val' => $data['counts']['goals'] ?? 0, 'color' => 'text-navy'],
+                ['label' => 'البرامج', 'val' => $data['counts']['programs'] ?? 0, 'color' => 'text-navy'],
+                ['label' => 'المبادرات', 'val' => $data['counts']['initiatives'] ?? 0, 'color' => 'text-navy'],
+                ['label' => 'المهام التشغيلية', 'val' => $data['counts']['op_tasks'] ?? 0, 'color' => 'text-navy'],
+                ['label' => 'المخاطر النشطة', 'val' => $data['counts']['active_risks'] ?? 0, 'color' => 'text-danger'],
+            ];
+        @endphp
+        @foreach($counts as $c)
+        <div class="col-6 col-md-2">
+            <div class="kpi-card p-3 text-center">
+                <h6 class="text-muted mb-1">{{ $c['label'] }}</h6>
+                <h3 class="fw-bold {{ $c['color'] }} mb-0">{{ $c['val'] }}</h3>
+            </div>
+        </div>
+        @endforeach
+    </div>
+
+
+    <!-- التنقل -->
+    <h4 class="fw-bold mb-3 border-bottom pb-2">مكتبة التقارير</h4>
+    <div class="row g-4">
+        <div class="col-md-4">
+            <a href="{{ route('reports.strategic') }}" class="report-nav-card p-4 h-100 d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-soft-primary"><i class="fas fa-sitemap"></i></div>
+                <div><h5 class="fw-bold mb-1">التقرير الاستراتيجي</h5><p class="text-muted small mb-0">الركائز، الأهداف، البرامج، المبادرات، والمهام.</p></div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ route('reports.budget') }}" class="report-nav-card p-4 h-100 d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-soft-success"><i class="fas fa-coins"></i></div>
+                <div><h5 class="fw-bold mb-1">تقرير الميزانية</h5><p class="text-muted small mb-0">التوزيع المالي للمخصصات والمصروفات.</p></div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ route('reports.risks') }}" class="report-nav-card p-4 h-100 d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-soft-danger"><i class="fas fa-shield-alt"></i></div>
+                <div><h5 class="fw-bold mb-1">تقرير المخاطر</h5><p class="text-muted small mb-0">المخاطر حسب المستوى والحالة والإدارة.</p></div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ route('reports.kpis') }}" class="report-nav-card p-4 h-100 d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-soft-warning"><i class="fas fa-chart-line"></i></div>
+                <div><h5 class="fw-bold mb-1">تقرير مؤشرات الأداء</h5><p class="text-muted small mb-0">نسب الإنجاز للمؤشرات الاستراتيجية.</p></div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ route('reports.departments') }}" class="report-nav-card p-4 h-100 d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-soft-primary"><i class="fas fa-building"></i></div>
+                <div><h5 class="fw-bold mb-1">تقرير الإدارات</h5><p class="text-muted small mb-0">أداء وموارد الإدارات المختلفة.</p></div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ route('reports.employees') }}" class="report-nav-card p-4 h-100 d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-soft-success"><i class="fas fa-users"></i></div>
+                <div><h5 class="fw-bold mb-1">تقرير الموظفين</h5><p class="text-muted small mb-0">توزيع المهام والعبء الوظيفي.</p></div>
+            </a>
+        </div>
+    </div>
 </div>
 @endsection
-
-@push('scripts')
-<script>
-    function showReport(type) {
-        alert('تقرير ' + type + ' - سيتم تحميل التقرير المفصل قريباً');
-    }
-</script>
-@endpush

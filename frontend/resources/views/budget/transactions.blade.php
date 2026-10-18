@@ -1,130 +1,128 @@
 @extends('layouts.app')
 
+
 @section('title', 'العمليات المالية')
 
+
 @section('content')
-<div class="container-fluid px-4">
+<div class="container py-4" dir="rtl">
     <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold">سجل العمليات: {{ $budget['budgetable_name'] }}</h4>
         <div>
-            <h3><i class="fas fa-receipt ml-2"></i>العمليات المالية</h3>
-            <p class="text-muted mb-0">#{{ $budget['budget_id'] ?? '' }} - {{ $budget['budgetable_name'] ?? '' }}</p>
+            @php
+                $isEditable = false;
+                if ($budget['budgetable_type'] == 'program' && $budget['status_id'] == 47) $isEditable = true;
+                if ($budget['budgetable_type'] == 'initiative' && $budget['status_id'] == 2) $isEditable = true;
+                if ($budget['budgetable_type'] == 'operational_task' && $budget['status_id'] == 6) $isEditable = true;
+            @endphp
+
+
+            @if($isEditable)
+            <a href="{{ route('budget.transactions.create', $budget['budget_id']) }}" class="btn btn-success"><i class="fas fa-plus"></i> تسجيل عملية جديدة</a>
+            @endif
+            <a href="{{ route('budget.index') }}" class="btn btn-secondary">عودة</a>
         </div>
-        <div>
-            <a href="{{ route('budget.transactions.create', $budget['budget_id']) }}" class="btn btn-primary">
-                <i class="fas fa-plus"></i> إضافة عملية
-            </a>
-            <a href="{{ route('budget.show', $budget['budget_id']) }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-right"></i> العودة
-            </a>
-        </div>
     </div>
 
-    @if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="fas fa-check-circle me-2"></i> {{ session('success') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    @endif
 
-    @if(session('error'))
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="fas fa-exclamation-circle me-2"></i> {{ session('error') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    @endif
-
-    <div class="card-custom">
+    <div class="card shadow-sm border-0">
         <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>التاريخ</th>
-                            <th>نوع العملية</th>
-                            <th>المبلغ</th>
-                            <th>الوصف</th>
-                            <th>منشئ العملية</th>
-                            <th>المعتمد</th>
-                            <th>الحالة</th>
-                            <th>الإجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($transactions as $transaction)
-                        <tr>
-                            <td>{{ $transaction['transaction_id'] ?? '' }}</td>
-                            <td>{{ isset($transaction['transaction_date']) ? \Carbon\Carbon::parse($transaction['transaction_date'])->format('Y-m-d H:i') : '' }}</td>
-                            <td>{{ $transaction['transaction_type']['name'] ?? '' }}</td>
-                            <td class="fw-bold">{{ number_format($transaction['amount'] ?? 0, 2) }}</td>
-                            <td>{{ $transaction['description'] ?? '' }}</td>
-                            <td>{{ $transaction['created_by']['name'] ?? '' }}</td>
-                            <td>{{ $transaction['approved_by']['name'] ?? 'قيد المراجعة' }}</td>
-                            <td>
-                                <span class="badge bg-{{ $transaction['approved_by'] ? 'success' : 'warning' }}">
-                                    {{ $transaction['approved_by'] ? 'معتمدة' : 'قيد المراجعة' }}
-                                </span>
-                            </td>
-                            <td>
-                                <div class="btn-group">
-                                    <a href="{{ route('budget.transactions.show', $transaction['transaction_id']) }}" class="btn btn-sm btn-outline-info" title="عرض التفاصيل">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    @if(!$transaction['approved_by'])
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteTransaction({{ $transaction['transaction_id'] }})" title="حذف">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="9" class="text-center py-4">
-                                <i class="fas fa-receipt fa-2x text-muted d-block mb-2"></i>
-                                <p class="text-muted">لا توجد عمليات مالية</p>
-                                <a href="{{ route('budget.transactions.create', $budget['budget_id']) }}" class="btn btn-primary btn-sm">إضافة عملية</a>
-                            </td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+            <div class="row mb-4 text-center bg-light p-3 rounded">
+                <div class="col-md-4">
+                    <span class="text-muted d-block">المخصص</span>
+                    <strong class="text-primary fs-5">{{ number_format($budget['allocated_amount'], 2) }}</strong>
+                </div>
+                <div class="col-md-4 border-start border-end">
+                    <span class="text-muted d-block">المصروف</span>
+                    <strong class="text-danger fs-5">{{ number_format($budget['spent_amount'], 2) }}</strong>
+                </div>
+                <div class="col-md-4">
+                    <span class="text-muted d-block">المتبقي</span>
+                    <strong class="text-success fs-5">{{ number_format($budget['remaining_amount'], 2) }}</strong>
+                </div>
             </div>
 
+
+            <table class="table table-bordered table-striped text-center align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>الرقم</th>
+                        <th>التاريخ</th>
+                        <th>النوع</th>
+                        <th>المبلغ</th>
+                        <th>الوصف</th>
+                        <th>بواسطة</th>
+                        <th>الاعتماد</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($transactions as $t)
+                    <tr>
+                        <td>#{{ $t['transaction_id'] }}</td>
+                        <td>{{ \Carbon\Carbon::parse($t['transaction_date'])->format('Y-m-d') }}</td>
+                        <td>
+                            @if($t['type_id'] == 1) <span class="badge bg-primary">تخصيص</span>
+                            @elseif($t['type_id'] == 2) <span class="badge bg-danger">صرف</span>
+                            @elseif($t['type_id'] == 3) <span class="badge bg-success">استرداد</span>
+                            @else <span class="badge bg-secondary">تعديل</span>
+                            @endif
+                        </td>
+                        <td class="fw-bold">{{ number_format($t['amount'], 2) }}</td>
+                        <td>{{ $t['description'] }}</td>
+                        <td>{{ $t['created_by'] }}</td>
+                        <td>{{ $t['approved_by'] }}</td>
+                        <td>
+                            <a href="{{ route('budget.transactions.show', $t['transaction_id']) }}" class="btn btn-sm btn-outline-info"><i class="fas fa-eye"></i></a>
+                            @if($isEditable && $t['approved_by'] == 'معلق')
+                            <button onclick="deleteTransaction({{ $t['transaction_id'] }})" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                            @endif
+                        </td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="8" class="text-muted py-4">لا توجد عمليات مالية مسجلة.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+            
+            <!-- Pagination -->
             @if(isset($pagination['total_pages']) && $pagination['total_pages'] > 1)
-            <div class="d-flex justify-content-between align-items-center mt-3">
-                <div>
-                    عرض {{ ($pagination['page'] - 1) * $pagination['per_page'] + 1 }} - {{ min($pagination['page'] * $pagination['per_page'], $pagination['total']) }} من {{ $pagination['total'] }}
-                </div>
-                <nav>
-                    <ul class="pagination">
-                        @for($i = 1; $i <= $pagination['total_pages']; $i++)
-                        <li class="page-item {{ $i == $pagination['page'] ? 'active' : '' }}">
-                            <a class="page-link" href="?page={{ $i }}&per_page={{ $pagination['per_page'] }}">{{ $i }}</a>
-                        </li>
-                        @endfor
-                    </ul>
-                </nav>
-            </div>
+            <nav>
+                <ul class="pagination justify-content-center">
+                    @for($i = 1; $i <= $pagination['total_pages']; $i++)
+                    <li class="page-item {{ $i == $pagination['page'] ? 'active' : '' }}">
+                        <a class="page-link" href="?page={{ $i }}">{{ $i }}</a>
+                    </li>
+                    @endfor
+                </ul>
+            </nav>
             @endif
         </div>
     </div>
 </div>
-
-<form id="deleteForm" method="POST" style="display:none;">
-    @csrf
-    @method('DELETE')
-</form>
 @endsection
+
 
 @push('scripts')
 <script>
-    function deleteTransaction(id) {
-        if (confirm('هل أنت متأكد من حذف هذه العملية المالية؟')) {
-            var form = document.getElementById('deleteForm');
-            form.action = '/budget/transactions/' + id;
-            form.submit();
+function deleteTransaction(id) {
+    if(!confirm('هل أنت متأكد من التراجع عن هذه العملية؟ سيتم تعديل الأرصدة المالية تلقائياً.')) return;
+    
+    fetch('/budget/transactions/' + id, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'Accept': 'application/json'
         }
-    }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'حدث خطأ');
+        }
+    });
+}
 </script>
 @endpush

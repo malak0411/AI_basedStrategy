@@ -28,7 +28,7 @@ class DictStatus(Base):
     code = Column(String(30), unique=True, nullable=False)
     name_ar = Column(String(100), nullable=False)
     name_en = Column(String(100), nullable=False)
-    category = Column(Enum('initiative', 'task', 'risk', 'employee', 'budget', 'recommendation'), nullable=False)
+    category = Column(Enum('initiative', 'task', 'risk', 'employee', 'program', 'recommendation'), nullable=False)
     color_hex = Column(String(7), default='#6c757d')
     is_default = Column(Boolean, default=False)
     is_system = Column(Boolean, default=True)

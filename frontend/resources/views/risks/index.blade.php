@@ -1,13 +1,20 @@
 @extends('layouts.app')
 
+
 @section('title', 'إدارة المخاطر')
+
 
 @section('content')
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h3><i class="fas fa-shield-alt ml-2"></i>إدارة المخاطر</h3>
-            <p class="text-muted mb-0">متابعة المخاطر المرتبطة بالمهام التشغيلية وإجراءات المعالجة</p>
+            <p class="text-muted mb-0">
+                مخاطر المهام التشغيلية النشطة التابعة لإدارتك
+                <span class="badge bg-info ms-2">
+                    <i class="fas fa-filter"></i> مفلترة تلقائياً
+                </span>
+            </p>
         </div>
         <div>
             <a href="{{ route('risks.create') }}" class="btn btn-primary">
@@ -16,6 +23,7 @@
         </div>
     </div>
 
+
     @if(session('success'))
     <div class="alert alert-success alert-dismissible fade show" role="alert">
         <i class="fas fa-check-circle me-2"></i> {{ session('success') }}
@@ -23,12 +31,14 @@
     </div>
     @endif
 
+
     @if(session('error'))
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
         <i class="fas fa-exclamation-circle me-2"></i> {{ session('error') }}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     @endif
+
 
     <div class="row mb-4">
         <div class="col-md-3">
@@ -42,7 +52,7 @@
         <div class="col-md-3">
             <div class="card-custom text-center">
                 <div class="card-body">
-                    <h6 class="text-muted">مخاطر مفتوحة</h6>
+                    <h6 class="text-muted">جاري التخفيف</h6>
                     <h2 class="text-warning">{{ $openRisks ?? 0 }}</h2>
                 </div>
             </div>
@@ -77,6 +87,7 @@
             </div>
         </div>
     </div>
+
 
     <div class="card-custom">
         <div class="card-body">
@@ -119,6 +130,7 @@
                 </div>
             </div>
 
+
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead>
@@ -158,8 +170,9 @@
                             <td>{{ $risk['probability'] ?? 0 }}</td>
                             <td>{{ $risk['impact'] ?? 0 }}</td>
                             <td>
-                                <span class="fw-bold {{ ($risk['risk_score'] ?? 0) > 15 ? 'text-danger' : (($risk['risk_score'] ?? 0) > 8 ? 'text-warning' : 'text-success') }}">
-                                    {{ $risk['risk_score'] ?? 0 }}
+                                @php $score = $risk['risk_score'] ?? 0; @endphp
+                                <span class="fw-bold {{ $score > 15 ? 'text-danger' : ($score > 8 ? 'text-warning' : 'text-success') }}">
+                                    {{ $score }}
                                 </span>
                             </td>
                             <td>
@@ -203,6 +216,7 @@
                 </table>
             </div>
 
+
             @if(isset($pagination['total_pages']) && $pagination['total_pages'] > 1)
             <div class="d-flex justify-content-between align-items-center mt-3">
                 <div>
@@ -223,11 +237,13 @@
     </div>
 </div>
 
+
 <form id="deleteForm" method="POST" style="display:none;">
     @csrf
     @method('DELETE')
 </form>
 @endsection
+
 
 @push('scripts')
 <script>
@@ -239,12 +255,14 @@
         }
     }
 
+
     document.addEventListener('DOMContentLoaded', function() {
         var searchInput = document.getElementById('searchInput');
         var riskLevelFilter = document.getElementById('riskLevelFilter');
         var statusFilter = document.getElementById('statusFilter');
         var taskFilter = document.getElementById('taskFilter');
         var filterBtn = document.getElementById('filterBtn');
+
 
         function applyFilters() {
             var url = new URL(window.location.href);
@@ -253,13 +271,16 @@
             var status = statusFilter.value;
             var task = taskFilter.value;
 
+
             if (search) { url.searchParams.set('search', search); } else { url.searchParams.delete('search'); }
             if (riskLevel) { url.searchParams.set('risk_level_id', riskLevel); } else { url.searchParams.delete('risk_level_id'); }
             if (status) { url.searchParams.set('status_id', status); } else { url.searchParams.delete('status_id'); }
             if (task) { url.searchParams.set('task_id', task); } else { url.searchParams.delete('task_id'); }
 
+
             window.location.href = url.toString();
         }
+
 
         filterBtn.addEventListener('click', applyFilters);
         searchInput.addEventListener('keypress', function(e) {

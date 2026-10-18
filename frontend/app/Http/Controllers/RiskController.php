@@ -56,7 +56,7 @@ class RiskController extends Controller
             }
 
 
-            $response = $this->apiClient->get('/api/risks', $token, $params);
+            $response = $this->apiClient->get('/api/risks/by-manager-department', $token, $params);
             $risks = $response['data'] ?? [];
             $pagination = [
                 'total' => $response['total'] ?? 0,
@@ -66,11 +66,23 @@ class RiskController extends Controller
             ];
 
 
-            $optionsResponse = $this->apiClient->get('/api/risks/options', $token);
+            $totalRisks = $response['total'] ?? 0;
+            $openRisks = $response['open_count'] ?? 0;
+            $overdueRisks = $response['overdue_count'] ?? 0;
+
+
+            $optionsResponse = $this->apiClient->get('/api/risks/options-by-manager-department', $token);
             $options = $optionsResponse ?? [];
 
 
-            return view('risks.index', compact('risks', 'pagination', 'options'));
+            return view('risks.index', compact(
+                'risks',
+                'pagination',
+                'options',
+                'totalRisks',
+                'openRisks',
+                'overdueRisks'
+            ));
 
 
         } catch (\Exception $e) {
@@ -94,7 +106,7 @@ class RiskController extends Controller
             }
 
 
-            $optionsResponse = $this->apiClient->get('/api/risks/options', $token);
+            $optionsResponse = $this->apiClient->get('/api/risks/options-by-manager-department', $token);
             $options = $optionsResponse ?? [];
 
 
@@ -455,7 +467,7 @@ class RiskController extends Controller
             $data = [];
             foreach (['action', 'task_id', 'assigned_to', 'due_date', 'status_id', 'notes'] as $field) {
                 if ($request->has($field)) {
-                    $data[$field] = $request->$field;
+                    $data[$field] = $request->input($field);
                 }
             }
 

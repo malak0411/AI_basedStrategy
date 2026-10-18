@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 
-from app.api.routers import auth, strategic, tasks, dashboard, employees, budget, risks, kpis
+from app.api.routers import auth, strategic, tasks, dashboard, employees, budget, risks, kpis, reports
 from app.api.routers import system_config, admin, location, departments as dept_routes
 from app.ai.routers.ai_router import router as ai_router
 from app.api.routers import dict_router 
@@ -52,6 +52,8 @@ app.include_router(dept_routes.router)
 app.include_router(dict_router.router)
 
 app.include_router(ai_router)
+
+app.include_router(reports.router)
 
 @app.get("/")
 async def root():

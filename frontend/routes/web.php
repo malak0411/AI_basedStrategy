@@ -385,8 +385,17 @@ Route::put('/operational/risks/mitigations/{mitigationId}', [OperationalTaskCont
             Route::post('/approve', [AiStrategicController::class, 'approve'])->name('approve');
         });
     });
+Route::middleware(['check.jwt'])->prefix('reports')->name('reports.')->group(function () {
+    Route::get('/', [ReportController::class, 'index'])->name('index');
+    Route::get('/strategic', [ReportController::class, 'strategic'])->name('strategic');
+    Route::get('/budget', [ReportController::class, 'budget'])->name('budget');
+    Route::get('/risks', [ReportController::class, 'risks'])->name('risks');
+    Route::get('/kpis', [ReportController::class, 'kpis'])->name('kpis');
+    Route::get('/departments', [ReportController::class, 'departments'])->name('departments');
+    Route::get('/employees', [ReportController::class, 'employees'])->name('employees');
+    Route::get('/export/{type}', [ReportController::class, 'export'])->name('export');
+});
 
-    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');

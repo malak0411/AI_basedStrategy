@@ -30,7 +30,25 @@ IMPACT_MAX = 10
 MITIGATION_COMPLETED_CODES = ['completed', 'resolved', 'done', 'closed']
 
 
+RISK_MITIGATING_STATUS_ID = 9
+RISK_RESOLVED_STATUS_ID = 10
 
+
+TASK_STATUS_IN_PROGRESS = 6
+TASK_STATUS_READY = 26
+TASK_STATUS_TEMP_PENDING = 16
+TASK_STATUS_PENDING = 5
+TASK_STATUS_REVIEW = 8
+TASK_STATUS_COMPLETED = 19
+
+
+ALLOWED_TASK_STATUS_IDS = [
+    TASK_STATUS_IN_PROGRESS,
+    TASK_STATUS_READY,
+    TASK_STATUS_TEMP_PENDING,
+    TASK_STATUS_PENDING,
+    TASK_STATUS_REVIEW,
+]
 
 @router.get("/")
 async def get_risks(
@@ -235,6 +253,271 @@ async def get_risk_options(
     }
 
 
+@router.get("/by-manager-department")
+async def get_risks_by_manager_department(
+    status_id: Optional[int] = Query(None),
+    risk_level_id: Optional[int] = Query(None),
+    task_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(10, ge=1, le=100),
+    employee_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    employee = db.query(Employee).filter(
+        Employee.employee_id == employee_id
+    ).first()
+
+
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+
+    department_id = employee.department_id
+
+
+    if not department_id:
+        return {
+            "data": [],
+            "total": 0,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": 0,
+            "open_count": 0,
+            "overdue_count": 0
+        }
+
+
+    tasks = db.query(OperationalTask).filter(
+        OperationalTask.department_id == department_id,
+        OperationalTask.is_active == True,
+        OperationalTask.status_id.in_(ALLOWED_TASK_STATUS_IDS)
+    ).all()
+
+
+    allowed_task_ids = [t.task_id for t in tasks]
+
+
+    if not allowed_task_ids:
+        return {
+            "data": [],
+            "total": 0,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": 0,
+            "open_count": 0,
+            "overdue_count": 0
+        }
+
+
+    base_query = db.query(Risk).filter(Risk.task_id.in_(allowed_task_ids))
+
+
+    if task_id:
+        base_query = base_query.filter(Risk.task_id == task_id)
+
+
+    open_count = base_query.filter(
+        Risk.status_id == RISK_MITIGATING_STATUS_ID
+    ).count()
+
+
+    today = date.today()
+    overdue_count = base_query.filter(
+        Risk.status_id == RISK_MITIGATING_STATUS_ID,
+        Risk.target_date < today
+    ).count()
+
+
+    query = base_query
+
+
+    if risk_level_id:
+        query = query.filter(Risk.risk_level_id == risk_level_id)
+
+
+    if status_id:
+        query = query.filter(Risk.status_id == status_id)
+
+
+    if search:
+        query = query.filter(
+            Risk.name.contains(search) | Risk.description.contains(search)
+        )
+
+
+    query = query.order_by(desc(Risk.identified_at))
+
+
+    total = query.count()
+    risks = query.offset((page - 1) * per_page).limit(per_page).all()
+
+
+    all_task_ids = list({r.task_id for r in risks if r.task_id})
+    tasks_map = {}
+    if all_task_ids:
+        for t in db.query(OperationalTask).filter(OperationalTask.task_id.in_(all_task_ids)).all():
+            tasks_map[t.task_id] = t
+
+
+    level_ids = list({r.risk_level_id for r in risks if r.risk_level_id})
+    status_ids_r = list({r.status_id for r in risks if r.status_id})
+    emp_ids = list({r.identified_by for r in risks if r.identified_by})
+
+
+    levels_map = {}
+    if level_ids:
+        for l in db.query(DictRiskLevel).filter(DictRiskLevel.risk_level_id.in_(level_ids)).all():
+            levels_map[l.risk_level_id] = l
+
+
+    statuses_map = {}
+    if status_ids_r:
+        for s in db.query(DictStatus).filter(DictStatus.status_id.in_(status_ids_r)).all():
+            statuses_map[s.status_id] = s
+
+
+    employees_map = {}
+    if emp_ids:
+        for e in db.query(Employee).filter(Employee.employee_id.in_(emp_ids)).all():
+            employees_map[e.employee_id] = e
+
+
+    risk_ids = [r.risk_id for r in risks]
+    mitigations_counts = {}
+    if risk_ids:
+        rows = db.query(
+            RiskMitigation.risk_id,
+            func.count(RiskMitigation.mitigation_id)
+        ).filter(
+            RiskMitigation.risk_id.in_(risk_ids)
+        ).group_by(RiskMitigation.risk_id).all()
+        mitigations_counts = {rid: cnt for rid, cnt in rows}
+
+
+    result = []
+    for risk in risks:
+        task = tasks_map.get(risk.task_id)
+        level = levels_map.get(risk.risk_level_id)
+        status = statuses_map.get(risk.status_id)
+        emp = employees_map.get(risk.identified_by)
+
+
+        result.append({
+            "risk_id": risk.risk_id,
+            "name": risk.name,
+            "description": risk.description,
+            "task_id": risk.task_id,
+            "task": {
+                "task_id": task.task_id if task else None,
+                "title": task.title if task else None
+            },
+            "probability": risk.probability,
+            "impact": risk.impact,
+            "risk_score": risk.risk_score,
+            "risk_level": {
+                "risk_level_id": level.risk_level_id if level else None,
+                "code": level.code if level else None,
+                "name_ar": level.name_ar if level else None,
+                "name_en": level.name_en if level else None,
+                "color_hex": level.color_hex if level else "#6c757d"
+            },
+            "status": {
+                "status_id": status.status_id if status else None,
+                "code": status.code if status else None,
+                "name_ar": status.name_ar if status else None,
+                "name_en": status.name_en if status else None,
+                "color_hex": status.color_hex if status else "#6c757d"
+            },
+            "identified_by": {
+                "employee_id": emp.employee_id if emp else None,
+                "full_name": emp.full_name if emp else None
+            },
+            "identified_at": risk.identified_at.isoformat() if risk.identified_at else None,
+            "target_date": risk.target_date.isoformat() if risk.target_date else None,
+            "mitigations_count": mitigations_counts.get(risk.risk_id, 0),
+            "updated_at": risk.updated_at.isoformat() if risk.updated_at else None
+        })
+
+
+    return {
+        "data": result,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": (total + per_page - 1) // per_page,
+        "open_count": open_count,
+        "overdue_count": overdue_count
+    }
+
+
+
+
+@router.get("/options-by-manager-department")
+async def get_risk_options_by_manager_department(
+    employee_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    employee = db.query(Employee).filter(
+        Employee.employee_id == employee_id
+    ).first()
+
+
+    if not employee or not employee.department_id:
+        return {
+            "risk_levels": [],
+            "statuses": [],
+            "tasks": [],
+            "probability_range": {"min": PROBABILITY_MIN, "max": PROBABILITY_MAX},
+            "impact_range": {"min": IMPACT_MIN, "max": IMPACT_MAX}
+        }
+
+
+    tasks = db.query(OperationalTask).filter(
+        OperationalTask.department_id == employee.department_id,
+        OperationalTask.is_active == True,
+        OperationalTask.status_id.in_(ALLOWED_TASK_STATUS_IDS)
+    ).all()
+
+
+    tasks_data = [{"task_id": t.task_id, "title": t.title} for t in tasks]
+
+
+    risk_levels = db.query(DictRiskLevel).all()
+    risk_levels_data = [
+        {
+            "risk_level_id": rl.risk_level_id,
+            "code": rl.code,
+            "name_ar": rl.name_ar,
+            "name_en": rl.name_en,
+            "color_hex": rl.color_hex,
+            "min_score": rl.min_score,
+            "max_score": rl.max_score
+        }
+        for rl in risk_levels
+    ]
+
+
+    statuses = db.query(DictStatus).filter(DictStatus.category == "risk").all()
+    statuses_data = [
+        {
+            "status_id": s.status_id,
+            "code": s.code,
+            "name_ar": s.name_ar,
+            "name_en": s.name_en,
+            "color_hex": s.color_hex
+        }
+        for s in statuses
+    ]
+
+
+    return {
+        "risk_levels": risk_levels_data,
+        "statuses": statuses_data,
+        "tasks": tasks_data,
+        "probability_range": {"min": PROBABILITY_MIN, "max": PROBABILITY_MAX},
+        "impact_range": {"min": IMPACT_MIN, "max": IMPACT_MAX}
+    }
 
 
 @router.get("/{risk_id}")
