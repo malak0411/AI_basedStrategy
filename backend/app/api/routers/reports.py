@@ -7,7 +7,7 @@ from typing import Optional
 from app.models import (
     StrategicPillar, StrategicGoal, Program, Initiative, MajorTask, OperationalTask,
     Risk, RiskMitigation, BudgetLine, BudgetTransaction, Employee, Department, 
-    DictStatus, DictRiskLevel, DictTransactionType, KPI, KPIMeasurement
+    DictStatus, DictRiskLevel, DictTransactionType, KPI, KPIMeasurement, TaskAssignment
 )
 from app.core.dependencies import get_current_user
 from app.database import get_db
@@ -21,7 +21,7 @@ async def get_dashboard_data(
     employee_id: int = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # 1. الحسابات المالية (البرامج فقط لتجنب الازدواجية)
+
     budget_res = db.query(
         func.sum(BudgetLine.allocated_amount).label('total_alloc'),
         func.sum(BudgetLine.spent_amount).label('total_spent')
@@ -55,7 +55,7 @@ async def get_strategic_report(
     employee_id: int = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # جلب البيانات دفعة واحدة لتجميعها في الذاكرة (أسرع من الاستعلام المتداخل)
+
     pillars = db.query(StrategicPillar).all()
     goals = db.query(StrategicGoal).all()
     programs = db.query(Program).all()
@@ -65,7 +65,7 @@ async def get_strategic_report(
     
     statuses = {s.status_id: s.name_ar for s in db.query(DictStatus).all()}
     
-    # ربط المهام التشغيلية بالمهام الرئيسية
+
     ot_by_mt = {}
     for ot in op_tasks:
         ot_by_mt.setdefault(ot.major_task_id, []).append({
@@ -167,7 +167,7 @@ async def get_kpis_report(
     result = []
     
     for k in kpis:
-        # جلب آخر قياس
+
         last_measure = db.query(KPIMeasurement).filter(
             KPIMeasurement.kpi_id == k.kpi_id
         ).order_by(desc(KPIMeasurement.measured_at)).first()
@@ -201,9 +201,9 @@ async def get_departments_report(
     result = []
     
     for d in depts:
-        # عدد الموظفين
+
         emp_count = db.query(Employee).filter(Employee.department_id == d.department_id, Employee.is_active == True).count()
-        # المهام التشغيلية
+
         tasks = db.query(OperationalTask).filter(OperationalTask.department_id == d.department_id).all()
         
         result.append({
@@ -227,14 +227,11 @@ async def get_employees_report(
     result = []
     
     for e in emps:
-        # المهام المسندة (من جدول task_assignments)
         assigned = db.query(TaskAssignment).filter(
             TaskAssignment.employee_id == e.employee_id,
             TaskAssignment.is_active == True
         ).count()
         
-        # المهام المكتملة (بناءً على الجدول أعلاه أو جدول المهام)
-        # نعتمد على task_assignments للربط
         result.append({
             "id": e.employee_id,
             "name": e.full_name,

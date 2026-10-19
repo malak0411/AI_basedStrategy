@@ -3,27 +3,19 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from ..config import settings
 
-# ================================================================
-# تشفير كلمات المرور
-# ================================================================
+
 
 def hash_password(password: str) -> str:
-    """تشفير كلمة المرور باستخدام bcrypt"""
+
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """التحقق من كلمة المرور"""
+
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
-# ================================================================
-# واجهة موحدة لتشفير كلمة المرور (للاستخدام في جميع أنحاء التطبيق)
-# ================================================================
 
-get_password_hash = hash_password  # <-- أضف هذا السطر
+get_password_hash = hash_password  
 
-# ================================================================
-# JWT
-# ================================================================
 
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     to_encode = data.copy()
@@ -41,9 +33,6 @@ def decode_access_token(token: str) -> dict:
     except JWTError:
         return None
 
-# ================================================================
-# أدوات أمنية إضافية
-# ================================================================
 
 def hash_ip_address(ip: str) -> str:
     import hashlib
