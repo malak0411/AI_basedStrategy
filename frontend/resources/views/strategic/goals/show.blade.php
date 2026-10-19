@@ -16,6 +16,11 @@
     .kpi-card {
         background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 10px;
         border: 1px solid #e2e8f0; border-right: 4px solid #805ad5;
+        transition: all 0.2s; cursor: pointer;
+    }
+    .kpi-card:hover {
+        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        transform: translateY(-2px);
     }
     .kpi-card.achieved  { border-right-color: #38a169; }
     .kpi-card.on_track  { border-right-color: #3182ce; }
@@ -39,42 +44,47 @@
     .strategic-path .node.goal   { border-color: #e53e3e; color: #e53e3e; background: #fff5f5; font-weight: 600; }
 
 
-    .progress-bar-custom { height: 6px; background: #edf2f7; border-radius: 3px; overflow: hidden; }
-    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #3182ce, #4299e1); }
+    .progress-bar-custom {
+        height: 8px; background: #edf2f7; border-radius: 10px; overflow: hidden;
+        position: relative;
+    }
+    .progress-bar-fill {
+        height: 100%; border-radius: 10px;
+        transition: width 0.6s ease-in-out, background 0.3s ease;
+        position: relative;
+    }
+    .progress-bar-fill::after {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.35) 100%);
+        border-radius: 10px;
+    }
 
 
     .progress-circle {
-        width: 100px; height: 100px; border-radius: 50%;
-        background: conic-gradient(#e53e3e var(--p), #edf2f7 0);
+        width: 110px; height: 110px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         margin: 0 auto;
+        transition: background 0.3s ease;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
     }
     .progress-circle-inner {
-        width: 78px; height: 78px; border-radius: 50%; background: #fff;
+        width: 86px; height: 86px; border-radius: 50%; background: #fff;
         display: flex; align-items: center; justify-content: center;
-        font-size: 20px; font-weight: 700; color: #c53030;
+        font-size: 22px; font-weight: 800;
+        transition: color 0.3s ease;
     }
-
-
-    .progress-circle-kpi {
-        width: 100px; height: 100px; border-radius: 50%;
-        background: conic-gradient(#805ad5 var(--p), #edf2f7 0);
-        display: flex; align-items: center; justify-content: center;
-        margin: 0 auto;
-    }
-    .progress-circle-kpi .progress-circle-inner { color: #6b46c1; }
 
 
     .stat-box {
         background: #f7fafc; border-radius: 10px; padding: 12px; text-align: center;
         border: 1px solid #e2e8f0;
     }
-    .stat-box .value { font-size: 20px; font-weight: 700; }
+    .stat-box .value { font-size: 22px; font-weight: 700; }
     .stat-box .label { font-size: 11px; color: #718096; margin-top: 4px; }
 
 
     .kpi-value-large {
-        font-size: 24px; font-weight: 700; color: #1a202c;
+        font-size: 22px; font-weight: 700; color: #1a202c;
     }
     .kpi-target {
         font-size: 12px; color: #718096;
@@ -96,11 +106,63 @@
     .badge-at_risk   { background: #fefcbf; color: #744210; }
     .badge-off_track { background: #fed7d7; color: #822727; }
     .badge-no_data   { background: #e2e8f0; color: #4a5568; }
+
+
+    .days-badge {
+        display: inline-block; padding: 3px 9px; border-radius: 10px;
+        font-size: 10px; font-weight: 600;
+    }
+    .days-ok      { background: #c6f6d5; color: #22543d; }
+    .days-warning { background: #fefcbf; color: #744210; }
+    .days-danger  { background: #fed7d7; color: #822727; }
+
+
+    .color-legend {
+        display: flex; gap: 12px; justify-content: center; align-items: center;
+        padding: 8px 14px; background: #fff; border-radius: 10px;
+        border: 1px solid #e2e8f0; font-size: 11px; color: #4a5568;
+        margin-bottom: 12px;
+    }
+    .color-legend .dot {
+        width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+        margin-left: 5px; vertical-align: middle;
+    }
+
+
+    .kpi-arrow {
+        opacity: 0.4;
+        transition: all 0.2s;
+    }
+    .kpi-card:hover .kpi-arrow {
+        opacity: 1;
+        color: #805ad5 !important;
+        transform: translateX(-4px);
+    }
 </style>
 @endpush
 
 
 @section('content')
+@php
+    function progressColor($p) {
+        $p = (int) $p;
+        if ($p < 20)  return '#e53e3e';
+        if ($p < 40)  return '#dd6b20';
+        if ($p < 60)  return '#d69e2e';
+        if ($p < 80)  return '#48bb78';
+        return '#38a169';
+    }
+    function progressLabel($p) {
+        $p = (int) $p;
+        if ($p < 20)  return 'منخفض جداً';
+        if ($p < 40)  return 'منخفض';
+        if ($p < 60)  return 'متوسط';
+        if ($p < 80)  return 'جيد';
+        return 'ممتاز';
+    }
+@endphp
+
+
 <div class="container-fluid px-4">
 
 
@@ -132,7 +194,7 @@
     <div class="card-custom mb-4">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div class="flex-grow-1">
-                <div class="d-flex align-items-center gap-2 mb-2">
+                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
                     <h4 class="mb-0">{{ $goal['title'] ?? '' }}</h4>
                     @if($days !== null)
                         <span class="status-badge
@@ -176,7 +238,7 @@
         </div>
         <div class="col-md-3 mb-2">
             <div class="stat-box">
-                <div class="value text-purple" style="color: #805ad5;">{{ $goal['kpis_count'] ?? 0 }}</div>
+                <div class="value" style="color: #805ad5;">{{ $goal['kpis_count'] ?? 0 }}</div>
                 <div class="label"><i class="fas fa-chart-bar ml-1"></i> مؤشرات الأداء</div>
             </div>
         </div>
@@ -248,6 +310,7 @@
                     $pStatusColor = $program['status_color'] ?? '#6c757d';
                     $pStatusName  = $program['status_name'] ?? 'غير محدد';
                     $pProgress    = (int) ($program['progress'] ?? 0);
+                    $pBarColor    = progressColor($pProgress);
                 @endphp
 
 
@@ -264,7 +327,7 @@
                             <p class="text-muted small mb-2">{{ Str::limit($program['description'] ?? '', 150) }}</p>
 
 
-                            <div class="d-flex gap-3 flex-wrap">
+                            <div class="d-flex gap-3 flex-wrap mb-2">
                                 <small class="text-muted">
                                     <i class="fas fa-lightbulb ml-1"></i>
                                     مبادرات: {{ $program['initiatives_count'] ?? 0 }}
@@ -273,10 +336,6 @@
                                     <i class="fas fa-cog ml-1"></i>
                                     تشغيلية: {{ $program['operational_completed'] ?? 0 }}/{{ $program['operational_count'] ?? 0 }}
                                 </small>
-                                <small class="text-primary">
-                                    <i class="fas fa-chart-line ml-1"></i>
-                                    التقدم: {{ $pProgress }}%
-                                </small>
                                 <small class="text-muted">
                                     <i class="fas fa-coins ml-1"></i>
                                     {{ number_format($program['budget_estimate'] ?? 0) }}
@@ -284,8 +343,15 @@
                             </div>
 
 
-                            <div class="progress-bar-custom mt-2">
-                                <div class="progress-bar-fill" style="width: {{ $pProgress }}%"></div>
+                            <div class="d-flex justify-content-between align-items-center small mb-1">
+                                <span class="text-muted">نسبة التقدم</span>
+                                <strong style="color: {{ $pBarColor }};">
+                                    {{ $pProgress }}%
+                                    <small class="text-muted">({{ progressLabel($pProgress) }})</small>
+                                </strong>
+                            </div>
+                            <div class="progress-bar-custom">
+                                <div class="progress-bar-fill" style="width: {{ $pProgress }}%; background: {{ $pBarColor }};"></div>
                             </div>
                         </div>
 
@@ -314,26 +380,33 @@
             @else
                 @foreach($kpis as $kpi)
                 @php
-                    $kpiStatus = $kpi['status'] ?? 'no_data';
-                    $achievement = $kpi['achievement'];
-                    $trend = $kpi['trend'] ?? 'stable';
+                    $kpiStatus    = $kpi['status'] ?? 'no_data';
+                    $achievement  = $kpi['achievement'];
+                    $trend        = $kpi['trend'] ?? 'stable';
+                    $kpiBarColor  = progressColor($achievement ?? 0);
                 @endphp
 
 
-                <div class="kpi-card {{ $kpiStatus }}">
+                <div class="kpi-card {{ $kpiStatus }}"
+                     onclick="window.location='{{ route('kpis.show', $kpi['kpi_id']) }}'">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div class="flex-grow-1">
-                            <h6 class="mb-1">{{ $kpi['name'] ?? '' }}</h6>
-                            <small class="text-muted">{{ $kpi['description'] ?? '' }}</small>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <h6 class="mb-0">{{ $kpi['name'] ?? '' }}</h6>
+                                <span class="kpi-status-badge badge-{{ $kpiStatus }}">
+                                    @if($kpiStatus === 'achieved')  محقق
+                                    @elseif($kpiStatus === 'on_track')  على المسار
+                                    @elseif($kpiStatus === 'at_risk')  معرض للخطر
+                                    @elseif($kpiStatus === 'off_track')  خارج المسار
+                                    @else  لا توجد بيانات
+                                    @endif
+                                </span>
+                            </div>
+                            <small class="text-muted">{{ Str::limit($kpi['description'] ?? '', 120) }}</small>
                         </div>
-                        <span class="kpi-status-badge badge-{{ $kpiStatus }}">
-                            @if($kpiStatus === 'achieved')  محقق
-                            @elseif($kpiStatus === 'on_track')  على المسار
-                            @elseif($kpiStatus === 'at_risk')  معرض للخطر
-                            @elseif($kpiStatus === 'off_track')  خارج المسار
-                            @else  لا توجد بيانات
-                            @endif
-                        </span>
+                        <div class="ms-2">
+                            <i class="fas fa-chevron-left kpi-arrow text-muted"></i>
+                        </div>
                     </div>
 
 
@@ -353,16 +426,16 @@
                             <div class="kpi-value-large text-primary">
                                 {{ $kpi['target_value'] !== null ? number_format($kpi['target_value']) : '—' }}
                             </div>
-                            <small class="text-muted">القيمة المستهدفة</small>
+                            <small class="text-muted">المستهدفة</small>
                         </div>
                         <div class="col-md-3 text-center">
                             <div class="kpi-value-large text-secondary">
                                 {{ $kpi['baseline_value'] !== null ? number_format($kpi['baseline_value']) : '—' }}
                             </div>
-                            <small class="text-muted">القيمة الأساسية</small>
+                            <small class="text-muted">الأساسية</small>
                         </div>
                         <div class="col-md-3 text-center">
-                            <div class="kpi-value-large" style="color: #805ad5;">
+                            <div class="kpi-value-large" style="color: {{ $kpiBarColor }};">
                                 {{ $achievement !== null ? number_format($achievement, 1) . '%' : '—' }}
                                 @if($trend === 'up')
                                     <i class="fas fa-arrow-up trend-icon trend-up"></i>
@@ -378,9 +451,9 @@
 
 
                     @if($achievement !== null)
-                        <div class="progress-bar-kpi mt-3">
-                            <div class="progress-bar-kpi-fill"
-                                 style="width: {{ min(max($achievement, 0), 100) }}%"></div>
+                        <div class="progress-bar-custom mt-3">
+                            <div class="progress-bar-fill"
+                                 style="width: {{ min(max($achievement, 0), 100) }}%; background: {{ $kpiBarColor }};"></div>
                         </div>
                     @endif
 
@@ -412,10 +485,29 @@
         <div class="col-lg-4">
 
 
+            <div class="color-legend">
+                <span><span class="dot" style="background: #e53e3e;"></span>0-19%</span>
+                <span><span class="dot" style="background: #dd6b20;"></span>20-39%</span>
+                <span><span class="dot" style="background: #d69e2e;"></span>40-59%</span>
+                <span><span class="dot" style="background: #48bb78;"></span>60-79%</span>
+                <span><span class="dot" style="background: #38a169;"></span>80-100%</span>
+            </div>
+
+
             <div class="card-custom mb-4 text-center">
                 <h6 class="mb-3">تقدم البرامج</h6>
-                <div class="progress-circle" style="--p: {{ $progress }}%">
-                    <div class="progress-circle-inner">{{ $progress }}%</div>
+                <div class="progress-circle"
+                     style="background: conic-gradient({{ progressColor($progress) }} {{ $progress }}%, #edf2f7 0);">
+                    <div class="progress-circle-inner" style="color: {{ progressColor($progress) }};">
+                        {{ $progress }}%
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <span class="badge py-2 px-3"
+                          style="background: {{ progressColor($progress) }}22; color: {{ progressColor($progress) }}; border: 1px solid {{ progressColor($progress) }}55; font-size: 12px;">
+                        <i class="fas fa-chart-line ml-1"></i>
+                        {{ progressLabel($progress) }}
+                    </span>
                 </div>
                 <small class="text-muted d-block mt-2">
                     متوسط تقدم البرامج التابعة
@@ -425,8 +517,18 @@
 
             <div class="card-custom mb-4 text-center">
                 <h6 class="mb-3">تحقيق المؤشرات</h6>
-                <div class="progress-circle-kpi" style="--p: {{ min($kpiProgress, 100) }}%">
-                    <div class="progress-circle-inner">{{ $kpiProgress }}%</div>
+                <div class="progress-circle"
+                     style="background: conic-gradient({{ progressColor($kpiProgress) }} {{ min($kpiProgress, 100) }}%, #edf2f7 0);">
+                    <div class="progress-circle-inner" style="color: {{ progressColor($kpiProgress) }};">
+                        {{ $kpiProgress }}%
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <span class="badge py-2 px-3"
+                          style="background: {{ progressColor($kpiProgress) }}22; color: {{ progressColor($kpiProgress) }}; border: 1px solid {{ progressColor($kpiProgress) }}55; font-size: 12px;">
+                        <i class="fas fa-bullseye ml-1"></i>
+                        {{ progressLabel($kpiProgress) }}
+                    </span>
                 </div>
                 <small class="text-muted d-block mt-2">
                     المتوسط المرجح لمؤشرات الأداء

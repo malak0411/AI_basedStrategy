@@ -43,9 +43,24 @@ class InitiativeCreate(BaseModel):
     end_date: Optional[date_type] = None
     budget_estimate: Optional[float] = 0
 
-# ============================================================
-# PILLARS - GET/POST/PUT/DELETE
-# ============================================================
+INIT_STATUS_DRAFT = 1
+INIT_STATUS_IN_PROGRESS = 2
+INIT_STATUS_COMPLETED = 3
+INIT_STATUS_CANCELLED = 4
+INIT_STATUS_APPROVED = 17
+INIT_STATUS_PENDING = 45
+
+
+PROG_STATUS_PENDING = 45
+PROG_STATUS_DRAFT = 46
+PROG_STATUS_IN_PROGRESS = 47
+PROG_STATUS_COMPLETED = 48
+PROG_STATUS_CANCELLED = 49
+
+
+TASK_STATUS_COMPLETED = 3
+
+
 def _serialize_pillar(p: StrategicPillar, db: Session, full: bool = False):
     goals = db.query(StrategicGoal).filter(
         StrategicGoal.pillar_id == p.pillar_id,
@@ -202,9 +217,6 @@ async def update_pillar(pillar_id: int, data: PillarCreate, db: Session = Depend
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============================================================
-# GOALS - GET/POST/PUT/DELETE
-# ============================================================
 def _serialize_kpi(goal_kpi: GoalKPI, kpi: KPI, db: Session):
     measurements = db.query(KPIMeasurement).filter(
         KPIMeasurement.kpi_id == kpi.kpi_id
@@ -744,17 +756,17 @@ def _serialize_program(p: Program, db: Session, full: bool = False):
         total_progress += init_progress
 
 
-        if init.status_id == STATUS_DRAFT:
+        if init.status_id == INIT_STATUS_DRAFT:
             statuses_count["draft"] += 1
-        elif init.status_id == STATUS_PENDING:
+        elif init.status_id == INIT_STATUS_PENDING:
             statuses_count["pending"] += 1
-        elif init.status_id == STATUS_APPROVED:
+        elif init.status_id == INIT_STATUS_APPROVED:
             statuses_count["approved"] += 1
-        elif init.status_id == STATUS_IN_PROGRESS:
+        elif init.status_id == INIT_STATUS_IN_PROGRESS:
             statuses_count["in_progress"] += 1
-        elif init.status_id == STATUS_COMPLETED:
+        elif init.status_id == INIT_STATUS_COMPLETED:
             statuses_count["completed"] += 1
-        elif init.status_id == STATUS_CANCELLED:
+        elif init.status_id == INIT_STATUS_CANCELLED:
             statuses_count["cancelled"] += 1
 
 
@@ -819,7 +831,6 @@ def _serialize_program(p: Program, db: Session, full: bool = False):
 
 
 
-
 @router.get("/programs")
 async def get_programs(db: Session = Depends(get_db)):
     try:
@@ -861,7 +872,7 @@ async def create_program(data: ProgramCreate, db: Session = Depends(get_db)):
             budget_estimate=data.budget_estimate,
             start_date=data.start_date,
             end_date=data.end_date,
-            status_id=STATUS_DRAFT,
+            status_id=PROG_STATUS_DRAFT,
             is_active=True
         )
         db.add(program)
@@ -883,8 +894,8 @@ async def update_program(program_id: int, data: ProgramCreate, db: Session = Dep
             raise HTTPException(status_code=404, detail="غير موجود")
 
 
-        if program.status_id in (STATUS_APPROVED, STATUS_IN_PROGRESS, STATUS_COMPLETED):
-            program.status_id = STATUS_PENDING
+        if program.status_id in (PROG_STATUS_IN_PROGRESS, PROG_STATUS_COMPLETED):
+            program.status_id = PROG_STATUS_PENDING
 
 
         program.goal_id = data.goal_id
@@ -911,7 +922,6 @@ async def update_program(program_id: int, data: ProgramCreate, db: Session = Dep
 
 
 
-
 @router.post("/programs/{program_id}/change-status")
 async def change_program_status(program_id: int, data: dict, db: Session = Depends(get_db)):
     try:
@@ -919,8 +929,10 @@ async def change_program_status(program_id: int, data: dict, db: Session = Depen
         user_role = (data.get("user_role") or "").lower()
 
 
-        valid_statuses = (STATUS_DRAFT, STATUS_IN_PROGRESS, STATUS_COMPLETED,
-                          STATUS_CANCELLED, STATUS_APPROVED, STATUS_PENDING)
+        valid_statuses = (
+            PROG_STATUS_PENDING, PROG_STATUS_DRAFT, PROG_STATUS_IN_PROGRESS,
+            PROG_STATUS_COMPLETED, PROG_STATUS_CANCELLED
+        )
         if new_status not in valid_statuses:
             raise HTTPException(status_code=400, detail="حالة غير صحيحة")
 
@@ -930,12 +942,12 @@ async def change_program_status(program_id: int, data: dict, db: Session = Depen
             raise HTTPException(status_code=404, detail="غير موجود")
 
 
-        if new_status in (STATUS_APPROVED, STATUS_CANCELLED):
+        if new_status == PROG_STATUS_CANCELLED:
             if user_role not in ("minister", "وزير"):
                 raise HTTPException(status_code=403, detail="هذا الإجراء متاح للوزير فقط")
 
 
-        if new_status in (STATUS_IN_PROGRESS, STATUS_COMPLETED):
+        if new_status in (PROG_STATUS_IN_PROGRESS, PROG_STATUS_COMPLETED):
             if user_role not in ("manager", "مدير"):
                 raise HTTPException(status_code=403, detail="هذا الإجراء متاح للمدير فقط")
 
@@ -956,16 +968,6 @@ async def change_program_status(program_id: int, data: dict, db: Session = Depen
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-
-# ============================================================
-# INITIATIVES - GET/POST/PUT/DELETE
-# ============================================================
-STATUS_DRAFT = 1
-STATUS_IN_PROGRESS = 2
-STATUS_COMPLETED = 3
-STATUS_CANCELLED = 4
-STATUS_APPROVED = 17
-STATUS_PENDING = 45
 
 
 
@@ -997,7 +999,7 @@ def _calc_major_task_progress(mt: MajorTask) -> dict:
 
 
     for op in ops:
-        if op.status_id == 19:
+        if op.status_id == TASK_STATUS_COMPLETED:
             completed += 1
             progress_sum += 100
         else:
@@ -1014,7 +1016,6 @@ def _calc_major_task_progress(mt: MajorTask) -> dict:
 
     avg_progress = round(progress_sum / total, 2) if total > 0 else 0
     return {"total": total, "completed": completed, "progress": avg_progress}
-
 
 
 
@@ -1186,7 +1187,7 @@ async def create_initiative(data: InitiativeCreate, db: Session = Depends(get_db
             start_date=data.start_date,
             end_date=data.end_date,
             budget_estimate=data.budget_estimate,
-            status_id=STATUS_DRAFT,
+            status_id=INIT_STATUS_DRAFT,
             is_active=True
         )
         db.add(initiative)
@@ -1198,8 +1199,6 @@ async def create_initiative(data: InitiativeCreate, db: Session = Depends(get_db
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-
 @router.put("/initiatives/{initiative_id}")
 async def update_initiative(initiative_id: int, data: InitiativeCreate, db: Session = Depends(get_db)):
     try:
@@ -1208,8 +1207,8 @@ async def update_initiative(initiative_id: int, data: InitiativeCreate, db: Sess
             raise HTTPException(status_code=404, detail="غير موجودة")
 
 
-        if initiative.status_id in (STATUS_APPROVED, STATUS_IN_PROGRESS, STATUS_COMPLETED):
-            initiative.status_id = STATUS_PENDING
+        if initiative.status_id in (INIT_STATUS_APPROVED, INIT_STATUS_IN_PROGRESS, INIT_STATUS_COMPLETED):
+            initiative.status_id = INIT_STATUS_PENDING
 
 
         initiative.program_id = data.program_id
@@ -1237,7 +1236,6 @@ async def update_initiative(initiative_id: int, data: InitiativeCreate, db: Sess
 
 
 
-
 @router.post("/initiatives/{initiative_id}/change-status")
 async def change_initiative_status(initiative_id: int, data: dict, db: Session = Depends(get_db)):
     try:
@@ -1245,8 +1243,10 @@ async def change_initiative_status(initiative_id: int, data: dict, db: Session =
         user_role = (data.get("user_role") or "").lower()
 
 
-        valid_statuses = (STATUS_DRAFT, STATUS_IN_PROGRESS, STATUS_COMPLETED,
-                          STATUS_CANCELLED, STATUS_APPROVED, STATUS_PENDING)
+        valid_statuses = (
+            INIT_STATUS_DRAFT, INIT_STATUS_IN_PROGRESS, INIT_STATUS_COMPLETED,
+            INIT_STATUS_CANCELLED, INIT_STATUS_APPROVED, INIT_STATUS_PENDING
+        )
         if new_status not in valid_statuses:
             raise HTTPException(status_code=400, detail="حالة غير صحيحة")
 
@@ -1256,12 +1256,12 @@ async def change_initiative_status(initiative_id: int, data: dict, db: Session =
             raise HTTPException(status_code=404, detail="غير موجودة")
 
 
-        if new_status in (STATUS_APPROVED, STATUS_CANCELLED):
+        if new_status in (INIT_STATUS_APPROVED, INIT_STATUS_CANCELLED):
             if user_role not in ("minister", "وزير"):
                 raise HTTPException(status_code=403, detail="هذا الإجراء متاح للوزير فقط")
 
 
-        if new_status in (STATUS_IN_PROGRESS, STATUS_COMPLETED):
+        if new_status in (INIT_STATUS_IN_PROGRESS, INIT_STATUS_COMPLETED):
             if user_role not in ("manager", "مدير"):
                 raise HTTPException(status_code=403, detail="هذا الإجراء متاح للمدير فقط")
 
@@ -1282,7 +1282,6 @@ async def change_initiative_status(initiative_id: int, data: dict, db: Session =
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 
@@ -1345,7 +1344,7 @@ async def create_major_task_manual(initiative_id: int, data: dict, db: Session =
             raise HTTPException(status_code=404, detail="المبادرة غير موجودة")
 
 
-        if initiative.status_id not in (STATUS_APPROVED, STATUS_IN_PROGRESS):
+        if initiative.status_id not in (INIT_STATUS_APPROVED, INIT_STATUS_IN_PROGRESS):
             raise HTTPException(status_code=400, detail="لا يمكن إنشاء مهام رئيسية قبل اعتماد المبادرة")
 
 
@@ -1384,8 +1383,8 @@ async def create_major_task_manual(initiative_id: int, data: dict, db: Session =
             db.add(mtd)
 
 
-        if initiative.status_id == STATUS_APPROVED:
-            initiative.status_id = STATUS_IN_PROGRESS
+        if initiative.status_id == INIT_STATUS_APPROVED:
+            initiative.status_id = INIT_STATUS_IN_PROGRESS
 
 
         db.commit()

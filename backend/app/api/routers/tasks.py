@@ -249,7 +249,7 @@ async def tasks_by_major_task(major_task_id: int, db: Session = Depends(get_db))
                 "task_name": task.title,
                 "title": task.title,
                 "description": task.description or "",
-                "department_id": task.department_id,   # 🔥 تمت إضافة هذا السطر
+                "department_id": task.department_id,  
                 "status": task.status_id,
                 "status_id": task.status_id,
                 "status_name": get_status_map(db).get(task.status_id, str(task.status_id)),
@@ -549,16 +549,30 @@ async def major_tasks_by_department_id(department_id: int, db: Session = Depends
         dept_tasks = db.query(MajorTaskDepartment).filter(
             MajorTaskDepartment.department_id == department_id
         ).all()
-        
+
+
         major_task_ids = list(set(d.major_task_id for d in dept_tasks))
         if not major_task_ids:
             return {"success": True, "data": []}
-        
-        tasks = db.query(MajorTask).filter(MajorTask.major_task_id.in_(major_task_ids)).all()
-        
+
+
+        tasks = db.query(MajorTask).filter(
+            MajorTask.major_task_id.in_(major_task_ids)
+        ).all()
+
+
         result = []
         for t in tasks:
-            dept_role = next((d.responsibility_type for d in dept_tasks if d.major_task_id == t.major_task_id), 'SUPPORT')
+            dept_role = next(
+                (d.responsibility_type for d in dept_tasks if d.major_task_id == t.major_task_id),
+                'SUPPORT'
+            )
+
+
+            initiative_name = t.initiative.name if t.initiative else ""
+            op_count = len(t.operational_tasks) if t.operational_tasks else 0
+
+
             result.append({
                 "id": t.major_task_id,
                 "name": t.name,
@@ -568,11 +582,18 @@ async def major_tasks_by_department_id(department_id: int, db: Session = Depends
                 "is_cross_department": t.is_cross_department,
                 "is_active": t.is_active,
                 "responsibility_type": dept_role,
+                "initiative_name": initiative_name,
+                "operational_tasks_count": op_count,
+                "total_operational_tasks": op_count,
             })
-        
+
+
         return {"success": True, "data": result}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/{task_id}")
 async def get_task(

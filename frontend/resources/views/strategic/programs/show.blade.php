@@ -33,20 +33,41 @@
     .strategic-path .node.program{ border-color: #3182ce; color: #3182ce; background: #ebf8ff; font-weight: 600; }
 
 
-    .progress-bar-custom { height: 6px; background: #edf2f7; border-radius: 3px; overflow: hidden; }
-    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #3182ce, #4299e1); }
+    .progress-bar-custom {
+        height: 8px; background: #edf2f7; border-radius: 10px; overflow: hidden;
+        position: relative;
+    }
+    .progress-bar-fill {
+        height: 100%; border-radius: 10px;
+        transition: width 0.6s ease-in-out, background 0.3s ease;
+        position: relative;
+    }
+    .progress-bar-fill::after {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.35) 100%);
+        border-radius: 10px;
+    }
+
+
+    .progress-bar-kpi { height: 8px; background: #edf2f7; border-radius: 10px; overflow: hidden; }
+    .progress-bar-kpi-fill {
+        height: 100%; border-radius: 10px;
+        transition: width 0.6s ease-in-out;
+    }
 
 
     .progress-circle {
-        width: 100px; height: 100px; border-radius: 50%;
-        background: conic-gradient(#3182ce var(--p), #edf2f7 0);
+        width: 110px; height: 110px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         margin: 0 auto;
+        transition: background 0.3s ease;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
     }
     .progress-circle-inner {
-        width: 78px; height: 78px; border-radius: 50%; background: #fff;
+        width: 86px; height: 86px; border-radius: 50%; background: #fff;
         display: flex; align-items: center; justify-content: center;
-        font-size: 20px; font-weight: 700; color: #2b6cb0;
+        font-size: 22px; font-weight: 800;
+        transition: color 0.3s ease;
     }
 
 
@@ -54,7 +75,7 @@
         background: #f7fafc; border-radius: 10px; padding: 12px; text-align: center;
         border: 1px solid #e2e8f0;
     }
-    .stat-box .value { font-size: 20px; font-weight: 700; color: #1a202c; }
+    .stat-box .value { font-size: 22px; font-weight: 700; color: #1a202c; }
     .stat-box .label { font-size: 11px; color: #718096; margin-top: 4px; }
 
 
@@ -67,8 +88,6 @@
     .budget-row.initiative{ border-right-color: #dd6b20; }
     .budget-row.major     { border-right-color: #805ad5; }
     .budget-row.operation { border-right-color: #38a169; }
-
-
     .budget-row .name { font-weight: 600; font-size: 13px; }
     .budget-row .amounts { font-size: 12px; color: #4a5568; }
     .budget-row .amounts strong { color: #1a202c; }
@@ -86,11 +105,43 @@
         display: inline-block; padding: 2px 8px; border-radius: 10px;
         font-size: 10px; font-weight: 600; background: #e2e8f0; color: #4a5568;
     }
+
+
+    .color-legend {
+        display: flex; gap: 12px; justify-content: center; align-items: center;
+        padding: 8px 14px; background: #fff; border-radius: 10px;
+        border: 1px solid #e2e8f0; font-size: 11px; color: #4a5568;
+        margin-bottom: 12px;
+    }
+    .color-legend .dot {
+        width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+        margin-left: 5px; vertical-align: middle;
+    }
 </style>
 @endpush
 
 
 @section('content')
+@php
+    function progressColor($p) {
+        $p = (int) $p;
+        if ($p < 20)  return '#e53e3e';
+        if ($p < 40)  return '#dd6b20';
+        if ($p < 60)  return '#d69e2e';
+        if ($p < 80)  return '#48bb78';
+        return '#38a169';
+    }
+    function progressLabel($p) {
+        $p = (int) $p;
+        if ($p < 20)  return 'منخفض جداً';
+        if ($p < 40)  return 'منخفض';
+        if ($p < 60)  return 'متوسط';
+        if ($p < 80)  return 'جيد';
+        return 'ممتاز';
+    }
+@endphp
+
+
 <div class="container-fluid px-4">
 
 
@@ -108,13 +159,12 @@
 
 
     @php
-        $statusId    = $program['status_id'] ?? 1;
+        $statusId    = $program['status_id'] ?? 46;
         $statusName  = $program['status_name'] ?? 'غير محدد';
         $statusColor = $program['status_color'] ?? '#6c757d';
         $progress    = (int) ($program['progress'] ?? 0);
         $userRole    = $userRole ?? session('user_role', 'employee');
-        $canApprove  = ($userRole === 'minister') && !in_array($statusId, [17, 4]);
-        $canAddInit  = in_array($statusId, [17, 2]);
+        $canAddInit  = in_array($statusId, [46, 47, 48]);
         $budget      = $budgetDetails ?? [];
         $statusesCount = $program['statuses_count'] ?? [];
     @endphp
@@ -137,23 +187,11 @@
             <div class="d-flex gap-2 flex-wrap">
 
 
-                @if($statusId === 1 && $userRole === 'minister')
-                    <form action="{{ route('strategic.programs.change-status', $program['id']) }}" method="POST" class="d-inline"
-                          onsubmit="return confirm('اعتماد البرنامج؟')">
-                        @csrf
-                        <input type="hidden" name="status_id" value="17">
-                        <button type="submit" class="btn-gold">
-                            <i class="fas fa-check-circle"></i> اعتماد
-                        </button>
-                    </form>
-                @endif
-
-
-                @if($statusId === 17 && $userRole === 'manager')
+                @if($statusId === 46 && $userRole === 'manager')
                     <form action="{{ route('strategic.programs.change-status', $program['id']) }}" method="POST" class="d-inline"
                           onsubmit="return confirm('بدء تنفيذ البرنامج؟')">
                         @csrf
-                        <input type="hidden" name="status_id" value="2">
+                        <input type="hidden" name="status_id" value="47">
                         <button type="submit" class="btn btn-info">
                             <i class="fas fa-play"></i> بدء التنفيذ
                         </button>
@@ -161,11 +199,11 @@
                 @endif
 
 
-                @if($statusId === 2 && $userRole === 'manager')
+                @if($statusId === 47 && $userRole === 'manager')
                     <form action="{{ route('strategic.programs.change-status', $program['id']) }}" method="POST" class="d-inline"
                           onsubmit="return confirm('تعليم البرنامج كمكتمل؟')">
                         @csrf
-                        <input type="hidden" name="status_id" value="3">
+                        <input type="hidden" name="status_id" value="48">
                         <button type="submit" class="btn btn-success">
                             <i class="fas fa-flag-checkered"></i> إكمال
                         </button>
@@ -173,11 +211,11 @@
                 @endif
 
 
-                @if(!in_array($statusId, [4, 3]) && $userRole === 'minister')
+                @if(!in_array($statusId, [49, 48]) && $userRole === 'minister')
                     <form action="{{ route('strategic.programs.change-status', $program['id']) }}" method="POST" class="d-inline"
                           onsubmit="return confirm('هل أنت متأكد من إلغاء البرنامج؟')">
                         @csrf
-                        <input type="hidden" name="status_id" value="4">
+                        <input type="hidden" name="status_id" value="49">
                         <button type="submit" class="btn btn-danger">
                             <i class="fas fa-times-circle"></i> إلغاء
                         </button>
@@ -195,11 +233,11 @@
         </div>
 
 
-        @if(in_array($statusId, [17, 2, 3]))
+        @if(in_array($statusId, [47, 48]))
             <div class="alert alert-warning mt-3 mb-0 py-2">
                 <small>
                     <i class="fas fa-exclamation-triangle"></i>
-                    أي تعديل على البرنامج سيعيد حالته إلى <strong>"معلق"</strong> وتحتاج لإعادة اعتماد الوزير.
+                    أي تعديل على البرنامج سيعيد حالته إلى <strong>"معلق"</strong>.
                 </small>
             </div>
         @endif
@@ -215,7 +253,7 @@
         </div>
         <div class="col-md-3 mb-2">
             <div class="stat-box">
-                <div class="value text-purple" style="color: #805ad5;">{{ $program['major_tasks_count'] ?? 0 }}</div>
+                <div class="value" style="color: #805ad5;">{{ $program['major_tasks_count'] ?? 0 }}</div>
                 <div class="label"><i class="fas fa-tasks ml-1"></i> المهام الرئيسية</div>
             </div>
         </div>
@@ -318,7 +356,7 @@
                     @else
                         <span class="badge bg-secondary py-2 px-3">
                             <i class="fas fa-lock"></i>
-                            يجب اعتماد البرنامج أولاً لإنشاء المبادرات
+                            لا يمكن إضافة مبادرات
                         </span>
                     @endif
                 </div>
@@ -328,12 +366,14 @@
             @if(empty($initiatives))
                 <div class="empty-state card-custom">
                     <i class="fas fa-lightbulb"></i>
-                    @if($statusId === 17 || $statusId === 2)
+                    @if(in_array($statusId, [46, 47, 48]))
                         <h5>لا توجد مبادرات لهذا البرنامج</h5>
                         <p class="text-muted">يمكنك إنشاء مبادرة جديدة من الزر أعلاه</p>
+                    @elseif($statusId === 49)
+                        <h5>البرنامج ملغي</h5>
+                        <p class="text-muted">لا يمكن إضافة مبادرات لبرنامج ملغي</p>
                     @else
-                        <h5>🔒 لا يمكن إنشاء مبادرات قبل اعتماد البرنامج</h5>
-                        <p class="text-muted">يرجى اعتماد البرنامج من قِبل الوزير أولاً</p>
+                        <h5>لا توجد مبادرات لهذا البرنامج</h5>
                     @endif
                 </div>
             @else
@@ -342,6 +382,7 @@
                     $initStatusColor = $initiative['status_color'] ?? '#6c757d';
                     $initStatusName  = $initiative['status_name'] ?? 'غير محدد';
                     $initProgress    = (int) ($initiative['progress'] ?? 0);
+                    $initBarColor    = progressColor($initProgress);
                 @endphp
 
 
@@ -358,7 +399,7 @@
                             <p class="text-muted small mb-2">{{ Str::limit($initiative['description'] ?? '', 150) }}</p>
 
 
-                            <div class="d-flex gap-3 flex-wrap">
+                            <div class="d-flex gap-3 flex-wrap mb-2">
                                 <small class="text-muted">
                                     <i class="fas fa-tasks ml-1"></i>
                                     مهام رئيسية: {{ $initiative['major_tasks_count'] ?? 0 }}
@@ -367,10 +408,6 @@
                                     <i class="fas fa-cog ml-1"></i>
                                     تشغيلية: {{ $initiative['operational_completed'] ?? 0 }}/{{ $initiative['operational_count'] ?? 0 }}
                                 </small>
-                                <small class="text-primary">
-                                    <i class="fas fa-chart-line ml-1"></i>
-                                    التقدم: {{ $initProgress }}%
-                                </small>
                                 <small class="text-muted">
                                     <i class="fas fa-coins ml-1"></i>
                                     {{ number_format($initiative['budget_estimate'] ?? 0) }}
@@ -378,8 +415,15 @@
                             </div>
 
 
-                            <div class="progress-bar-custom mt-2">
-                                <div class="progress-bar-fill" style="width: {{ $initProgress }}%"></div>
+                            <div class="d-flex justify-content-between align-items-center small mb-1">
+                                <span class="text-muted">نسبة التقدم</span>
+                                <strong style="color: {{ $initBarColor }};">
+                                    {{ $initProgress }}%
+                                    <small class="text-muted">({{ progressLabel($initProgress) }})</small>
+                                </strong>
+                            </div>
+                            <div class="progress-bar-custom">
+                                <div class="progress-bar-fill" style="width: {{ $initProgress }}%; background: {{ $initBarColor }};"></div>
                             </div>
                         </div>
 
@@ -399,10 +443,29 @@
         <div class="col-lg-4">
 
 
+            <div class="color-legend">
+                <span><span class="dot" style="background: #e53e3e;"></span>0-19%</span>
+                <span><span class="dot" style="background: #dd6b20;"></span>20-39%</span>
+                <span><span class="dot" style="background: #d69e2e;"></span>40-59%</span>
+                <span><span class="dot" style="background: #48bb78;"></span>60-79%</span>
+                <span><span class="dot" style="background: #38a169;"></span>80-100%</span>
+            </div>
+
+
             <div class="card-custom mb-4 text-center">
                 <h6 class="mb-3">نسبة التقدم الكلية</h6>
-                <div class="progress-circle" style="--p: {{ $progress }}%">
-                    <div class="progress-circle-inner">{{ $progress }}%</div>
+                <div class="progress-circle"
+                     style="background: conic-gradient({{ progressColor($progress) }} {{ $progress }}%, #edf2f7 0);">
+                    <div class="progress-circle-inner" style="color: {{ progressColor($progress) }};">
+                        {{ $progress }}%
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <span class="badge py-2 px-3"
+                          style="background: {{ progressColor($progress) }}22; color: {{ progressColor($progress) }}; border: 1px solid {{ progressColor($progress) }}55; font-size: 12px;">
+                        <i class="fas fa-chart-line ml-1"></i>
+                        {{ progressLabel($progress) }}
+                    </span>
                 </div>
                 <small class="text-muted d-block mt-2">
                     متوسط تقدم المبادرات التابعة

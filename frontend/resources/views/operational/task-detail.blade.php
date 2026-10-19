@@ -1130,7 +1130,7 @@
     .progress-value { font-size: 14px; font-weight: 600; color: #007bff; }
     .progress { height: 8px; border-radius: 4px; background: #e9ecef; }
     .progress-bar.dirigo-progress-bar {
-        background: linear-gradient(90deg, #007bff, #20c997) !important;
+        background: linear-gradient(90deg, #08d026, #e03506) !important;
         border-radius: 4px;
         transition: width 0.6s ease;
     }

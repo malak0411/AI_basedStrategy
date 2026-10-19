@@ -9,9 +9,30 @@
     .program-card {
         background: #fff; border-radius: 16px; padding: 24px; height: 100%;
         border: 1px solid #e2e8f0; transition: all 0.3s ease; cursor: pointer;
-        border-right: 5px solid #3182ce;
+        border-right: 5px solid #3182ce; position: relative; overflow: hidden;
     }
     .program-card:hover { box-shadow: 0 8px 25px rgba(0,0,0,0.08); transform: translateY(-2px); }
+
+
+    .empty-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.97);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+        z-index: 10;
+        border-radius: 16px;
+    }
+    .empty-overlay i  { color: #cbd5e0; }
+    .empty-overlay h5 { color: #2d3748; }
+    .empty-overlay p  { color: #4a5568; }
+    .empty-overlay small { color: #a0aec0; }
+
+
     .status-badge { padding: 5px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
     .progress-bar-custom { height: 6px; background: #edf2f7; border-radius: 3px; overflow: hidden; }
     .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #3182ce, #4299e1); }
@@ -27,15 +48,21 @@
 <div class="container-fluid px-4">
 
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h3><i class="fas fa-project-diagram ml-2"></i>البرامج</h3>
-            <p class="text-muted mb-0">اضغط على أي برنامج لعرض تفاصيله ومبادراته</p>
-        </div>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h3><i class="fas fa-project-diagram ml-2"></i>البرامج</h3>
+        <p class="text-muted mb-0">اضغط على أي برنامج لعرض تفاصيله ومبادراته</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ route('strategic.programs.kanban') }}" class="btn btn-outline-primary">
+            <i class="fas fa-columns"></i> إدارة الحالات (كانبان)
+        </a>
         <a href="{{ route('strategic.programs.create') }}" class="btn-gold">
             <i class="fas fa-plus"></i> برنامج جديد
         </a>
     </div>
+</div>
+
 
 
     @if(session('success'))
@@ -54,11 +81,24 @@
         @php
             $statusName  = $program['status_name'] ?? 'غير محدد';
             $statusColor = $program['status_color'] ?? '#6c757d';
-            $progress    = (int) ($program['progress'] ?? 0);
+            $progress    = (int)($program['progress'] ?? 0);
             $statusesCount = $program['statuses_count'] ?? [];
         @endphp
         <div class="col-md-4 mb-4">
             <div class="program-card" onclick="window.location='{{ route('strategic.programs.show', $program['id']) }}'">
+
+
+                @if((int)($program['initiatives_count'] ?? 0) === 0)
+                    <div class="empty-overlay" onclick="event.stopPropagation()">
+                        <i class="fas fa-lightbulb fa-3x mb-3"></i>
+                        <h5 class="fw-bold mb-2">{{ $program['name'] ?? $program['title'] ?? '' }}</h5>
+                        <p class="mb-1 fw-semibold">لم يتم إضافة أي مبادرة إلى هذا البرنامج بعد</p>
+                        <small class="mb-3 d-block">ابدأ بإضافة أول مبادرة لهذا البرنامج</small>
+                        <a href="{{ route('strategic.programs.show', $program['id']) }}" class="btn btn-sm btn-gold">
+                            <i class="fas fa-plus ml-1"></i> إضافة مبادرة
+                        </a>
+                    </div>
+                @endif
 
 
                 <div class="d-flex justify-content-between align-items-start mb-3">

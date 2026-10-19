@@ -224,4 +224,72 @@ class InitiativeController extends Controller
         }
         return back()->with('error', $response['detail'] ?? 'فشل إضافة المهمة');
     }
+
+    public function kanban()
+{
+    $token = session('jwt_token');
+    $response = $this->apiClient->get('/api/strategic/initiatives', $token);
+    $initiatives = $response['data'] ?? [];
+
+
+    $columns = [
+        1  => ['name' => 'مسودة', 'color' => '#e2e8f0', 'text_color' => '#4a5568'],
+        45 => ['name' => 'معلق', 'color' => '#fefcbf', 'text_color' => '#744210'],
+        17 => ['name' => 'معتمد', 'color' => '#d4af37', 'text_color' => '#1a1a2e'],
+        2  => ['name' => 'قيد التنفيذ', 'color' => '#bee3f8', 'text_color' => '#2c5282'],
+        3  => ['name' => 'مكتمل', 'color' => '#c6f6d5', 'text_color' => '#22543d'],
+        4  => ['name' => 'ملغي', 'color' => '#fed7d7', 'text_color' => '#822727'],
+    ];
+
+
+    $grouped = [];
+    foreach ($columns as $sid => $col) {
+        $grouped[$sid] = [];
+    }
+    foreach ($initiatives as $i) {
+        $sid = $i['status_id'] ?? 1;
+        if (isset($grouped[$sid])) {
+            $grouped[$sid][] = $i;
+        }
+    }
+
+
+    $userRole = session('user_role', 'employee');
+
+
+    return view('strategic.initiatives.kanban', compact('grouped', 'columns', 'userRole'));
+}
+
+
+public function kanbanMove(Request $request, $id)
+{
+    $token = session('jwt_token');
+    $userRole = session('user_role', 'employee');
+
+
+    $response = $this->apiClient->post(
+        "/api/strategic/initiatives/{$id}/change-status",
+        [
+            'status_id' => (int) $request->status_id,
+            'user_role' => $userRole,
+        ],
+        $token
+    );
+
+
+    if ($response['success'] ?? false) {
+        return response()->json([
+            'success' => true,
+            'new_status' => $response['new_status'] ?? null,
+            'new_status_name' => $response['new_status_name'] ?? '',
+        ]);
+    }
+
+
+    return response()->json([
+        'success' => false,
+        'message' => $response['detail'] ?? 'فشل تحديث الحالة',
+    ], 400);
+}
+
 }

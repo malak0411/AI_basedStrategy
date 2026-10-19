@@ -333,6 +333,8 @@ Route::put('/operational/risks/mitigations/{mitigationId}', [OperationalTaskCont
         Route::get('/programs', [ProgramController::class, 'index'])->name('programs.index');
         Route::get('/programs/create', [ProgramController::class, 'create'])->name('programs.create');
         Route::post('/programs', [ProgramController::class, 'store'])->name('programs.store');
+        Route::get('/programs/kanban', [ProgramController::class, 'kanban'])->name('programs.kanban');
+        Route::post('/programs/{id}/kanban-move', [ProgramController::class, 'kanbanMove'])->name('programs.kanban-move');
         Route::get('/programs/{id}', [ProgramController::class, 'show'])->name('programs.show');
         Route::get('/programs/{id}/edit', [ProgramController::class, 'edit'])->name('programs.edit');
         Route::put('/programs/{id}', [ProgramController::class, 'update'])->name('programs.update');
@@ -342,6 +344,8 @@ Route::put('/operational/risks/mitigations/{mitigationId}', [OperationalTaskCont
         Route::get('/initiatives', [InitiativeController::class, 'index'])->name('initiatives.index');
         Route::get('/initiatives/create', [InitiativeController::class, 'create'])->name('initiatives.create');
         Route::post('/initiatives', [InitiativeController::class, 'store'])->name('initiatives.store');
+        Route::get('/initiatives/kanban', [InitiativeController::class, 'kanban'])->name('initiatives.kanban');
+        Route::post('/initiatives/{id}/kanban-move', [InitiativeController::class, 'kanbanMove'])->name('initiatives.kanban-move');
         Route::get('/initiatives/{id}', [InitiativeController::class, 'show'])->name('initiatives.show');
         Route::get('/initiatives/{id}/edit', [InitiativeController::class, 'edit'])->name('initiatives.edit');
         Route::put('/initiatives/{id}', [InitiativeController::class, 'update'])->name('initiatives.update');

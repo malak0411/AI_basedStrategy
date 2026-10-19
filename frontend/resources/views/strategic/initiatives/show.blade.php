@@ -39,28 +39,89 @@
     .strategic-path .node.pillar { border-color: #dd6b20; color: #dd6b20; }
     .strategic-path .node.goal   { border-color: #e53e3e; color: #e53e3e; }
     .strategic-path .node.program{ border-color: #3182ce; color: #3182ce; }
+    .strategic-path .node.initiative{ border-color: #d4af37; color: #b8932a; background: #fdf8e7; font-weight: 600; }
 
 
-    .progress-bar-custom { height: 6px; background: #edf2f7; border-radius: 3px; overflow: hidden; }
-    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #38a169, #48bb78); }
+    /* ✅ شريط تقدم متدرج ديناميكي */
+    .progress-bar-custom {
+        height: 8px; background: #edf2f7; border-radius: 10px; overflow: hidden;
+        position: relative;
+    }
+    .progress-bar-fill {
+        height: 100%; border-radius: 10px;
+        transition: width 0.6s ease-in-out, background 0.3s ease;
+        position: relative;
+    }
+    .progress-bar-fill::after {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.35) 100%);
+        border-radius: 10px;
+    }
 
 
+    /* دائرة التقدم الديناميكية */
     .progress-circle {
-        width: 100px; height: 100px; border-radius: 50%;
-        background: conic-gradient(#48bb78 var(--p), #edf2f7 0);
+        width: 110px; height: 110px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         margin: 0 auto;
+        transition: background 0.3s ease;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
     }
     .progress-circle-inner {
-        width: 78px; height: 78px; border-radius: 50%; background: #fff;
+        width: 86px; height: 86px; border-radius: 50%; background: #fff;
         display: flex; align-items: center; justify-content: center;
-        font-size: 20px; font-weight: 700; color: #2f855a;
+        font-size: 22px; font-weight: 800;
+        transition: color 0.3s ease;
+    }
+
+
+    /* مفتاح الألوان */
+    .color-legend {
+        display: flex; gap: 12px; justify-content: center; align-items: center;
+        padding: 8px 14px; background: #fff; border-radius: 10px;
+        border: 1px solid #e2e8f0; font-size: 11px; color: #4a5568;
+        margin-bottom: 12px;
+    }
+    .color-legend .dot {
+        width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+        margin-left: 5px; vertical-align: middle;
+    }
+
+
+    /* حالة المهمة الرئيسية */
+    .task-status-bar {
+        height: 6px; background: #edf2f7; border-radius: 10px; overflow: hidden;
+        margin-top: 8px;
+    }
+    .task-status-bar .fill {
+        height: 100%; border-radius: 10px;
+        transition: width 0.6s ease-in-out;
     }
 </style>
 @endpush
 
 
 @section('content')
+@php
+    function progressColor($p) {
+        $p = (int) $p;
+        if ($p < 20)  return '#e53e3e';
+        if ($p < 40)  return '#dd6b20';
+        if ($p < 60)  return '#d69e2e';
+        if ($p < 80)  return '#48bb78';
+        return '#38a169';
+    }
+    function progressLabel($p) {
+        $p = (int) $p;
+        if ($p < 20)  return 'منخفض جداً';
+        if ($p < 40)  return 'منخفض';
+        if ($p < 60)  return 'متوسط';
+        if ($p < 80)  return 'جيد';
+        return 'ممتاز';
+    }
+@endphp
+
+
 <div class="container-fluid px-4">
 
 
@@ -192,6 +253,10 @@
                     <span class="node program">
                         <i class="fas fa-project-diagram"></i> {{ $initiative['program_name'] ?? '—' }}
                     </span>
+                    <i class="fas fa-arrow-left text-muted"></i>
+                    <span class="node initiative">
+                        <i class="fas fa-lightbulb"></i> {{ $initiative['name'] ?? '—' }}
+                    </span>
                 </div>
                 <div class="row mt-3">
                     <div class="col-md-3">
@@ -255,6 +320,7 @@
                     $supportingDepts  = $task['supporting_departments'] ?? [];
                     $isShared         = $task['is_cross_department'] ?? false;
                     $taskProgress     = (int) ($task['progress'] ?? 0);
+                    $taskBarColor     = progressColor($taskProgress);
                 @endphp
 
 
@@ -296,7 +362,7 @@
                             @endif
 
 
-                            <div class="d-flex gap-3 flex-wrap mt-2">
+                            <div class="d-flex gap-3 flex-wrap mt-2 mb-2">
                                 <small class="text-muted">
                                     <i class="far fa-clock ml-1"></i>
                                     {{ $task['estimated_duration_days'] ?? 0 }} يوم
@@ -305,15 +371,18 @@
                                     <i class="fas fa-cog ml-1"></i>
                                     مهام تشغيلية: {{ $task['operational_completed'] ?? 0 }}/{{ $task['operational_count'] ?? 0 }}
                                 </small>
-                                <small class="text-success">
-                                    <i class="fas fa-chart-line ml-1"></i>
-                                    التقدم: {{ $taskProgress }}%
-                                </small>
                             </div>
 
 
-                            <div class="progress-bar-custom mt-2">
-                                <div class="progress-bar-fill" style="width: {{ $taskProgress }}%"></div>
+                            <div class="d-flex justify-content-between align-items-center small mb-1">
+                                <span class="text-muted">نسبة التقدم</span>
+                                <strong style="color: {{ $taskBarColor }};">
+                                    {{ $taskProgress }}%
+                                    <small class="text-muted">({{ progressLabel($taskProgress) }})</small>
+                                </strong>
+                            </div>
+                            <div class="progress-bar-custom">
+                                <div class="progress-bar-fill" style="width: {{ $taskProgress }}%; background: {{ $taskBarColor }};"></div>
                             </div>
                         </div>
 
@@ -336,10 +405,31 @@
         <div class="col-lg-4">
 
 
+            {{-- مفتاح الألوان --}}
+            <div class="color-legend">
+                <span><span class="dot" style="background: #e53e3e;"></span>0-19%</span>
+                <span><span class="dot" style="background: #dd6b20;"></span>20-39%</span>
+                <span><span class="dot" style="background: #d69e2e;"></span>40-59%</span>
+                <span><span class="dot" style="background: #48bb78;"></span>60-79%</span>
+                <span><span class="dot" style="background: #38a169;"></span>80-100%</span>
+            </div>
+
+
+            {{-- تقدم المبادرة --}}
             <div class="card-custom mb-4 text-center">
                 <h6 class="mb-3">نسبة التقدم الكلية</h6>
-                <div class="progress-circle" style="--p: {{ $progress }}%">
-                    <div class="progress-circle-inner">{{ $progress }}%</div>
+                <div class="progress-circle"
+                     style="background: conic-gradient({{ progressColor($progress) }} {{ $progress }}%, #edf2f7 0);">
+                    <div class="progress-circle-inner" style="color: {{ progressColor($progress) }};">
+                        {{ $progress }}%
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <span class="badge py-2 px-3"
+                          style="background: {{ progressColor($progress) }}22; color: {{ progressColor($progress) }}; border: 1px solid {{ progressColor($progress) }}55; font-size: 12px;">
+                        <i class="fas fa-chart-line ml-1"></i>
+                        {{ progressLabel($progress) }}
+                    </span>
                 </div>
                 <small class="text-muted d-block mt-2">
                     محسوبة من المهام التشغيلية التابعة
@@ -347,6 +437,7 @@
             </div>
 
 
+            {{-- معلومات سريعة --}}
             <div class="card-custom mb-4">
                 <h6 class="mb-3"><i class="fas fa-info-circle text-primary ml-1"></i> معلومات سريعة</h6>
                 <div class="d-flex justify-content-between py-2 border-bottom">
@@ -375,6 +466,7 @@
             </div>
 
 
+            {{-- سجل الميزانية --}}
             <div class="card-custom mb-4">
                 <h6 class="mb-3"><i class="fas fa-coins text-warning ml-1"></i> سجل الميزانية</h6>
                 @if(!empty($initiative['budget_history']))
@@ -542,7 +634,7 @@ document.querySelector('form[action*="major-tasks"]')?.addEventListener('submit'
     });
     if (!hasLead) {
         e.preventDefault();
-        alert('⚠️ يجب تحديد إدارة مسؤولة واحدة على الأقل');
+        alert(' يجب تحديد إدارة مسؤولة واحدة على الأقل');
     }
 });
 </script>

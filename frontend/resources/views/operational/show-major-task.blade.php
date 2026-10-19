@@ -92,7 +92,7 @@
         position: relative;
     }
     .btn-kanban {
-        background: #9f7aea;
+        background: #5412da;
         color: #fff;
         border: none;
         padding: 6px 16px;
@@ -102,7 +102,7 @@
         font-size: 14px;
     }
     .btn-kanban:hover {
-        background: #805ad5;
+        background: #4a0fca;
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(159, 122, 234, 0.3);
         color: #fff;
