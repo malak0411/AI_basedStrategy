@@ -1708,35 +1708,33 @@ public function predictTaskDelay($taskId)
             return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
         }
 
-
         $response = $this->apiClient->post(
-            "/api/tasks/{$taskId}/predict-and-analyze",
+            "/api/ai/predict-and-detect/{$taskId}",
             [],
             $token
         );
 
-
-        if ($response['success'] ?? false) {
-            return response()->json([
-                'success' => true,
-                'message' => 'تم التنبؤ وتحليل المخاطر',
-                'data' => $response['data'] ?? []
-            ]);
+        if (!is_array($response)) {
+            return response()->json(['success' => false, 'error' => 'رد غير صالح من خدمة AI'], 502);
         }
 
+        if (!($response['success'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'error' => $response['detail'] ?? $response['error'] ?? 'فشل التنبؤ',
+            ], 500);
+        }
 
-        return response()->json([
-            'success' => false,
-            'error' => $response['detail'] ?? 'فشل التنبؤ'
-        ], 500);
+        $data = $response['data'] ?? [];
+        $prob = (float) ($data['delay_probability'] ?? 0);
+        $data['probability_percent'] = $prob <= 1 ? round($prob * 100, 1) : round($prob, 1);
 
-
-    } catch (\Exception $e) {
-        Log::error('Predict task delay error: ' . $e->getMessage());
+        return response()->json(['success' => true, 'data' => $data]);
+    } catch (\Throwable $e) {
+        \Log::error('predictTaskDelay error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
         return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
     }
 }
-
 
 public function generateTaskRiskRecommendations($riskId)
 {
@@ -1746,27 +1744,26 @@ public function generateTaskRiskRecommendations($riskId)
             return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
         }
 
+        $response = $this->apiClient->post(
+            "/api/ai/risk/{$riskId}/recommendations",
+            [],
+            $token
+        );
 
-        $response = $this->apiClient->post("/api/risks/{$riskId}/recommendations", [], $token);
-
-
-        if ($response['success'] ?? false) {
-            return response()->json([
-                'success' => true,
-                'message' => 'تم توليد التوصيات',
-                'data' => $response['data'] ?? []
-            ]);
+        if (!is_array($response)) {
+            return response()->json(['success' => false, 'error' => 'رد غير صالح من خدمة AI'], 502);
         }
 
+        if (!($response['success'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'error' => $response['detail'] ?? $response['error'] ?? 'فشل التوليد',
+            ], 500);
+        }
 
-        return response()->json([
-            'success' => false,
-            'error' => $response['detail'] ?? 'فشل التوليد'
-        ], 500);
-
-
-    } catch (\Exception $e) {
-        Log::error('Generate recommendations error: ' . $e->getMessage());
+        return response()->json(['success' => true, 'data' => $response['data'] ?? []]);
+    } catch (\Throwable $e) {
+        \Log::error('generateRecommendations error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
         return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
     }
 }

@@ -1,77 +1,81 @@
 import schedule
 import time
 import threading
+import logging
 from datetime import datetime
-from app.ai.services.prediction_service import prediction_service
 
-
+logger = logging.getLogger(__name__)
 
 
 class AIScheduler:
-
 
     def __init__(self):
         self.is_running = False
         self.thread = None
 
-
     def start(self):
         if self.is_running:
             return
-
-
         schedule.every().day.at("06:00").do(self.run_daily_prediction)
+        schedule.every().day.at("07:00").do(self.run_risk_reassessment)
         schedule.every().monday.at("02:00").do(self.run_weekly_training)
-
-
         self.is_running = True
-        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread = threading.Thread(target=self._loop, daemon=True)
         self.thread.start()
+        logger.info("AI scheduler started")
 
-
-        print(" جدولة AI بدأت - تنبؤ يومي (6:00) + تدريب أسبوعي (الإثنين 2:00)")
-
-
-    def _run_loop(self):
+    def _loop(self):
         while self.is_running:
-            schedule.run_pending()
+            try:
+                schedule.run_pending()
+            except Exception as e:
+                logger.exception(f"scheduler tick fail: {e}")
             time.sleep(60)
 
-
     def run_daily_prediction(self):
-        print(f"\n [{datetime.now()}] بدء التنبؤ اليومي التلقائي...")
+        from app.ai.services.prediction_service import prediction_service
+        logger.info("daily prediction started")
         try:
             results = prediction_service.predict_all_active(save=True, detect_risk=True)
-            high_risk = sum(1 for r in results if r.get('risk_level') == 'High')
-            risks_created = sum(1 for r in results if r.get('risk_detection', {}).get('action') == 'created')
-            risks_updated = sum(1 for r in results if r.get('risk_detection', {}).get('action') == 'updated')
-            print(f" اكتمل التنبؤ: {len(results)} مهمة | {high_risk} عالية الخطورة")
-            print(f" مخاطر جديدة: {risks_created} | مخاطر محدَّثة: {risks_updated}")
+            high = sum(1 for r in results if r.get('risk_level') == 'High')
+            logger.info(f"daily prediction done: {len(results)} tasks, {high} high risk")
             return results
         except Exception as e:
-            print(f" فشل التنبؤ اليومي: {str(e)}")
+            logger.exception(f"daily prediction fail: {e}")
             return None
 
+    def run_risk_reassessment(self):
+        from app.ai.services.risk_detection_service import RiskDetectionService
+        logger.info("risk reassessment started")
+        try:
+            svc = RiskDetectionService()
+            try:
+                results = svc.reassess_all_active_risks()
+                logger.info(f"reassessed {len(results)} active risks")
+                return results
+            finally:
+                svc.close()
+        except Exception as e:
+            logger.exception(f"risk reassessment fail: {e}")
+            return None
 
     def run_weekly_training(self):
-        print(f"\n [{datetime.now()}] بدء إعادة التدريب الأسبوعي...")
+        from app.ai.services.prediction_service import prediction_service
+        logger.info("weekly training started")
         try:
-            from app.ai.models.delay_predictor import DelayPredictor
-            predictor = DelayPredictor()
-            metrics = predictor.train(force=True)
+            metrics = prediction_service.predictor.train(force=True)
             if metrics:
-                print(f" اكتمل التدريب: F1={metrics.get('f1_score', 0)}")
+                prediction_service.reload_model()
+                logger.info(f"training done: F1={metrics.get('f1_score', 0)}")
             return metrics
         except Exception as e:
-            print(f" فشل التدريب: {str(e)}")
+            logger.exception(f"training fail: {e}")
             return None
-
 
     def stop(self):
         self.is_running = False
         schedule.clear()
-
-
+        logger.info("AI scheduler stopped")
 
 
 ai_scheduler = AIScheduler()

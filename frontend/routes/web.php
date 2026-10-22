@@ -335,6 +335,8 @@ Route::post('/risks/auto-detect/{taskId}', [RiskController::class, 'detectForTas
 Route::post('/operational/task/{taskId}/predict', [OperationalTaskController::class, 'predictTaskDelay'])
     ->name('operational.task.predict');
 
+Route::post('/risks/{riskId}/recommendations', [OperationalTaskController::class, 'generateTaskRiskRecommendations'])
+        ->name('risk.recommendations');
 
 Route::post('/operational/risks/{riskId}/recommendations', [OperationalTaskController::class, 'generateTaskRiskRecommendations'])
     ->name('operational.risks.generate-recommendations');
