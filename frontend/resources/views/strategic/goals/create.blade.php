@@ -5,7 +5,7 @@
 @section('content')
 <div class="container-fluid px-4">
 
-    <a href="{{ route('strategic.goals.index') }}" class="btn btn-outline-secondary mb-3">
+    <a href="javascript:history.back()" class="btn btn-outline-secondary">
         <i class="fas fa-arrow-right"></i> العودة
     </a>
 

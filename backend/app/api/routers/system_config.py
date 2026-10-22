@@ -17,12 +17,8 @@ class ConfigUpdate(BaseModel):
     config_value: str
     description: Optional[str] = None
 
-# ============================================================
-# GET - جميع الإعدادات (قائمة واحدة)
-# ============================================================
 @router.get("")
 async def get_all_configs(db: Session = Depends(get_db)):
-    """جميع إعدادات النظام في قائمة واحدة"""
     try:
         configs = db.query(SystemConfig).order_by(SystemConfig.config_id).all()
         result = [{
@@ -36,12 +32,8 @@ async def get_all_configs(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-# ============================================================
-# POST - إضافة إعداد جديد
-# ============================================================
 @router.post("")
 async def create_config(data: ConfigCreate, db: Session = Depends(get_db)):
-    """إضافة إعداد جديد"""
     try:
         existing = db.query(SystemConfig).filter(
             SystemConfig.config_key == data.config_key
@@ -71,12 +63,8 @@ async def create_config(data: ConfigCreate, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-# ============================================================
-# PUT - تحديث إعداد
-# ============================================================
 @router.put("/{config_key}")
 async def update_config(config_key: str, data: ConfigUpdate, db: Session = Depends(get_db)):
-    """تحديث قيمة إعداد"""
     try:
         config = db.query(SystemConfig).filter(SystemConfig.config_key == config_key).first()
         if not config:
@@ -103,12 +91,8 @@ async def update_config(config_key: str, data: ConfigUpdate, db: Session = Depen
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-# ============================================================
-# DELETE - حذف إعداد
-# ============================================================
 @router.delete("/{config_key}")
 async def delete_config(config_key: str, db: Session = Depends(get_db)):
-    """حذف إعداد"""
     try:
         config = db.query(SystemConfig).filter(SystemConfig.config_key == config_key).first()
         if not config:

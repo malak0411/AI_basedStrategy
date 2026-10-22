@@ -1,12 +1,22 @@
 import json
 import threading
+import traceback
 from datetime import datetime
+
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 
 from app.database import get_db, SessionLocal
-from app.models import OperationalTask, AIPrediction, AiJob, Employee, AIRecommendation, DictPriority
+from app.models import (
+    OperationalTask,
+    AIPrediction,
+    AiJob,
+    Employee,
+    AIRecommendation,
+    DictPriority,
+)
 from app.ai.services.prediction_service import prediction_service
 from app.ai.services.ollama_client import ollama_client
 from app.ai.models.delay_predictor import DelayPredictor
@@ -27,10 +37,54 @@ router = APIRouter(prefix="/api/ai", tags=["AI"])
 
 
 
+def _ensure_employee(current_user, db: Session) -> Employee:
+    if current_user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+    if hasattr(current_user, "employee_id") and hasattr(current_user, "department_id"):
+        return current_user
+
+
+    emp_id = None
+    if isinstance(current_user, int):
+        emp_id = current_user
+    elif isinstance(current_user, dict):
+        emp_id = (
+            current_user.get("employee_id")
+            or current_user.get("id")
+            or current_user.get("sub")
+        )
+    else:
+        emp_id = getattr(current_user, "employee_id", None) or getattr(
+            current_user, "id", None
+        )
+
+
+    if emp_id is None:
+        raise HTTPException(
+            status_code=401, detail="Cannot resolve employee from authentication"
+        )
+
+
+    try:
+        emp_id = int(emp_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid employee id in token")
+
+
+    emp = db.query(Employee).filter(Employee.employee_id == emp_id).first()
+    if not emp:
+        raise HTTPException(status_code=401, detail=f"Employee {emp_id} not found")
+    return emp
+
+
+
+
 def operational_in_background(job_id: int, major_task_id: int, instructions: str = ""):
+    planner = OperationalPlanner()
     try:
         print(f"Job #{job_id}: Starting operational task generation")
-        planner = OperationalPlanner()
         context = planner.get_major_task_context(major_task_id)
         prompt = planner.build_prompt(context, instructions)
         planner.close()
@@ -38,45 +92,90 @@ def operational_in_background(job_id: int, major_task_id: int, instructions: str
 
         response_text = ollama_client.generate(
             prompt,
-            system_instruction="Return ONLY valid JSON array. No other text."
+            system_instruction="Return ONLY a valid JSON array. No explanation.",
         )
 
 
         planner2 = OperationalPlanner()
-        tasks = planner2.parse_response(response_text)
-        tasks = planner2.normalize_tasks(tasks, major_task_id)
+        raw = planner2.parse_response(response_text)
+        tasks = planner2.normalize_tasks(raw, major_task_id)
+
+
         if not tasks:
-            raise ValueError("No valid tasks generated")
+            raise ValueError("No valid operational tasks generated")
 
 
         planner2.update_job(
             job_id,
             "review",
-            {
-                "major_task_id": major_task_id,
-                "operational_tasks": tasks
-            }
+            {"major_task_id": major_task_id, "operational_tasks": tasks},
         )
         planner2.close()
         print(f"Job #{job_id}: Completed - {len(tasks)} tasks generated")
-
-
     except Exception as e:
-        print(f"Job #{job_id}: Failed - {str(e)}")
-        import traceback
         traceback.print_exc()
-        db = SessionLocal()
         try:
-            job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
-            if job:
-                job.status = "failed"
-                job.result_json = json.dumps({"error": str(e)}, ensure_ascii=False)
-                job.updated_at = datetime.now()
-                db.commit()
+            p = OperationalPlanner()
+            p.update_job(job_id, "failed", {"error": str(e)})
+            p.close()
         except Exception:
             pass
-        finally:
-            db.close()
+    finally:
+        try:
+            planner.close()
+        except Exception:
+            pass
+
+
+
+
+def operational_edit_in_background(job_id: int, instruction: str):
+    planner = OperationalPlanner()
+    try:
+        print(f"Job #{job_id}: Starting background edit")
+        job = planner.db.query(AiJob).filter(AiJob.job_id == job_id).first()
+        if not job:
+            return
+
+
+        current = json.loads(job.result_json) if job.result_json else {}
+        major_task_id = current.get("major_task_id")
+        current_tasks = current.get("operational_tasks", [])
+
+
+        if not major_task_id or not current_tasks:
+            raise ValueError("No tasks to edit")
+
+
+        ctx = planner.get_major_task_context(major_task_id)
+        prompt = planner.build_edit_prompt(ctx, current_tasks, instruction)
+        response_text = ollama_client.generate(
+            prompt,
+            system_instruction="Return ONLY a valid JSON array. No explanation.",
+        )
+        raw = planner.parse_response(response_text)
+        new_tasks = planner.normalize_tasks(raw, major_task_id) if raw else current_tasks
+
+
+        current["operational_tasks"] = new_tasks
+        planner.update_job(job_id, "review", current)
+        print(f"Job #{job_id}: Edit completed - {len(new_tasks)} tasks")
+    except Exception as e:
+        traceback.print_exc()
+        try:
+            p = OperationalPlanner()
+            job = p.db.query(AiJob).filter(AiJob.job_id == job_id).first()
+            if job and job.status == "editing":
+                job.status = "review"
+                p.db.commit()
+            p.close()
+        except Exception:
+            pass
+    finally:
+        try:
+            planner.close()
+        except Exception:
+            pass
 
 
 
@@ -92,7 +191,7 @@ def generate_in_background(job_id: int, initiative_id: int, user_instructions: s
 
         response_text = ollama_client.generate(
             prompt,
-            system_instruction="Return ONLY valid JSON array. No other text."
+            system_instruction="Return ONLY valid JSON array. No other text.",
         )
 
 
@@ -103,17 +202,15 @@ def generate_in_background(job_id: int, initiative_id: int, user_instructions: s
         processed_tasks = planner2.post_process_tasks(raw_tasks, context)
 
 
-        planner2.update_job(job_id, "review", {
-            "initiative_id": initiative_id,
-            "major_tasks": processed_tasks
-        })
+        planner2.update_job(
+            job_id,
+            "review",
+            {"initiative_id": initiative_id, "major_tasks": processed_tasks},
+        )
         planner2.close()
         print(f"Job #{job_id}: Completed - {len(processed_tasks)} tasks")
-
-
     except Exception as e:
         print(f"Job #{job_id}: Failed - {str(e)}")
-        import traceback
         traceback.print_exc()
         db = SessionLocal()
         try:
@@ -136,15 +233,13 @@ def edit_in_background(job_id: int, instruction: str):
         print(f"Job #{job_id}: Starting background edit...")
         db = SessionLocal()
         job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
-
-
         if not job:
             db.close()
             return
 
 
         current_result = json.loads(job.result_json) if job.result_json else {}
-        current_tasks = current_result.get('major_tasks', [])
+        current_tasks = current_result.get("major_tasks", [])
 
 
         prompt = f"""
@@ -162,7 +257,7 @@ Return ONLY the JSON array.
 """
         response_text = ollama_client.generate(
             prompt,
-            system_instruction="Return ONLY the complete modified JSON array. No other text."
+            system_instruction="Return ONLY the complete modified JSON array. No other text.",
         )
 
 
@@ -182,10 +277,9 @@ Return ONLY the JSON array.
         job.updated_at = datetime.now()
         db.commit()
         print(f"Job #{job_id}: Edit completed")
-
-
     except Exception as e:
         print(f"Job #{job_id}: Edit failed - {str(e)}")
+        traceback.print_exc()
         db = SessionLocal()
         try:
             job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
@@ -195,7 +289,7 @@ Return ONLY the JSON array.
         finally:
             db.close()
     finally:
-        if 'db' in locals():
+        if "db" in locals():
             db.close()
 
 
@@ -215,20 +309,30 @@ def train_delay_model_sync():
 
 
 @router.post("/operational/generate-tasks/{major_task_id}")
-async def generate_operational_tasks(major_task_id: int, request: dict = None):
+async def generate_operational_tasks(
+    major_task_id: int,
+    request: dict = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     try:
+        employee = _ensure_employee(current_user, db)
+
+
         planner = OperationalPlanner()
-        job_id = planner.create_job(major_task_id)
-        planner.close()
+        try:
+            planner.get_major_task_context(major_task_id)  
+            job_id = planner.create_job(major_task_id, created_by=employee.employee_id)
+        finally:
+            planner.close()
 
 
-        instructions = (request or {}).get('instructions', '')
-        thread = threading.Thread(
+        instructions = (request or {}).get("instructions", "") or ""
+        threading.Thread(
             target=operational_in_background,
             args=(job_id, major_task_id, instructions),
-            daemon=True
-        )
-        thread.start()
+            daemon=True,
+        ).start()
 
 
         return {
@@ -236,65 +340,123 @@ async def generate_operational_tasks(major_task_id: int, request: dict = None):
             "data": {
                 "job_id": job_id,
                 "status": "pending",
-                "message": "Task generation started in background"
-            }
+                "message": "Task generation started in background",
+            },
         }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"generate_error: {type(e).__name__}: {e}")
 
 
 
 
 @router.post("/operational/edit-tasks/{job_id}")
-async def edit_operational_tasks(job_id: int, request: dict, db: Session = Depends(get_db)):
+async def edit_operational_tasks(
+    job_id: int,
+    request: dict,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     try:
+        _ensure_employee(current_user, db) 
+
+
         job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
 
-        current = json.loads(job.result_json) if job.result_json else {}
-        current_tasks = current.get('operational_tasks', [])
+        if job.status not in ("review", "editing"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot edit job in status '{job.status}'",
+            )
 
 
-        prompt = f"""
-Current tasks:
-{json.dumps(current_tasks, ensure_ascii=False, indent=2)}
+        instruction = (request or {}).get("instruction", "").strip()
+        if not instruction:
+            raise HTTPException(status_code=400, detail="instruction is required")
 
 
-Instructions: {request.get('instruction', '')}
-
-
-Apply the instructions and return the modified JSON array.
-"""
-        response_text = ollama_client.generate(
-            prompt,
-            system_instruction="Return ONLY valid JSON array. No other text."
-        )
-
-
-        planner = OperationalPlanner()
-        new_tasks = planner.parse_response(response_text)
-        planner.close()
-
-
-        if new_tasks:
-            current["operational_tasks"] = new_tasks
-
-
-        job.result_json = json.dumps(current, ensure_ascii=False)
+        job.status = "editing"
         job.updated_at = datetime.now()
         db.commit()
 
 
-        return {
-            "success": True,
-            "data": {
-                "job_id": job_id,
-                "operational_tasks": current.get("operational_tasks", [])
-            }
-        }
+        threading.Thread(
+            target=operational_edit_in_background,
+            args=(job_id, instruction),
+            daemon=True,
+        ).start()
+
+
+        return {"success": True, "data": {"job_id": job_id, "status": "editing"}}
+    except HTTPException:
+        raise
     except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+@router.put("/operational/tasks/{job_id}")
+async def replace_operational_tasks(
+    job_id: int,
+    request: dict,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    try:
+        _ensure_employee(current_user, db)
+
+
+        job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if job.status not in ("review", "editing"):
+            raise HTTPException(
+                status_code=400, detail=f"Job in status '{job.status}' cannot be edited"
+            )
+
+
+        result = json.loads(job.result_json) if job.result_json else {}
+        major_task_id = result.get("major_task_id")
+        if not major_task_id:
+            raise HTTPException(status_code=400, detail="Missing major_task_id")
+
+
+        incoming = (request or {}).get("operational_tasks")
+        if not isinstance(incoming, list):
+            raise HTTPException(status_code=400, detail="operational_tasks must be a list")
+
+
+        planner = OperationalPlanner()
+        try:
+            normalized = planner.normalize_tasks(incoming, major_task_id)
+        finally:
+            planner.close()
+
+
+        if not normalized:
+            raise HTTPException(status_code=400, detail="No valid tasks after validation")
+
+
+        result["operational_tasks"] = normalized
+        job.result_json = json.dumps(result, ensure_ascii=False)
+        job.updated_at = datetime.now()
+        db.commit()
+
+
+        return {"success": True, "data": {"operational_tasks": normalized}}
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -304,62 +466,71 @@ Apply the instructions and return the modified JSON array.
 async def approve_operational_tasks(
     job_id: int,
     db: Session = Depends(get_db),
-    current_user: Employee = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     try:
+        employee = _ensure_employee(current_user, db)
+
+
         job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
-
-
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+        if job.status == "completed":
+            raise HTTPException(status_code=400, detail="Job already approved")
+        if job.status != "review":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Job must be in 'review' status (current: '{job.status}')",
+            )
 
 
         result = json.loads(job.result_json) if job.result_json else {}
-
-
         major_task_id = result.get("major_task_id")
         tasks = result.get("operational_tasks", [])
 
 
         if not major_task_id:
-            raise HTTPException(status_code=400, detail="Major task ID not found")
-
-
+            raise HTTPException(status_code=400, detail="Major task ID not found in job")
         if not tasks:
             raise HTTPException(status_code=400, detail="No tasks to save")
 
 
-        department_id = current_user.department_id
-        employee_id = current_user.employee_id
-
-
+        department_id = employee.department_id
         if not department_id:
             raise HTTPException(status_code=400, detail="Current employee has no department")
 
 
         planner = OperationalPlanner()
+        try:
+            saved = planner.save_tasks(
+                major_task_id=major_task_id,
+                tasks=tasks,
+                department_id=department_id,
+                created_by=employee.employee_id,
+            )
+        finally:
+            planner.close()
 
 
-        saved = planner.save_tasks(
-            major_task_id=major_task_id,
-            tasks=tasks,
-            department_id=department_id,
-            created_by=employee_id
-        )
+        if not saved:
+            raise HTTPException(
+                status_code=400, detail="No new tasks saved (duplicates skipped?)"
+            )
 
 
-        planner.update_job(
-            job_id,
-            "completed",
-            {
-                "major_task_id": major_task_id,
-                "operational_tasks": tasks,
-                "saved_tasks": saved
-            }
-        )
-
-
-        planner.close()
+        planner2 = OperationalPlanner()
+        try:
+            planner2.update_job(
+                job_id,
+                "completed",
+                {
+                    "major_task_id": major_task_id,
+                    "operational_tasks": tasks,
+                    "saved_tasks": saved,
+                },
+            )
+        finally:
+            planner2.close()
 
 
         return {
@@ -368,35 +539,177 @@ async def approve_operational_tasks(
                 "message": f"Saved {len(saved)} operational tasks",
                 "major_task_id": major_task_id,
                 "department_id": department_id,
-                "created_by": employee_id,
-                "tasks": saved
-            }
+                "created_by": employee.employee_id,
+                "tasks": saved,
+            },
         }
-
-
     except HTTPException:
         raise
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 
 
-@router.post("/strategic/generate-major-tasks/{initiative_id}")
-async def generate_major_tasks(initiative_id: int, request: dict = None):
+@router.get("/operational/strategic-map/{major_task_id}")
+async def get_operational_strategic_map(
+    major_task_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     try:
-        user_instructions = request.get('instructions', '') if request else ''
-        planner = StrategicPlanner()
-        job_id = planner.create_job(initiative_id)
+        _ensure_employee(current_user, db)
+        planner = OperationalPlanner()
+        try:
+            data = planner.get_major_task_context(major_task_id)
+        finally:
+            planner.close()
+        return {"success": True, "data": data}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ===========================================================================
+# Strategic generation (background workers)
+# ===========================================================================
+def strategic_generation_in_background(job_id: int, initiative_id: int, instructions: str = ""):
+    planner = StrategicPlanner()
+    try:
+        print(f"Job #{job_id}: Starting strategic generation")
+        ctx = planner.get_initiative_context(initiative_id)
+        prompt = planner.build_prompt(ctx, instructions)
         planner.close()
 
 
-        thread = threading.Thread(
-            target=generate_in_background,
-            args=(job_id, initiative_id, user_instructions),
-            daemon=True
+        response_text = ollama_client.generate(
+            prompt,
+            system_instruction="Return ONLY a valid JSON array. No explanation.",
         )
-        thread.start()
+
+
+        planner2 = StrategicPlanner()
+        raw = planner2.parse_response(response_text)
+        if not raw:
+            raise ValueError("No tasks returned by model")
+
+
+        ctx2 = planner2.get_initiative_context(initiative_id)
+        tasks = planner2.normalize_tasks(raw, ctx2)
+        if not tasks:
+            raise ValueError("No valid major tasks after validation")
+
+
+        planner2.update_job(
+            job_id, "review",
+            {"initiative_id": initiative_id, "major_tasks": tasks},
+        )
+        planner2.close()
+        print(f"Job #{job_id}: Completed - {len(tasks)} tasks")
+    except Exception as e:
+        traceback.print_exc()
+        try:
+            p = StrategicPlanner()
+            p.update_job(job_id, "failed", {"error": str(e)})
+            p.close()
+        except Exception:
+            pass
+    finally:
+        try:
+            planner.close()
+        except Exception:
+            pass
+
+
+
+
+def strategic_edit_in_background(job_id: int, instruction: str):
+    planner = StrategicPlanner()
+    try:
+        print(f"Job #{job_id}: Starting strategic edit")
+        job = planner.db.query(AiJob).filter(AiJob.job_id == job_id).first()
+        if not job:
+            return
+
+
+        current = json.loads(job.result_json) if job.result_json else {}
+        initiative_id = current.get("initiative_id")
+        current_tasks = current.get("major_tasks", [])
+
+
+        if not initiative_id or not current_tasks:
+            raise ValueError("No tasks to edit")
+
+
+        ctx = planner.get_initiative_context(initiative_id)
+        prompt = planner.build_edit_prompt(ctx, current_tasks, instruction)
+        response_text = ollama_client.generate(
+            prompt,
+            system_instruction="Return ONLY a valid JSON array. No explanation.",
+        )
+
+
+        raw = planner.parse_response(response_text)
+        new_tasks = planner.normalize_tasks(raw, ctx) if raw else current_tasks
+
+
+        current["major_tasks"] = new_tasks
+        planner.update_job(job_id, "review", current)
+        print(f"Job #{job_id}: Edit completed - {len(new_tasks)} tasks")
+    except Exception as e:
+        traceback.print_exc()
+        try:
+            p = StrategicPlanner()
+            job = p.db.query(AiJob).filter(AiJob.job_id == job_id).first()
+            if job and job.status == "editing":
+                job.status = "review"
+                p.db.commit()
+            p.close()
+        except Exception:
+            pass
+    finally:
+        try:
+            planner.close()
+        except Exception:
+            pass
+
+
+
+
+# ===========================================================================
+# Strategic generation (endpoints)
+# ===========================================================================
+@router.post("/strategic/generate-major-tasks/{initiative_id}")
+async def generate_major_tasks(
+    initiative_id: int,
+    request: dict = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    try:
+        employee = _ensure_employee(current_user, db)
+
+
+        planner = StrategicPlanner()
+        try:
+            planner.get_initiative_context(initiative_id)
+            job_id = planner.create_job(initiative_id, created_by=employee.employee_id)
+        finally:
+            planner.close()
+
+
+        instructions = (request or {}).get("instructions", "") or ""
+        threading.Thread(
+            target=strategic_generation_in_background,
+            args=(job_id, initiative_id, instructions),
+            daemon=True,
+        ).start()
 
 
         return {
@@ -404,123 +717,228 @@ async def generate_major_tasks(initiative_id: int, request: dict = None):
             "data": {
                 "job_id": job_id,
                 "status": "pending",
-                "message": "Task generation started in background"
-            }
+                "message": "Strategic task generation started",
+            },
         }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"generate_error: {type(e).__name__}: {e}")
+
+
+
+
+@router.get("/strategic/strategic-map/{initiative_id}")
+async def get_strategic_map(
+    initiative_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    try:
+        _ensure_employee(current_user, db)
+        planner = StrategicPlanner()
+        try:
+            data = planner.get_initiative_context(initiative_id)
+        finally:
+            planner.close()
+        return {"success": True, "data": data}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 
 
-@router.post("/strategic/edit-task-plan/{job_id}")
-async def edit_task_plan(job_id: int, request: dict, db: Session = Depends(get_db)):
+@router.post("/strategic/edit-tasks/{job_id}")
+async def edit_strategic_tasks(
+    job_id: int,
+    request: dict,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     try:
+        _ensure_employee(current_user, db)
         job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+        if job.status not in ("review", "editing"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot edit job in status '{job.status}'",
+            )
 
 
-        edit_instruction = request.get('instruction', '')
+        instruction = (request or {}).get("instruction", "").strip()
+        if not instruction:
+            raise HTTPException(status_code=400, detail="instruction is required")
 
 
         job.status = "editing"
+        job.updated_at = datetime.now()
         db.commit()
 
 
-        thread = threading.Thread(
-            target=edit_in_background,
-            args=(job_id, edit_instruction),
-            daemon=True
-        )
-        thread.start()
+        threading.Thread(
+            target=strategic_edit_in_background,
+            args=(job_id, instruction),
+            daemon=True,
+        ).start()
 
 
-        return {
-            "success": True,
-            "data": {
-                "job_id": job_id,
-                "status": "editing",
-                "message": "Edit started in background"
-            }
-        }
+        return {"success": True, "data": {"job_id": job_id, "status": "editing"}}
+    except HTTPException:
+        raise
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 
 
-@router.post("/strategic/approve-task-plan/{job_id}")
-async def approve_task_plan(job_id: int, db: Session = Depends(get_db)):
+@router.put("/strategic/tasks/{job_id}")
+async def replace_strategic_tasks(
+    job_id: int,
+    request: dict,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     try:
+        _ensure_employee(current_user, db)
         job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+        if job.status not in ("review", "editing"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Job in status '{job.status}' cannot be edited",
+            )
 
 
         result = json.loads(job.result_json) if job.result_json else {}
-        initiative_id = result.get('initiative_id')
-        tasks = result.get('major_tasks', [])
+        initiative_id = result.get("initiative_id")
+        if not initiative_id:
+            raise HTTPException(status_code=400, detail="Missing initiative_id")
 
 
-        if not tasks:
-            raise HTTPException(status_code=400, detail="No tasks to save")
+        incoming = (request or {}).get("major_tasks")
+        if not isinstance(incoming, list):
+            raise HTTPException(status_code=400, detail="major_tasks must be a list")
 
 
         planner = StrategicPlanner()
-        saved = planner.save_major_tasks(initiative_id, tasks, job.created_by)
-        planner.update_job(job_id, "completed", {"saved_tasks": saved})
-        planner.close()
+        try:
+            ctx = planner.get_initiative_context(initiative_id)
+            normalized = planner.normalize_tasks(incoming, ctx)
+        finally:
+            planner.close()
 
 
-        return {
-            "success": True,
-            "data": {
-                "message": f"Saved {len(saved)} major tasks",
-                "tasks": saved
-            }
-        }
+        if not normalized:
+            raise HTTPException(status_code=400, detail="No valid tasks after validation")
+
+
+        result["major_tasks"] = normalized
+        job.result_json = json.dumps(result, ensure_ascii=False)
+        job.updated_at = datetime.now()
+        db.commit()
+
+
+        return {"success": True, "data": {"major_tasks": normalized}}
+    except HTTPException:
+        raise
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 
 
-@router.post("/strategic/save-edited-tasks/{job_id}")
-async def save_edited_tasks(job_id: int, request: dict, db: Session = Depends(get_db)):
+@router.post("/strategic/approve-tasks/{job_id}")
+async def approve_strategic_tasks(
+    job_id: int,
+    request: dict = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
     try:
+        employee = _ensure_employee(current_user, db)
         job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
+        if job.status == "completed":
+            raise HTTPException(status_code=400, detail="Job already approved")
+        if job.status != "review":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Job must be in 'review' status (current: '{job.status}')",
+            )
 
 
-        initiative_id = request.get('initiative_id')
-        tasks = request.get('major_tasks', [])
+        result = json.loads(job.result_json) if job.result_json else {}
+        initiative_id = result.get("initiative_id")
+        tasks = result.get("major_tasks", [])
 
 
+        if not initiative_id:
+            raise HTTPException(status_code=400, detail="Missing initiative_id in job")
         if not tasks:
             raise HTTPException(status_code=400, detail="No tasks to save")
 
 
         planner = StrategicPlanner()
-        saved = planner.save_major_tasks(initiative_id, tasks, job.created_by)
-        planner.update_job(job_id, "completed", {"saved_tasks": saved})
-        planner.close()
+        try:
+            saved = planner.save_major_tasks(
+                initiative_id=initiative_id,
+                tasks_data=tasks,
+                created_by=employee.employee_id,
+            )
+        finally:
+            planner.close()
+
+
+        if not saved:
+            raise HTTPException(status_code=400, detail="No new tasks saved (duplicates skipped?)")
+
+
+        planner2 = StrategicPlanner()
+        try:
+            planner2.update_job(
+                job_id, "completed",
+                {
+                    "initiative_id": initiative_id,
+                    "major_tasks": tasks,
+                    "saved_tasks": saved,
+                },
+            )
+        finally:
+            planner2.close()
 
 
         return {
             "success": True,
             "data": {
                 "message": f"Saved {len(saved)} major tasks",
-                "tasks": saved
-            }
+                "initiative_id": initiative_id,
+                "created_by": employee.employee_id,
+                "tasks": saved,
+            },
         }
+    except HTTPException:
+        raise
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-
-
-
+# ===========================================================================
+# Predictions & dashboard (unchanged)
+# ===========================================================================
 @router.get("/predict-delay/{task_id}")
 async def predict_task_delay(task_id: int):
     try:
@@ -546,12 +964,10 @@ async def predict_all_delays():
 @router.post("/predict-and-detect/{task_id}")
 async def predict_and_detect_risk(
     task_id: int,
-    current_user: Employee = Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     try:
-        result = prediction_service.predict_single(
-            task_id, save=True, detect_risk=True
-        )
+        result = prediction_service.predict_single(task_id, save=True, detect_risk=True)
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -563,24 +979,32 @@ async def predict_and_detect_risk(
 async def ai_dashboard(db: Session = Depends(get_db)):
     try:
         stats = prediction_service.get_dashboard_stats()
-        high_risk = db.query(AIPrediction).filter(
-            AIPrediction.prediction_type == 'delay'
-        ).order_by(AIPrediction.probability.desc()).limit(5).all()
+        high_risk = (
+            db.query(AIPrediction)
+            .filter(AIPrediction.prediction_type == "delay")
+            .order_by(AIPrediction.probability.desc())
+            .limit(5)
+            .all()
+        )
 
 
         risky_tasks = []
         for p in high_risk:
-            task = db.query(OperationalTask).filter(
-                OperationalTask.task_id == p.task_id
-            ).first()
+            task = (
+                db.query(OperationalTask)
+                .filter(OperationalTask.task_id == p.task_id)
+                .first()
+            )
             prob = float(p.probability or 0)
             prob_pct = round(prob * 100, 1) if prob <= 1 else round(prob, 1)
-            risky_tasks.append({
-                "task_id": int(p.task_id),
-                "task_name": str(task.title) if task else "Unknown",
-                "delay_probability": prob_pct,
-                "risk_level": "High" if prob > 0.7 else "Medium"
-            })
+            risky_tasks.append(
+                {
+                    "task_id": int(p.task_id),
+                    "task_name": str(task.title) if task else "Unknown",
+                    "delay_probability": prob_pct,
+                    "risk_level": "High" if prob > 0.7 else "Medium",
+                }
+            )
 
 
         return {"success": True, "data": {**stats, "risky_tasks": risky_tasks}}
@@ -621,21 +1045,29 @@ async def get_recommendations(task_id: int, save: bool = False):
 
 
 
+# ===========================================================================
+# Risk endpoints (current_user fix applied)
+# ===========================================================================
 @router.post("/risk/{risk_id}/recommendations")
 async def generate_risk_recommendations(
     risk_id: int,
-    current_user: Employee = Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     try:
+        employee = _ensure_employee(current_user, db)
         service = RiskRecommendationService()
         try:
-            result = service.generate_for_risk(risk_id, created_by=current_user.employee_id)
+            result = service.generate_for_risk(risk_id, created_by=employee.employee_id)
             return {"success": True, "data": result}
         finally:
             service.close()
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -644,42 +1076,48 @@ async def generate_risk_recommendations(
 @router.post("/risk/{risk_id}/reassess")
 async def reassess_risk(
     risk_id: int,
-    current_user: Employee = Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
     try:
+        employee = _ensure_employee(current_user, db)
         service = RiskReassessmentService()
         try:
-            result = service.reassess(risk_id, created_by=current_user.employee_id)
+            result = service.reassess(risk_id, created_by=employee.employee_id)
             return {"success": True, "data": result}
         finally:
             service.close()
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 
 
 @router.get("/risk/{risk_id}/ai-recommendations")
-async def get_risk_ai_recommendations(
-    risk_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_risk_ai_recommendations(risk_id: int, db: Session = Depends(get_db)):
     try:
         from app.models import Risk
+
+
         risk = db.query(Risk).filter(Risk.risk_id == risk_id).first()
         if not risk:
             raise HTTPException(status_code=404, detail="الخطر غير موجود")
-
-
         if not risk.task_id:
             return {"success": True, "data": []}
 
 
-        recommendations = db.query(AIRecommendation).filter(
-            AIRecommendation.task_id == risk.task_id
-        ).order_by(AIRecommendation.created_at.desc()).limit(20).all()
+        recommendations = (
+            db.query(AIRecommendation)
+            .filter(AIRecommendation.task_id == risk.task_id)
+            .order_by(AIRecommendation.created_at.desc())
+            .limit(20)
+            .all()
+        )
 
 
         result = []
@@ -689,7 +1127,7 @@ async def get_risk_ai_recommendations(
             try:
                 parsed_reasoning = json.loads(r.reasoning) if r.reasoning else None
                 if parsed_reasoning:
-                    reasoning_risk_id = parsed_reasoning.get('risk_id')
+                    reasoning_risk_id = parsed_reasoning.get("risk_id")
             except Exception:
                 parsed_reasoning = None
 
@@ -700,27 +1138,31 @@ async def get_risk_ai_recommendations(
 
             priority = None
             if r.priority_id:
-                p = db.query(DictPriority).filter(
-                    DictPriority.priority_id == r.priority_id
-                ).first()
+                p = (
+                    db.query(DictPriority)
+                    .filter(DictPriority.priority_id == r.priority_id)
+                    .first()
+                )
                 if p:
                     priority = {"code": p.code, "name_ar": p.name_ar}
 
 
             reasoning_text = r.reasoning
             if parsed_reasoning:
-                reasoning_text = parsed_reasoning.get('text', r.reasoning)
+                reasoning_text = parsed_reasoning.get("text", r.reasoning)
 
 
-            result.append({
-                "recommendation_id": r.recommendation_id,
-                "text": r.text,
-                "reasoning": reasoning_text,
-                "priority": priority,
-                "status_id": r.status_id,
-                "implemented_at": r.implemented_at.isoformat() if r.implemented_at else None,
-                "created_at": r.created_at.isoformat() if r.created_at else None
-            })
+            result.append(
+                {
+                    "recommendation_id": r.recommendation_id,
+                    "text": r.text,
+                    "reasoning": reasoning_text,
+                    "priority": priority,
+                    "status_id": r.status_id,
+                    "implemented_at": r.implemented_at.isoformat() if r.implemented_at else None,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                }
+            )
 
 
         return {"success": True, "data": result}
@@ -732,6 +1174,9 @@ async def get_risk_ai_recommendations(
 
 
 
+# ===========================================================================
+# Job status & scheduler (unchanged)
+# ===========================================================================
 @router.get("/jobs/{job_id}")
 async def get_job_status(job_id: int, db: Session = Depends(get_db)):
     job = db.query(AiJob).filter(AiJob.job_id == job_id).first()
@@ -755,8 +1200,8 @@ async def get_job_status(job_id: int, db: Session = Depends(get_db)):
             "status": job.status,
             "result": result,
             "created_at": job.created_at.isoformat() if job.created_at else None,
-            "updated_at": job.updated_at.isoformat() if job.updated_at else None
-        }
+            "updated_at": job.updated_at.isoformat() if job.updated_at else None,
+        },
     }
 
 
@@ -791,8 +1236,8 @@ async def scheduler_status():
         "data": {
             "is_running": ai_scheduler.is_running,
             "next_prediction": "06:00 daily",
-            "next_training": "Monday 02:00 weekly"
-        }
+            "next_training": "Monday 02:00 weekly",
+        },
     }
 
 
@@ -806,9 +1251,13 @@ async def predict_now():
             "success": True,
             "data": {
                 "total_tasks": len(results) if results else 0,
-                "high_risk": sum(1 for r in results if r.get('risk_level') == 'High') if results else 0,
-                "message": "Prediction completed"
-            }
+                "high_risk": sum(
+                    1 for r in results if r.get("risk_level") == "High"
+                )
+                if results
+                else 0,
+                "message": "Prediction completed",
+            },
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -836,15 +1285,12 @@ async def models_status():
         "data": {
             "delay_predictor": {
                 "trained": predictor.load_model(),
-                "version": predictor.model_version
+                "version": predictor.model_version,
             },
             "recommender": {
                 "trained": recommender.load_model(),
-                "version": recommender.model_version
+                "version": recommender.model_version,
             },
-            "ollama": {
-                "available": True,
-                "model": "qwen2.5:3b"
-            }
-        }
+            "ollama": {"available": True, "model": "qwen2.5:3b"},
+        },
     }

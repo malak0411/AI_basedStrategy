@@ -42,7 +42,6 @@
     .strategic-path .node.initiative{ border-color: #d4af37; color: #b8932a; background: #fdf8e7; font-weight: 600; }
 
 
-    /* ✅ شريط تقدم متدرج ديناميكي */
     .progress-bar-custom {
         height: 8px; background: #edf2f7; border-radius: 10px; overflow: hidden;
         position: relative;
@@ -59,7 +58,6 @@
     }
 
 
-    /* دائرة التقدم الديناميكية */
     .progress-circle {
         width: 110px; height: 110px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
@@ -75,7 +73,6 @@
     }
 
 
-    /* مفتاح الألوان */
     .color-legend {
         display: flex; gap: 12px; justify-content: center; align-items: center;
         padding: 8px 14px; background: #fff; border-radius: 10px;
@@ -88,7 +85,6 @@
     }
 
 
-    /* حالة المهمة الرئيسية */
     .task-status-bar {
         height: 6px; background: #edf2f7; border-radius: 10px; overflow: hidden;
         margin-top: 8px;
@@ -97,6 +93,36 @@
         height: 100%; border-radius: 10px;
         transition: width 0.6s ease-in-out;
     }
+
+
+    .section-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #4a5568;
+        padding-bottom: 4px;
+        border-bottom: 2px solid #edf2f7;
+    }
+    .dept-row {
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        transition: all 0.2s;
+    }
+    .dept-lead-row {
+        border-right: 4px solid #d4af37;
+        background: linear-gradient(90deg, #fdf8e7 0%, #fff 40%);
+    }
+    .dept-support-row {
+        border-right: 4px solid #a0aec0;
+    }
+    .dept-lead-icon {
+        background: #d4af37; color: #fff; border: none;
+    }
+    .dept-support-icon {
+        background: #718096; color: #fff; border: none;
+    }
+    .shared-indicator .badge { padding: 6px 12px; font-size: 12px; }
 </style>
 @endpush
 
@@ -125,8 +151,8 @@
 <div class="container-fluid px-4">
 
 
-    <a href="{{ route('strategic.initiatives.index') }}" class="btn btn-outline-secondary mb-3">
-        <i class="fas fa-arrow-right"></i> العودة للمبادرات
+    <a href="javascript:history.back()" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-right"></i> العودة
     </a>
 
 
@@ -142,7 +168,7 @@
         $statusId    = $initiative['status_id'] ?? 1;
         $statusName  = $initiative['status_name'] ?? 'غير محدد';
         $statusColor = $initiative['status_color'] ?? '#6c757d';
-        $progress    = (int) ($initiative['progress'] ?? 0);
+        $progress    = (int)($initiative['progress'] ?? 0);
         $userRole    = $userRole ?? session('user_role', 'employee');
         $canApprove  = ($userRole === 'minister') && !in_array($statusId, [17, 4]);
         $canAddTasks = in_array($statusId, [17, 2]);
@@ -289,8 +315,8 @@
                         <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addTaskModal">
                             <i class="fas fa-plus"></i> إضافة مهمة يدوياً
                         </button>
-                        <a href="{{ route('ai.strategic.index') }}?initiative_id={{ $initiative['id'] }}" class="btn-gold btn-sm">
-                            <i class="fas fa-robot"></i> توليد بالذكاء الاصطناعي
+                        <a href="{{ route('strategic.generate', $initiative['id']) }}" class="btn-gold">
+                            <i class="fas fa-robot"></i> توليد المهام الرئيسية بالذكاء الاصطناعي
                         </a>
                     @else
                         <span class="badge bg-secondary py-2 px-3">
@@ -319,12 +345,14 @@
                     $responsibleDepts = $task['responsible_departments'] ?? [];
                     $supportingDepts  = $task['supporting_departments'] ?? [];
                     $isShared         = $task['is_cross_department'] ?? false;
-                    $taskProgress     = (int) ($task['progress'] ?? 0);
+                    $taskProgress     = (int)($task['progress'] ?? 0);
                     $taskBarColor     = progressColor($taskProgress);
+                    $taskId           = $task['id'] ?? $task['major_task_id'] ?? null;
+                    $initiativeId     = $initiative['id'] ?? $initiative['initiative_id'] ?? null;
                 @endphp
 
 
-                <div class="task-card" id="task-{{ $task['id'] }}">
+                <div class="task-card" id="task-{{ $taskId }}">
                     <div class="d-flex justify-content-between align-items-start">
                         <div class="flex-grow-1">
                             <div class="d-flex align-items-center gap-2 mb-1">
@@ -388,10 +416,18 @@
 
 
                         <div class="d-flex gap-1 ms-2">
-                            <button class="btn btn-sm btn-outline-primary"
-                                    onclick="editTask({{ json_encode($task) }})" title="تعديل">
-                                <i class="fas fa-edit"></i>
-                            </button>
+                            @if($taskId && $initiativeId)
+                                <button class="btn btn-sm btn-outline-primary"
+                                        data-task="{{ json_encode($task, JSON_HEX_APOS | JSON_HEX_QUOT) }}"
+                                        data-update-url="{{ url('/strategic/initiatives/'.$initiativeId.'/major-tasks/'.$taskId) }}"
+                                        onclick="editTask(this)" title="تعديل">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            @else
+                                <button class="btn btn-sm btn-outline-secondary" disabled title="معرف المهمة غير متوفر">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -405,7 +441,6 @@
         <div class="col-lg-4">
 
 
-            {{-- مفتاح الألوان --}}
             <div class="color-legend">
                 <span><span class="dot" style="background: #e53e3e;"></span>0-19%</span>
                 <span><span class="dot" style="background: #dd6b20;"></span>20-39%</span>
@@ -415,7 +450,6 @@
             </div>
 
 
-            {{-- تقدم المبادرة --}}
             <div class="card-custom mb-4 text-center">
                 <h6 class="mb-3">نسبة التقدم الكلية</h6>
                 <div class="progress-circle"
@@ -437,7 +471,6 @@
             </div>
 
 
-            {{-- معلومات سريعة --}}
             <div class="card-custom mb-4">
                 <h6 class="mb-3"><i class="fas fa-info-circle text-primary ml-1"></i> معلومات سريعة</h6>
                 <div class="d-flex justify-content-between py-2 border-bottom">
@@ -466,7 +499,6 @@
             </div>
 
 
-            {{-- سجل الميزانية --}}
             <div class="card-custom mb-4">
                 <h6 class="mb-3"><i class="fas fa-coins text-warning ml-1"></i> سجل الميزانية</h6>
                 @if(!empty($initiative['budget_history']))
@@ -500,15 +532,160 @@
 
     @if($canAddTasks)
     <div class="modal fade" id="addTaskModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="mb-0">إضافة مهمة رئيسية</h5>
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header text-white" style="background: linear-gradient(135deg,#d4af37,#b8932a);">
+                    <div>
+                        <h5 class="mb-0"><i class="fas fa-plus-circle ml-1"></i> إضافة مهمة رئيسية</h5>
+                        <small class="opacity-75">املأ الحقول الأساسية وحدد الإدارات المشاركة</small>
+                    </div>
                     <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="{{ route('strategic.initiatives.major-tasks.store', $initiative['id']) }}">
+
+
+                <form method="POST"
+                      action="{{ route('strategic.initiatives.major-tasks.store', $initiative['id']) }}"
+                      id="addTaskForm" class="task-form" data-context="add">
                     @csrf
                     <div class="modal-body">
+
+
+                        <div class="section-title mb-2">
+                            <i class="fas fa-info-circle"></i> المعلومات الأساسية
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">اسم المهمة <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" required
+                                   placeholder="مثال: تطوير خطة التحول الرقمي">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">الوصف</label>
+                            <textarea name="description" class="form-control" rows="2"
+                                      placeholder="وصف موجز للمهمة..."></textarea>
+                        </div>
+
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">المدة (أيام) <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="far fa-clock"></i></span>
+                                    <input type="number" name="estimated_duration_days" class="form-control"
+                                           value="60" min="1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">الأولوية <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-flag"></i></span>
+                                    <select name="priority_id" class="form-control" required>
+                                        @foreach($priorities as $p)
+                                            <option value="{{ $p['priority_id'] ?? $p['id'] ?? '' }}">
+                                                {{ $p['name_ar'] ?? $p['name'] ?? '' }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <hr>
+
+
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="section-title mb-0">
+                                <i class="fas fa-sitemap"></i> الإدارات المشاركة
+                            </div>
+                            <div class="shared-indicator" data-context="add">
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-users"></i> مشتركة: <strong class="shared-value">لا</strong>
+                                </span>
+                            </div>
+                        </div>
+
+
+                        <div class="alert alert-info py-2 mb-2">
+                            <small>
+                                <i class="fas fa-info-circle"></i>
+                                <strong>ملاحظة:</strong> يجب تحديد <strong>إدارة مسؤولة واحدة</strong> إجبارياً.
+                                باقي الإدارات تُعتبر <strong>مساندة</strong>. عند إضافة أكثر من إدارة تصبح المهمة <strong>مشتركة</strong> تلقائياً.
+                            </small>
+                        </div>
+
+
+                        <div id="addDeptContainer">
+                            <div class="dept-row dept-lead-row mb-2" data-type="LEAD">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-md-5">
+                                        <div class="input-group">
+                                            <span class="input-group-text dept-lead-icon">
+                                                <i class="fas fa-crown"></i>
+                                            </span>
+                                            <select name="departments[0][department_id]" class="form-control" required>
+                                                <option value="">اختر الإدارة المسؤولة *</option>
+                                                @foreach($departments as $d)
+                                                    <option value="{{ $d['department_id'] ?? $d['id'] }}">{{ $d['name'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <input type="hidden" name="departments[0][responsibility_type]" value="LEAD">
+                                        <small class="text-warning fw-bold">
+                                            <i class="fas fa-crown"></i> إدارة مسؤولة (إجبارية)
+                                        </small>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input type="text" name="departments[0][notes]" class="form-control"
+                                               placeholder="ملاحظة (اختياري)">
+                                    </div>
+                                    <div class="col-md-2 text-center">
+                                        <span class="badge bg-warning text-dark">مسؤولة</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-1"
+                                onclick="addDeptRow('add')">
+                            <i class="fas fa-plus"></i> إضافة إدارة مساندة
+                        </button>
+                    </div>
+
+
+                    <div class="modal-footer bg-light">
+                        <button type="submit" class="btn-gold">
+                            <i class="fas fa-save"></i> حفظ المهمة
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="modal fade" id="editTaskModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header text-white" style="background: linear-gradient(135deg,#3182ce,#2b6cb0);">
+                    <div>
+                        <h5 class="mb-0"><i class="fas fa-edit ml-1"></i> تعديل المهمة الرئيسية</h5>
+                        <small class="opacity-75">عدّل البيانات والإدارات المشاركة</small>
+                    </div>
+                    <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+
+                <form method="POST" id="editTaskForm" action="" class="task-form" data-context="edit">
+                    @csrf
+                    @method('PUT')
+                    <div class="modal-body">
+
+
+                        <div class="section-title mb-2">
+                            <i class="fas fa-info-circle"></i> المعلومات الأساسية
+                        </div>
                         <div class="mb-3">
                             <label class="form-label">اسم المهمة <span class="text-danger">*</span></label>
                             <input type="text" name="name" class="form-control" required>
@@ -517,60 +694,69 @@
                             <label class="form-label">الوصف</label>
                             <textarea name="description" class="form-control" rows="2"></textarea>
                         </div>
-                        <div class="row">
+
+
+                        <div class="row mb-3">
                             <div class="col-md-6">
-                                <label class="form-label">المدة (أيام)</label>
-                                <input type="number" name="estimated_duration_days" class="form-control" value="60">
+                                <label class="form-label">المدة (أيام) <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="far fa-clock"></i></span>
+                                    <input type="number" name="estimated_duration_days" class="form-control"
+                                           min="1" required>
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">الأولوية</label>
-                                <select name="priority_id" class="form-control">
-                                    @foreach($priorities as $p)
-                                        <option value="{{ $p['priority_id'] ?? $p['id'] ?? '' }}">{{ $p['name_ar'] ?? $p['name'] ?? '' }}</option>
-                                    @endforeach
-                                </select>
+                                <label class="form-label">الأولوية <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-flag"></i></span>
+                                    <select name="priority_id" class="form-control" required>
+                                        @foreach($priorities as $p)
+                                            <option value="{{ $p['priority_id'] ?? $p['id'] ?? '' }}">
+                                                {{ $p['name_ar'] ?? $p['name'] ?? '' }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
 
                         <hr>
+
+
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="form-label mb-0">
-                                الإدارات المشاركة <span class="text-danger">*</span>
-                            </label>
-                            <small class="text-muted">يجب تحديد إدارة مسؤولة واحدة على الأقل</small>
-                        </div>
-                        <div id="deptContainer">
-                            <div class="row mb-2 dept-row">
-                                <div class="col-5">
-                                    <select name="departments[0][department_id]" class="form-control">
-                                        <option value="">اختر الإدارة</option>
-                                        @foreach($departments as $d)
-                                            <option value="{{ $d['department_id'] ?? $d['id'] }}">{{ $d['name'] }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="col-3">
-                                    <select name="departments[0][responsibility_type]" class="form-control">
-                                        <option value="LEAD">مسؤولة</option>
-                                        <option value="SUPPORT">داعمة</option>
-                                    </select>
-                                </div>
-                                <div class="col-3">
-                                    <input type="text" name="departments[0][notes]" class="form-control" placeholder="ملاحظة">
-                                </div>
-                                <div class="col-1">
-                                    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.dept-row').remove()">×</button>
-                                </div>
+                            <div class="section-title mb-0">
+                                <i class="fas fa-sitemap"></i> الإدارات المشاركة
+                            </div>
+                            <div class="shared-indicator" data-context="edit">
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-users"></i> مشتركة: <strong class="shared-value">لا</strong>
+                                </span>
                             </div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-primary mt-1" onclick="addDeptRow()">
-                            + إضافة إدارة
+
+
+                        <div class="alert alert-info py-2 mb-2">
+                            <small>
+                                <i class="fas fa-info-circle"></i>
+                                يجب إبقاء <strong>إدارة مسؤولة واحدة</strong> فقط، والباقي مساندة.
+                            </small>
+                        </div>
+
+
+                        <div id="editDeptContainer"></div>
+
+
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-1"
+                                onclick="addDeptRow('edit')">
+                            <i class="fas fa-plus"></i> إضافة إدارة مساندة
                         </button>
                     </div>
-                    <div class="modal-footer">
+
+
+                    <div class="modal-footer bg-light">
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> حفظ المهمة
+                            <i class="fas fa-save"></i> حفظ التعديلات
                         </button>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                     </div>
@@ -587,55 +773,210 @@
 
 @push('scripts')
 <script>
-let deptCount = 1;
-function addDeptRow() {
-    const container = document.getElementById('deptContainer');
+const DEPARTMENTS = @json($departments);
+
+
+function addDeptRow(context) {
+    const containerId = context === 'edit' ? 'editDeptContainer' : 'addDeptContainer';
+    const container = document.getElementById(containerId);
+    const idx = Date.now() + Math.floor(Math.random() * 1000);
+
+
+    const options = DEPARTMENTS.map(d => {
+        const id = d.department_id ?? d.id;
+        return `<option value="${id}">${d.name}</option>`;
+    }).join('');
+
+
     const row = document.createElement('div');
-    row.className = 'row mb-2 dept-row';
+    row.className = 'dept-row dept-support-row mb-2';
+    row.dataset.type = 'SUPPORT';
     row.innerHTML = `
-        <div class="col-5">
-            <select name="departments[${deptCount}][department_id]" class="form-control">
-                <option value="">اختر الإدارة</option>
-                @foreach($departments as $d)
-                    <option value="{{ $d['department_id'] ?? $d['id'] }}">{{ $d['name'] }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="col-3">
-            <select name="departments[${deptCount}][responsibility_type]" class="form-control">
-                <option value="LEAD">مسؤولة</option>
-                <option value="SUPPORT">داعمة</option>
-            </select>
-        </div>
-        <div class="col-3">
-            <input type="text" name="departments[${deptCount}][notes]" class="form-control" placeholder="ملاحظة">
-        </div>
-        <div class="col-1">
-            <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.dept-row').remove()">×</button>
+        <div class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text dept-support-icon">
+                        <i class="fas fa-hands-helping"></i>
+                    </span>
+                    <select name="departments[${idx}][department_id]" class="form-control">
+                        <option value="">اختر إدارة مساندة</option>
+                        ${options}
+                    </select>
+                </div>
+                <input type="hidden" name="departments[${idx}][responsibility_type]" value="SUPPORT">
+                <small class="text-muted"><i class="fas fa-hands-helping"></i> إدارة مساندة</small>
+            </div>
+            <div class="col-md-5">
+                <input type="text" name="departments[${idx}][notes]" class="form-control"
+                       placeholder="ملاحظة (اختياري)">
+            </div>
+            <div class="col-md-2 text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                        onclick="removeDeptRow(this)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
         </div>
     `;
     container.appendChild(row);
-    deptCount++;
+    refreshSharedBadge(context);
 }
 
 
-function editTask(task) {
-    console.log('Edit task:', task);
+function removeDeptRow(btn) {
+    const row = btn.closest('.dept-row');
+    const context = btn.closest('.task-form')?.dataset.context || 'add';
+    row.remove();
+    refreshSharedBadge(context);
 }
 
 
-document.querySelector('form[action*="major-tasks"]')?.addEventListener('submit', function(e) {
-    const types = this.querySelectorAll('select[name*="[responsibility_type]"]');
-    let hasLead = false;
-    types.forEach(sel => {
-        if (sel.value === 'LEAD' && sel.closest('.dept-row').querySelector('select[name*="[department_id]"]').value) {
-            hasLead = true;
+function refreshSharedBadge(context) {
+    const containerId = context === 'edit' ? 'editDeptContainer' : 'addDeptContainer';
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const rows = container.querySelectorAll('.dept-row');
+    let selectedCount = 0;
+    rows.forEach(r => {
+        const sel = r.querySelector('select[name*="[department_id]"]');
+        if (sel && sel.value) selectedCount++;
+    });
+    const badge = document.querySelector(`.shared-indicator[data-context="${context}"]`);
+    if (!badge) return;
+    const badgeEl = badge.querySelector('.badge');
+    const valueEl = badge.querySelector('.shared-value');
+    if (selectedCount > 1) {
+        valueEl.textContent = 'نعم';
+        badgeEl.className = 'badge bg-info';
+    } else {
+        valueEl.textContent = 'لا';
+        badgeEl.className = 'badge bg-secondary';
+    }
+}
+
+
+function editTask(btn) {
+    const task = JSON.parse(btn.dataset.task);
+    const updateUrl = btn.dataset.updateUrl;
+    const form = document.getElementById('editTaskForm');
+    form.action = updateUrl;
+
+
+    form.querySelector('[name="name"]').value = task.name || '';
+    form.querySelector('[name="description"]').value = task.description || '';
+    form.querySelector('[name="estimated_duration_days"]').value = task.estimated_duration_days || 60;
+    form.querySelector('[name="priority_id"]').value = task.priority_id || 2;
+
+
+    const container = document.getElementById('editDeptContainer');
+    container.innerHTML = '';
+
+
+    const options = DEPARTMENTS.map(d => {
+        const id = d.department_id ?? d.id;
+        return `<option value="${id}">${d.name}</option>`;
+    }).join('');
+
+
+    const responsible = task.responsible_departments || [];
+    const supporting   = task.supporting_departments  || [];
+
+
+    responsible.forEach((d, i) => {
+        const idx = 'r' + i;
+        const deptId = d.department_id ?? d.id ?? '';
+        const row = document.createElement('div');
+        row.className = 'dept-row dept-lead-row mb-2';
+        row.dataset.type = 'LEAD';
+        row.innerHTML = `
+            <div class="row g-2 align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text dept-lead-icon"><i class="fas fa-crown"></i></span>
+                        <select name="departments[${idx}][department_id]" class="form-control" required>
+                            <option value="">اختر الإدارة المسؤولة *</option>
+                            ${options}
+                        </select>
+                    </div>
+                    <input type="hidden" name="departments[${idx}][responsibility_type]" value="LEAD">
+                    <small class="text-warning fw-bold"><i class="fas fa-crown"></i> إدارة مسؤولة (إجبارية)</small>
+                </div>
+                <div class="col-md-5">
+                    <input type="text" name="departments[${idx}][notes]" class="form-control"
+                           value="${(d.notes || '').replace(/"/g,'&quot;')}"
+                           placeholder="ملاحظة (اختياري)">
+                </div>
+                <div class="col-md-2 text-center">
+                    <span class="badge bg-warning text-dark">مسؤولة</span>
+                </div>
+            </div>
+        `;
+        container.appendChild(row);
+        row.querySelector('select').value = deptId;
+    });
+
+
+    supporting.forEach((d, i) => {
+        const idx = 's' + i;
+        const deptId = d.department_id ?? d.id ?? '';
+        const row = document.createElement('div');
+        row.className = 'dept-row dept-support-row mb-2';
+        row.dataset.type = 'SUPPORT';
+        row.innerHTML = `
+            <div class="row g-2 align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text dept-support-icon"><i class="fas fa-hands-helping"></i></span>
+                        <select name="departments[${idx}][department_id]" class="form-control">
+                            <option value="">اختر إدارة مساندة</option>
+                            ${options}
+                        </select>
+                    </div>
+                    <input type="hidden" name="departments[${idx}][responsibility_type]" value="SUPPORT">
+                </div>
+                <div class="col-md-5">
+                    <input type="text" name="departments[${idx}][notes]" class="form-control"
+                           value="${(d.notes || '').replace(/"/g,'&quot;')}"
+                           placeholder="ملاحظة (اختياري)">
+                </div>
+                <div class="col-md-2 text-center">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeDeptRow(this)">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        container.appendChild(row);
+        row.querySelector('select').value = deptId;
+    });
+
+
+    refreshSharedBadge('edit');
+    new bootstrap.Modal(document.getElementById('editTaskModal')).show();
+}
+
+
+document.addEventListener('change', function(e) {
+    if (e.target.matches('select[name*="[department_id]"]')) {
+        const form = e.target.closest('.task-form');
+        if (form) refreshSharedBadge(form.dataset.context);
+    }
+});
+
+
+document.querySelectorAll('.task-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        const leadRows = this.querySelectorAll('.dept-lead-row');
+        let leadOk = false;
+        leadRows.forEach(r => {
+            const sel = r.querySelector('select[name*="[department_id]"]');
+            if (sel && sel.value) leadOk = true;
+        });
+        if (!leadOk) {
+            e.preventDefault();
+            alert('⚠️ يجب تحديد الإدارة المسؤولة قبل الحفظ');
         }
     });
-    if (!hasLead) {
-        e.preventDefault();
-        alert(' يجب تحديد إدارة مسؤولة واحدة على الأقل');
-    }
 });
 </script>
 @endpush

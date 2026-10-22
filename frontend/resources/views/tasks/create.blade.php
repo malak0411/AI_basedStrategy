@@ -4,8 +4,8 @@
 
 @section('content')
 <div class="container-fluid px-4">
-    <a href="{{ route('tasks.index') }}" class="btn btn-outline-secondary mb-3">
-        <i class="fas fa-arrow-right"></i> العودة للقائمة
+    <a href="javascript:history.back()" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-right"></i> العودة
     </a>
 
     @if ($errors->any())

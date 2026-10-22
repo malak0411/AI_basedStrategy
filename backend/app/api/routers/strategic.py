@@ -532,9 +532,6 @@ async def update_goal(goal_id: int, data: GoalCreate, db: Session = Depends(get_
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
-# ============================================================
-# PROGRAMS - GET/POST/PUT/DELETE
-# ============================================================
 def _calc_program_budget(program_id: int, db: Session):
     program_lines = db.query(BudgetLine).filter(
         BudgetLine.budgetable_type == "program",
@@ -1404,20 +1401,60 @@ async def create_major_task_manual(initiative_id: int, data: dict, db: Session =
 
 
 
-
-@router.put("/major-tasks/{task_id}")
-async def update_major_task(task_id: int, data: dict, db: Session = Depends(get_db)):
+@router.put("/initiatives/{initiative_id}/major-tasks/{task_id}")
+async def update_major_task(
+    initiative_id: int,
+    task_id: int,
+    data: dict,
+    db: Session = Depends(get_db)
+):
     try:
-        task = db.query(MajorTask).filter(MajorTask.major_task_id == task_id).first()
+        task = db.query(MajorTask).filter(
+            MajorTask.major_task_id == task_id,
+            MajorTask.initiative_id == initiative_id,
+        ).first()
+
+
         if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task {task_id} not found in initiative {initiative_id}"
+            )
 
 
         if "name" in data: task.name = data["name"]
         if "description" in data: task.description = data["description"]
         if "priority_id" in data: task.priority_id = data["priority_id"]
         if "estimated_duration_days" in data: task.estimated_duration_days = data["estimated_duration_days"]
-        if "is_cross_department" in data: task.is_cross_department = data["is_cross_department"]
+
+
+        if "departments" in data:
+            departments = data.get("departments", [])
+            lead_count = sum(
+                1 for d in departments
+                if (d.get("responsibility_type") or "").upper() in ("RESPONSIBLE", "LEAD")
+            )
+            if lead_count == 0:
+                raise HTTPException(status_code=400, detail="يجب تحديد إدارة مسؤولة واحدة")
+            if lead_count > 1:
+                raise HTTPException(status_code=400, detail="لا يمكن تحديد أكثر من إدارة مسؤولة واحدة")
+
+
+            task.is_cross_department = len(departments) > 1
+
+
+            db.query(MajorTaskDepartment).filter(
+                MajorTaskDepartment.major_task_id == task_id
+            ).delete()
+
+
+            for dept in departments:
+                db.add(MajorTaskDepartment(
+                    major_task_id=task_id,
+                    department_id=dept.get("department_id"),
+                    responsibility_type=(dept.get("responsibility_type") or "SUPPORT").upper(),
+                    notes=dept.get("notes", ""),
+                ))
 
 
         db.commit()
@@ -1431,7 +1468,7 @@ async def update_major_task(task_id: int, data: dict, db: Session = Depends(get_
 
 @router.put("/pestel")
 async def update_pestel(data: dict, db: Session = Depends(get_db)):
-    """تحديث PESTEL"""
+
     try:
         pestel = db.query(PESTELAnalysis).first()
         if pestel:

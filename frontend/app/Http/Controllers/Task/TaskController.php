@@ -15,9 +15,6 @@ class TaskController extends Controller
         $this->apiClient = new ApiClient();
     }
 
-    // ============================================================
-    // INDEX - قائمة المهام
-    // ============================================================
     public function index(Request $request)
     {
         $token = session('jwt_token');
@@ -36,9 +33,6 @@ class TaskController extends Controller
         return view('tasks.index', compact('tasks'));
     }
 
-    // ============================================================
-    // SHOW - تفاصيل مهمة
-    // ============================================================
     public function show($id)
     {
         $token = session('jwt_token');
@@ -49,25 +43,19 @@ class TaskController extends Controller
 
         if (!$task) return redirect()->route('tasks.index')->with('error', 'المهمة غير موجودة');
 
-        // جلب توصيات AI
         $aiResponse = $this->apiClient->get("/api/ai/recommendations/{$id}", $token);
         $aiRecommendations = $aiResponse['data']['recommendations'] ?? [];
 
-        // جلب تنبؤ AI
         $predictResponse = $this->apiClient->get("/api/ai/predict-delay/{$id}", $token);
         $prediction = $predictResponse['data'] ?? null;
 
         return view('tasks.show', compact('task', 'aiRecommendations', 'prediction'));
     }
 
-    // ============================================================
-    // CREATE - عرض صفحة الإنشاء
-    // ============================================================
     public function create()
     {
         $token = session('jwt_token');
         
-        // جلب المهام الرئيسية للاختيار
         $majorTasks = [];
         $departments = [];
         
@@ -82,9 +70,6 @@ class TaskController extends Controller
         return view('tasks.create', compact('majorTasks', 'departments'));
     }
 
-    // ============================================================
-    // STORE - تخزين مهمة جديدة
-    // ============================================================
     public function store(Request $request)
     {
         $token = session('jwt_token');
@@ -119,9 +104,6 @@ class TaskController extends Controller
         return back()->with('error', $response['detail'] ?? 'فشل إنشاء المهمة')->withInput();
     }
 
-    // ============================================================
-    // EDIT - عرض صفحة التعديل
-    // ============================================================
     public function edit($id)
     {
         $token = session('jwt_token');
@@ -132,7 +114,6 @@ class TaskController extends Controller
 
         if (empty($task)) return redirect()->route('tasks.index')->with('error', 'المهمة غير موجودة');
 
-        // جلب الإدارات للاختيار
         $departments = [];
         try {
             $deptResponse = $this->apiClient->get('/api/departments', $token);
@@ -142,9 +123,6 @@ class TaskController extends Controller
         return view('tasks.edit', compact('task', 'departments'));
     }
 
-    // ============================================================
-    // UPDATE - تحديث مهمة
-    // ============================================================
     public function update(Request $request, $id)
     {
         $token = session('jwt_token');

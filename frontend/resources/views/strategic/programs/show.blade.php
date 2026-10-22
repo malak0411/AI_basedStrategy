@@ -145,8 +145,8 @@
 <div class="container-fluid px-4">
 
 
-    <a href="{{ route('strategic.programs.index') }}" class="btn btn-outline-secondary mb-3">
-        <i class="fas fa-arrow-right"></i> العودة للبرامج
+    <a href="javascript:history.back()" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-right"></i> العودة
     </a>
 
 

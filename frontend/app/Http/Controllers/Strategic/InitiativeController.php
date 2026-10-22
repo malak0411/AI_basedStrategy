@@ -507,6 +507,78 @@ class InitiativeController extends Controller
         return back()->with('error', $response['detail'] ?? 'فشل إضافة المهمة');
     }
 
+    public function updateMajorTask(Request $request, $id, $taskId)
+{
+    \Log::info('updateMajorTask CALLED', [
+        'initiative_id_from_route' => $id,
+        'task_id_from_route'       => $taskId,
+        'full_url'                 => $request->fullUrl(),
+    ]);
+
+
+    if (empty($id) || !is_numeric($id)) {
+        return back()->with('error', 'معرف المبادرة غير صالح (id=' . var_export($id, true) . ')');
+    }
+    if (empty($taskId) || !is_numeric($taskId)) {
+        return back()->with('error', 'معرف المهمة غير صالح (taskId=' . var_export($taskId, true) . ')');
+    }
+
+
+    $token = session('jwt_token');
+
+
+    $departments = [];
+    foreach (($request->departments ?? []) as $dept) {
+        if (!empty($dept['department_id'])) {
+            $departments[] = [
+                'department_id'       => (int) $dept['department_id'],
+                'responsibility_type' => strtoupper($dept['responsibility_type'] ?? 'SUPPORT'),
+                'notes'               => $dept['notes'] ?? '',
+            ];
+        }
+    }
+
+
+    $leadCount = collect($departments)->where('responsibility_type', 'LEAD')->count();
+    if ($leadCount === 0) return back()->with('error', 'يجب تحديد إدارة مسؤولة واحدة');
+    if ($leadCount > 1)   return back()->with('error', 'لا يمكن تحديد أكثر من إدارة مسؤولة واحدة');
+
+
+    $data = [
+        'name'                    => $request->name,
+        'description'             => $request->description ?? '',
+        'priority_id'             => (int) ($request->priority_id ?? 2),
+        'estimated_duration_days' => (int) ($request->estimated_duration_days ?? 60),
+        'departments'             => $departments,
+    ];
+
+
+    $apiUrl = "/api/strategic/initiatives/{$id}/major-tasks/{$taskId}";
+
+
+    try {
+        $response = $this->apiClient->put($apiUrl, $data, $token);
+    } catch (\Throwable $e) {
+        \Log::error('updateMajorTask API exception', ['url' => $apiUrl, 'error' => $e->getMessage()]);
+        return back()->with('error', 'فشل الاتصال بالخادم: ' . $e->getMessage());
+    }
+
+
+    \Log::info('updateMajorTask API response', [
+        'url'      => $apiUrl,
+        'response' => $response,
+    ]);
+
+
+    if (($response['success'] ?? false) === true) {
+        return back()->with('success', 'تم تحديث المهمة بنجاح');
+    }
+
+
+    $error = $response['detail'] ?? $response['message'] ?? 'فشل تحديث المهمة';
+    return back()->with('error', 'API: ' . $error);
+}
+
 
     public function kanban()
     {

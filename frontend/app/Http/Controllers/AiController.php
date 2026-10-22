@@ -14,9 +14,6 @@ class AiController extends Controller
         $this->apiClient = new ApiClient();
     }
 
-    /**
-     * لوحة الذكاء الاصطناعي
-     */
     public function dashboard()
     {
         $token = session('jwt_token');
@@ -26,9 +23,6 @@ class AiController extends Controller
         return view('ai.dashboard', compact('dashboard'));
     }
 
-    /**
-     * قائمة التوصيات
-     */
     public function recommendations()
     {
         $token = session('jwt_token');
@@ -38,9 +32,6 @@ class AiController extends Controller
         return view('ai.recommendations', compact('recommendations'));
     }
 
-    /**
-     * تفاصيل توصية
-     */
     public function showRecommendation($id)
     {
         $token = session('jwt_token');
@@ -54,9 +45,6 @@ class AiController extends Controller
         return view('ai.recommendations-show', compact('recommendation'));
     }
 
-    /**
-     * قائمة النماذج
-     */
     public function models()
     {
         $token = session('jwt_token');
@@ -66,9 +54,6 @@ class AiController extends Controller
         return view('ai.models', compact('models'));
     }
 
-    /**
-     * تفاصيل نموذج
-     */
     public function showModel($id)
     {
         $token = session('jwt_token');
@@ -82,9 +67,6 @@ class AiController extends Controller
         return view('ai.models-show', compact('model'));
     }
 
-    /**
-     * قائمة التنبؤات
-     */
     public function predictions()
     {
         $token = session('jwt_token');
@@ -94,9 +76,6 @@ class AiController extends Controller
         return view('ai.predictions', compact('predictions'));
     }
 
-    /**
-     * تفاصيل تنبؤ
-     */
     public function showPrediction($id)
     {
         $token = session('jwt_token');

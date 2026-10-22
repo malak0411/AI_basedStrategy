@@ -394,68 +394,67 @@ public function generateRiskRecommendations($riskId)
     }
 
     public function updateOperational(Request $request, $id)
-    {
-        if (!$this->isManager()) {
-            return back()->with('error', 'غير مصرح');
-        }
-
-        $request->validate([
-            'title' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-            'status_id' => 'nullable|integer',
-            'priority_id' => 'nullable|integer',
-            'end_date' => 'nullable|date',
-            'estimated_hours' => 'nullable|numeric|min:1|max:720'
-        ]);
-
-        $token = session('jwt_token');
-
-        $data = [];
-
-        foreach (
-            [
-                'title',
-                'description',
-                'status_id',
-                'priority_id',
-                'end_date',
-                'estimated_hours'
-            ] as $field
-        ) {
-            if ($request->filled($field)) {
-                $data[$field] = $request->$field;
-            }
-        }
-
-        if (empty($data)) {
-            return back()->with('error', 'لا توجد بيانات للتحديث');
-        }
-
-        $response = $this->apiClient->put(
-            "/api/tasks/{$id}",
-            $data,
-            $token
-        );
-
-        if ($response['success'] ?? false) {
-            return back()->with(
-                'success',
-                'تم تحديث المهمة بنجاح'
-            );
-        }
-
-        return back()->with(
-            'error',
-            $response['detail']
-            ?? $response['message']
-            ?? 'فشل تحديث المهمة'
-        );
+{
+    if (!$this->isManager()) {
+        return back()->with('error', 'غير مصرح');
     }
 
-    public function update(Request $request, $id)
-    {
-        return $this->updateOperational($request, $id);
+
+    $request->validate([
+        'title'           => 'nullable|string|max:255',
+        'description'     => 'nullable|string|max:1000',
+        'status_id'       => 'nullable|integer|exists:dict_statuses,status_id',
+        'priority_id'     => 'nullable|integer|exists:dict_priorities,priority_id',
+        'start_date'      => 'nullable|date',
+        'end_date'        => 'nullable|date|after_or_equal:start_date',
+        'estimated_hours' => 'nullable|numeric|min:1|max:720',
+    ]);
+
+
+    $token = session('jwt_token');
+
+
+    $data = [];
+    foreach (
+        ['title', 'description', 'status_id', 'priority_id', 'start_date', 'end_date', 'estimated_hours'] as $field
+    ) {
+        if ($request->filled($field)) {
+            $data[$field] = $request->input($field);  
+        }
     }
+
+
+    if (empty($data)) {
+        return back()->with('error', 'لا توجد بيانات للتحديث');
+    }
+
+
+    $response = $this->apiClient->put(
+        "/api/tasks/{$id}",
+        $data,
+        $token
+    );
+
+
+    if ($response['success'] ?? false) {
+        return back()->with('success', 'تم تحديث المهمة بنجاح');
+    }
+
+
+    return back()->with(
+        'error',
+        $response['detail']
+        ?? $response['message']
+        ?? 'فشل تحديث المهمة'
+    );
+}
+
+
+public function update(Request $request, $id)
+{
+    return $this->updateOperational($request, $id);
+}
+
 
     public function destroyOperational($id)
     {
@@ -490,73 +489,52 @@ public function generateRiskRecommendations($riskId)
         return $this->destroyOperational($id);
     }
     
-    public function generate($majorTaskId)
-    {
-        if (!$this->isManager()) {
-            return redirect()
-                ->route('dashboard.employee')
-                ->with('error', 'غير مصرح');
-        }
-
-        $token = session('jwt_token');
-
-        $majorTask = $this->apiClient->get(
-            "/api/tasks/major-tasks/{$majorTaskId}/details",
-            $token
-        );
-
-        return view('operational.generate', [
-            'majorTask' => $majorTask['data'] ?? []
-        ]);
-    }
-
     public function startGeneration(Request $request)
-    {
-        if (!$this->isManager()) {
-            return back()->with('error', 'غير مصرح');
-        }
-
-        $request->validate([
-            'major_task_id' => 'required|integer',
-            'instructions' => 'nullable|string'
-        ]);
-
-        $token = session('jwt_token');
-
-        $response = $this->apiClient->post(
-            "/api/ai/operational/generate-tasks/{$request->major_task_id}",
-            [
-                'instructions' => $request->instructions ?? ''
-            ],
-            $token
-        );
-
-        if ($response['success'] ?? false) {
-            $data = $response['data'] ?? [];
-
-            return redirect()->to(
-                '/operational/waiting?job_id=' .
-                ($data['job_id'] ?? '') .
-                '&major_task_id=' .
-                $request->major_task_id
-            );
-        }
-
-        return back()->with(
-            'error',
-            $response['detail']
-            ?? $response['message']
-            ?? 'فشل توليد المهام'
-        );
+{
+    if (!$this->isManager()) {
+        return back()->with('error', 'غير مصرح');
     }
 
-    public function waiting(Request $request)
-    {
-        return view('operational.waiting', [
-            'jobId' => $request->job_id,
-            'majorTaskId' => $request->major_task_id
+
+    $request->validate([
+        'major_task_id' => 'required|integer',
+        'instructions'  => 'nullable|string',
+    ]);
+
+
+    $token = session('jwt_token');
+
+
+    $response = $this->apiClient->post(
+        "/api/ai/operational/generate-tasks/{$request->major_task_id}",
+        ['instructions' => $request->instructions ?? ''],
+        $token
+    );
+
+
+    if ($response['success'] ?? false) {
+        $jobId = $response['data']['job_id'] ?? null;
+        if (!$jobId) {
+            return back()->with('error', 'تعذر إنشاء وظيفة التوليد');
+        }
+
+
+        return redirect()->route('operational.generate', [
+            'id'     => $request->major_task_id,
+            'job_id' => $jobId,
         ]);
     }
+
+
+    return back()->with(
+        'error',
+        $response['detail']
+        ?? $response['message']
+        ?? 'فشل توليد المهام'
+    );
+}
+
+
 
     public function checkJobStatus($job_id)
 {
@@ -579,9 +557,7 @@ public function review(Request $request)
     }
 
 
-    $request->validate([
-        'job_id' => 'required|integer'
-    ]);
+    $request->validate(['job_id' => 'required|integer']);
 
 
     $token = session('jwt_token');
@@ -595,137 +571,122 @@ public function review(Request $request)
 
     if (!($jobResponse['success'] ?? false)) {
         return redirect()
-            ->route('operational.waiting', [
-                'job_id' => $request->job_id
-            ])
+            ->route('dashboard.employee')
             ->with('error', 'تعذر الحصول على نتيجة التوليد');
     }
 
 
-    $job = $jobResponse['data'] ?? [];
+    $job    = $jobResponse['data'] ?? [];
+    $result = is_array($job['result'] ?? null) ? $job['result'] : [];
+    $tasks  = is_array($result['operational_tasks'] ?? null) ? $result['operational_tasks'] : [];
+    $majorTaskId = $result['major_task_id'] ?? null;
+    $jobStatus   = $job['status'] ?? 'review';
 
 
-    $result = $job['result'] ?? [];
-
-
-    if (!is_array($result)) {
-        $result = [];
+    $strategicMap = [];
+    $priorities   = [];
+    if ($majorTaskId) {
+        $mapResponse = $this->apiClient->get(
+            "/api/ai/operational/strategic-map/{$majorTaskId}",
+            $token
+        );
+        if ($mapResponse['success'] ?? false) {
+            $strategicMap = $mapResponse['data'] ?? [];
+            $priorities   = $strategicMap['priorities'] ?? [];
+        }
     }
 
 
-    $tasks = $result['operational_tasks'] ?? [];
-
-
-    if (!is_array($tasks)) {
-        $tasks = [];
+    if (empty($priorities)) {
+        $pr = $this->apiClient->safeGet('/api/priorities', $token, []);
+        $priorities = $pr['data'] ?? (is_array($pr) ? $pr : []);
     }
 
 
-    $departmentsResponse = $this->apiClient->safeGet(
-        '/api/departments',
-        $token,
-        []
-    );
-
-
-    if (isset($departmentsResponse['data']) && is_array($departmentsResponse['data'])) {
-        $departments = $departmentsResponse['data'];
-    } else {
-        $departments = is_array($departmentsResponse)
-            ? $departmentsResponse
-            : [];
-    }
+    $departmentsResponse = $this->apiClient->safeGet('/api/departments', $token, []);
+    $departments = $departmentsResponse['data'] ?? (is_array($departmentsResponse) ? $departmentsResponse : []);
 
 
     return view('operational.review', [
-        'job' => $job,
-        'tasks' => $tasks,
-        'departments' => $departments,
-        'jobId' => $request->job_id
+        'job'          => $job,
+        'tasks'        => $tasks,
+        'departments'  => $departments,
+        'priorities'   => $priorities,       
+        'strategicMap' => $strategicMap,     
+        'majorTaskId'  => $majorTaskId,      
+        'jobStatus'    => $jobStatus,        
+        'jobId'        => $request->job_id,
     ]);
 }
 
-    public function editWithPrompt(Request $request)
-    {
-        $request->validate([
-            'job_id' => 'required|string',
-            'instruction' => 'required|string'
-        ]);
-
-        $token = session('jwt_token');
-
-        $response = $this->apiClient->post(
-            "/api/ai/operational/edit-tasks/{$request->job_id}",
-            [
-                'instruction' => $request->instruction
-            ],
-            $token
-        );
-
-        return response()->json($response);
-    }
-    
-    public function approve(Request $request)
+    public function editWithPrompt(Request $request, $job_id)
 {
-    $request->validate([
-        'job_id' => 'required|integer'
+    if (!$this->isManager()) {
+        return response()->json(['success' => false, 'detail' => 'غير مصرح'], 403);
+    }
+
+
+    $validator = \Validator::make($request->all(), [
+        'instruction' => 'required|string|min:3',
     ]);
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'detail'  => $validator->errors()->first(),
+        ], 422);
+    }
 
 
     $token = session('jwt_token');
-
-
-    \Log::info('Operational approve started', [
-        'job_id' => $request->job_id
-    ]);
+    if (!$token) {
+        return response()->json(['success' => false, 'detail' => 'انتهت الجلسة، أعد تسجيل الدخول'], 401);
+    }
 
 
     $response = $this->apiClient->post(
-        "/api/ai/operational/approve-tasks/{$request->job_id}",
-        [],
+        "/api/ai/operational/edit-tasks/{$job_id}",
+        ['instruction' => $request->input('instruction')],
         $token
     );
 
 
-    \Log::info('Operational approve API response', [
-        'job_id' => $request->job_id,
-        'response' => $response
-    ]);
-
-
-    if (!($response['success'] ?? false)) {
-        return back()->with(
-            'error',
-            $response['detail']
+    $success = (bool) ($response['success'] ?? false);
+    if (!$success) {
+        $detail = $response['detail']
             ?? $response['message']
-            ?? 'فشل اعتماد المهام التشغيلية'
-        );
+            ?? $response['error']
+            ?? 'فشل بدء إعادة التوليد على الخادم';
+
+
+        if (is_string($detail) && strpos($detail, '{') === 0) {
+            $parsed = json_decode($detail, true);
+            $detail = $parsed['detail'] ?? $detail;
+        }
+
+
+        return response()->json(['success' => false, 'detail' => $detail], 200);
     }
 
 
-    $majorTaskId =
-        $response['data']['major_task_id']
-        ?? null;
-
-
-    if (!$majorTaskId) {
-        return back()->with(
-            'error',
-            'تم حفظ المهام ولكن تعذر تحديد المهمة الرئيسية'
-        );
-    }
-
-
-    return redirect()
-        ->route(
-            'operational.show-major-task',
-            ['id' => $majorTaskId]
-        )
-        ->with(
-            'success',
-            'تم اعتماد المهام التشغيلية وحفظها بنجاح'
-        );
+    return response()->json([
+        'success' => true,
+        'data'    => [
+            'job_id' => (int) $job_id,
+            'status' => $response['data']['status'] ?? 'editing',
+        ],
+    ]);
 }
+
+
+private function extractMajorTaskId(int $jobId, ?string $token): ?int
+{
+    $jobResponse = $this->apiClient->get("/api/ai/jobs/{$jobId}", $token);
+    if (!($jobResponse['success'] ?? false)) {
+        return null;
+    }
+    return $jobResponse['data']['result']['major_task_id'] ?? null;
+}
+
 
     public function showOperationalTask($id)
 {
@@ -792,6 +753,152 @@ public function review(Request $request)
         Log::error('Task detail error: ' . $e->getMessage());
         return back()->with('error', 'حدث خطأ أثناء تحميل بيانات المهمة');
     }
+}
+
+public function generate($majorTaskId, Request $request)
+{
+    if (!$this->isManager()) {
+        return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+    }
+
+
+    $token = session('jwt_token');
+
+
+    $majorTask = $this->apiClient->get(
+        "/api/tasks/major-tasks/{$majorTaskId}/details",
+        $token
+    );
+
+
+    $strategicMap = [];
+    $mapResponse = $this->apiClient->get(
+        "/api/ai/operational/strategic-map/{$majorTaskId}",
+        $token
+    );
+    if ($mapResponse['success'] ?? false) {
+        $strategicMap = $mapResponse['data'] ?? [];
+    }
+
+
+    if (empty($strategicMap) && !empty($majorTask['data'])) {
+        $mt = $majorTask['data'];
+        $strategicMap = [
+            'major_task' => [
+                'id'                  => $mt['major_task_id'] ?? $mt['id'] ?? $majorTaskId,
+                'name'                => $mt['name'] ?? '',
+                'description'         => $mt['description'] ?? '',
+                'duration_days'       => $mt['estimated_duration_days'] ?? 30,
+                'is_cross_department' => $mt['is_cross_department'] ?? false,
+            ],
+            'departments' => $mt['departments'] ?? [],
+        ];
+    }
+
+
+    return view('operational.generate', [
+        'majorTask'    => $majorTask['data'] ?? [],
+        'strategicMap' => $strategicMap,
+        'jobId'        => $request->query('job_id'),
+    ]);
+}
+
+public function approve(Request $request)
+{
+    if (!$this->isManager()) {
+        return back()->with('error', 'غير مصرح');
+    }
+
+
+    $request->validate([
+        'job_id' => 'required|integer',
+    ]);
+
+
+    $token = session('jwt_token');
+    if (!$token) {
+        return back()->with('error', 'انتهت الجلسة، أعد تسجيل الدخول');
+    }
+
+
+    \Log::info('[approve] start', ['job_id' => $request->job_id]);
+
+
+    $response = $this->apiClient->post(
+        "/api/ai/operational/approve-tasks/{$request->job_id}",
+        [],
+        $token
+    );
+
+
+    \Log::info('[approve] api response', [
+        'job_id'   => $request->job_id,
+        'response' => $response,
+    ]);
+
+
+    if ($response['success'] ?? false) {
+        $majorTaskId = $response['data']['major_task_id'] ?? null;
+        $savedCount  = count($response['data']['tasks'] ?? []);
+
+
+        if (!$majorTaskId) {
+            return back()->with('error', 'تم الحفظ لكن تعذر تحديد المهمة الرئيسية');
+        }
+
+
+        return redirect()
+            ->route('operational.show-major-task', ['id' => $majorTaskId])
+            ->with('success', "تم اعتماد {$savedCount} مهام تشغيلية وحفظها بنجاح");
+    }
+
+
+    $detail = $response['detail']
+        ?? $response['message']
+        ?? $response['error']
+        ?? null;
+
+
+    if ($detail && stripos($detail, 'already approved') !== false) {
+        $majorTaskId = $this->extractMajorTaskIdFromJob($request->job_id, $token);
+        if ($majorTaskId) {
+            return redirect()
+                ->route('operational.show-major-task', ['id' => $majorTaskId])
+                ->with('error', 'هذه الوظيفة معتمدة مسبقًا — لم يُحفظ شيء جديد.');
+        }
+    }
+
+
+    if ($detail && (
+        stripos($detail, "must be in 'review'") !== false ||
+        stripos($detail, 'cannot be edited') !== false
+    )) {
+        return back()->with('error',
+            'لا يمكن اعتماد الوظيفة في حالتها الحالية. أعد تحميل الصفحة.'
+        );
+    }
+
+
+    if ($detail && stripos($detail, 'No tasks to save') !== false) {
+        return back()->with('error',
+            'لا توجد مهام للحفظ. أضف مهامًا أو أعد التوليد.'
+        );
+    }
+
+
+    return back()->with('error',
+        $detail ?: 'فشل اعتماد المهام التشغيلية'
+    );
+}
+
+
+private function extractMajorTaskIdFromJob(int $jobId, ?string $token): ?int
+{
+    $jobResponse = $this->apiClient->get("/api/ai/jobs/{$jobId}", $token);
+    if (!($jobResponse['success'] ?? false)) {
+        return null;
+    }
+    return $jobResponse['data']['result']['major_task_id'] ?? null;
 }
 
 
@@ -1574,7 +1681,6 @@ public function deleteComment($commentId)
             return response()->json(['success' => false, 'error' => 'غير مصرح'], 401);
         }
 
-        // جرب هذا المسار أولاً
         $endpoint = "/api/tasks/comments/{$commentId}";
         \Log::info('Deleting comment with endpoint: ' . $endpoint);
         
@@ -1956,6 +2062,103 @@ public function dependencies($majorTaskId)
 
         return response()->json($response);
     }
+
+    public function updateTasks(Request $request, $job_id)
+{
+    if (!$this->isManager()) {
+        return response()->json(['success' => false, 'detail' => 'غير مصرح'], 403);
+    }
+
+
+    $token = session('jwt_token');
+    if (!$token) {
+        return response()->json(['success' => false, 'detail' => 'انتهت الجلسة، أعد تسجيل الدخول'], 401);
+    }
+
+
+    $payload = $request->input('operational_tasks');
+    if (!is_array($payload) || empty($payload)) {
+        return response()->json([
+            'success' => false,
+            'detail'  => 'قائمة المهام مطلوبة (عنصر واحد على الأقل).',
+        ]);
+    }
+
+
+    \Log::info('[updateTasks] incoming', [
+        'job_id' => $job_id,
+        'count'  => count($payload),
+        'first'  => $payload[0] ?? null,
+    ]);
+
+
+    $validator = \Validator::make($request->all(), [
+        'operational_tasks'                    => 'required|array|min:1',
+        'operational_tasks.*.title'            => 'required|string|min:3|max:255',
+        'operational_tasks.*.description'      => 'required|string|max:1000',
+        'operational_tasks.*.priority_id'      => 'required|integer',
+        'operational_tasks.*.estimated_hours'  => 'required|numeric|min:1|max:120',
+        'operational_tasks.*.start_date'       => 'required|date',
+        'operational_tasks.*.end_date'         => 'required|date|after_or_equal:operational_tasks.*.start_date',
+    ], [
+        'operational_tasks.min'                     => 'يجب أن تبقى مهمة واحدة على الأقل.',
+        'operational_tasks.*.estimated_hours.max'   => 'لا يمكن أن تتجاوز ساعات المهمة 120 ساعة.',
+        'operational_tasks.*.end_date.after_or_equal'=> 'تاريخ النهاية يجب أن يكون بعد أو يساوي تاريخ البداية.',
+    ]);
+
+
+    if ($validator->fails()) {
+        \Log::warning('[updateTasks] validation failed', $validator->errors()->toArray());
+        return response()->json([
+            'success' => false,
+            'detail'  => $validator->errors()->first(),
+            'errors'  => $validator->errors()->toArray(),
+        ]);
+    }
+
+
+    try {
+        $response = $this->apiClient->put(
+            "/api/ai/operational/tasks/{$job_id}",
+            ['operational_tasks' => $payload],
+            $token
+        );
+    } catch (\Throwable $e) {
+        \Log::error('[updateTasks] apiClient exception', [
+            'message' => $e->getMessage(),
+            'class'   => get_class($e),
+        ]);
+        return response()->json([
+            'success' => false,
+            'detail'  => 'فشل الاتصال بالخادم الذكي: ' . $e->getMessage(),
+        ]);
+    }
+
+
+    \Log::info('[updateTasks] api response', ['response' => $response]);
+
+
+    $success = (bool) ($response['success'] ?? false);
+    if (!$success) {
+        $detail = $response['detail']
+            ?? $response['message']
+            ?? $response['error']
+            ?? 'فشل تحديث المهام على الخادم';
+
+
+        return response()->json(['success' => false, 'detail' => $detail]);
+    }
+
+
+    return response()->json([
+        'success' => true,
+        'data'    => [
+            'operational_tasks' => $response['data']['operational_tasks'] ?? $payload,
+        ],
+    ]);
+}
+
+
 
 }
 

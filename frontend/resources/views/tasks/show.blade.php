@@ -5,8 +5,8 @@
 @section('content')
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <a href="{{ route('tasks.index') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-right"></i> العودة للقائمة
+        <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-right"></i> العودة
         </a>
         <a href="{{ route('tasks.edit', $task['id'] ?? 0) }}" class="btn btn-outline-primary">
             <i class="fas fa-edit"></i> تعديل

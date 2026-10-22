@@ -202,8 +202,8 @@
                 @else <strong>{{ $userRole }}</strong>
                 @endif
             </span>
-            <a href="{{ route('strategic.programs.index') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-list"></i> عرض القائمة
+            <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-right"></i> العودة
             </a>
         </div>
     </div>

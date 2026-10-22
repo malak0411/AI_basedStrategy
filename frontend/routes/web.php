@@ -166,26 +166,88 @@ Route::middleware('check.jwt')->group(function () {
     Route::put('/operational/update-status', [OperationalTaskController::class, 'updateTaskStatus'])
         ->name('operational.update-status');
 
-    Route::get('/operational/generate/{id}', [OperationalTaskController::class, 'generate'])
+    Route::get('/operational/generate/{id}',
+        [OperationalTaskController::class, 'generate'])
         ->name('operational.generate');
 
-    Route::post('/operational/start-generation', [OperationalTaskController::class, 'startGeneration'])
+
+    Route::post('/operational/start-generation',
+        [OperationalTaskController::class, 'startGeneration'])
         ->name('operational.start-generation');
 
-    Route::get('/operational/waiting', [OperationalTaskController::class, 'waiting'])
-        ->name('operational.waiting');
 
-    Route::get('/operational/job/{job_id}', [OperationalTaskController::class, 'checkJobStatus'])
-    ->name('operational.job');
+    Route::get('/operational/job/{job_id}',
+        [OperationalTaskController::class, 'checkJobStatus'])
+        ->name('operational.job');
 
-    Route::get('/operational/review', [OperationalTaskController::class, 'review'])
+
+    Route::get('/operational/review',
+        [OperationalTaskController::class, 'review'])
         ->name('operational.review');
 
-    Route::post('/operational/edit-with-prompt', [OperationalTaskController::class, 'editWithPrompt'])
-        ->name('operational.edit-with-prompt');
 
-    Route::post('/operational/approve', [OperationalTaskController::class, 'approve'])
+    Route::post('/operational/edit/{job_id}',
+        [OperationalTaskController::class, 'editWithPrompt'])
+        ->name('operational.edit');
+
+
+    Route::match(['put', 'post'], '/operational/tasks/{job_id}',
+        [OperationalTaskController::class, 'updateTasks'])
+        ->name('operational.tasks.update');
+
+
+
+    Route::post('/operational/approve',
+        [OperationalTaskController::class, 'approve'])
         ->name('operational.approve');
+
+
+    Route::put('/operational/{id}',
+        [OperationalTaskController::class, 'updateOperational'])
+        ->name('operational.update');
+
+    Route::get('/strategic/generate/{id}',
+        [AiStrategicController::class, 'generate'])
+        ->name('strategic.generate');
+
+
+    Route::post('/strategic/start-generation',
+        [AiStrategicController::class, 'startGeneration'])
+        ->name('strategic.start-generation');
+
+
+    Route::get('/strategic/job/{job_id}',
+        [AiStrategicController::class, 'checkJobStatus'])
+        ->name('strategic.job');
+
+
+    Route::get('/strategic/review',
+        [AiStrategicController::class, 'review'])
+        ->name('strategic.review');
+
+
+    Route::post('/strategic/edit/{job_id}',
+        [AiStrategicController::class, 'editWithPrompt'])
+        ->name('strategic.edit');
+
+
+    Route::match(['put', 'post'], '/strategic/tasks/{job_id}',
+        [AiStrategicController::class, 'updateTasks'])
+        ->name('strategic.tasks.update');
+
+
+    Route::post('/strategic/approve',
+        [AiStrategicController::class, 'approve'])
+        ->name('strategic.approve');
+    
+    Route::match(['put', 'post'], '/strategic/initiatives/{id}/major-tasks/{taskId}',
+        [InitiativeController::class, 'updateMajorTask'])
+        ->name('strategic.major-tasks.update');
+
+
+    Route::post('/strategic/initiatives/{id}/major-tasks',
+        [InitiativeController::class, 'storeMajorTask'])
+        ->name('strategic.major-tasks.store');
 
     Route::get('/operational-tasks/{taskId}/attachments', [OperationalTaskController::class, 'attachments'])
     ->name('task.attachments.index');
@@ -301,7 +363,6 @@ Route::put('/operational/risks/mitigations/{mitigationId}', [OperationalTaskCont
         Route::delete('/destroy/{id}', [OperationalTaskController::class, 'destroy'])->name('destroy');
         Route::get('/generate/{majorTaskId}', [OperationalTaskController::class, 'generate'])->name('generate');
         Route::post('/start-generation', [OperationalTaskController::class, 'startGeneration'])->name('start-generation');
-        Route::get('/waiting', [OperationalTaskController::class, 'waiting'])->name('waiting');
         Route::get('/review', [OperationalTaskController::class, 'review'])->name('review');
         Route::post('/edit-prompt', [OperationalTaskController::class, 'editWithPrompt'])->name('edit-prompt');
         Route::post('/approve', [OperationalTaskController::class, 'approve'])->name('approve');
