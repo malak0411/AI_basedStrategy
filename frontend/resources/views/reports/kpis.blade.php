@@ -66,7 +66,7 @@
         </div>
     </div>
 
-    <!-- جدول المؤشرات -->
+
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             <table class="table table-bordered table-hover text-center align-middle mb-0">

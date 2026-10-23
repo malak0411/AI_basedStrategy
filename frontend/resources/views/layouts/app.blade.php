@@ -46,7 +46,6 @@
         }
 
 
-        /* ================= Sidebar ================= */
         .sidebar {
             position: fixed;
             top: 0;
@@ -276,7 +275,6 @@
         }
 
 
-        /* ================= Main Content ================= */
         .main-content {
             margin-right: 280px;
             padding: 22px 28px;
@@ -286,7 +284,6 @@
         .main-content.expanded { margin-right: 82px; }
 
 
-        /* ================= Topbar ================= */
         .topbar {
             display: flex;
             justify-content: space-between;
@@ -366,7 +363,6 @@
         .topbar .toggle-sidebar:hover { background: var(--primary-soft); color: var(--primary); }
 
 
-        /* ================= Responsive ================= */
         @media (max-width: 992px) {
             .sidebar { width: 280px !important; right: -100%; transition: right 0.3s ease; }
             .sidebar.mobile-open { right: 0; }
@@ -385,7 +381,6 @@
         }
 
 
-        /* ================= Utilities ================= */
         .gold-text { color: var(--gold); }
         .bg-gold { background: var(--gold); color: var(--primary-dark); }
 
@@ -453,7 +448,6 @@
         }
 
 
-        /* Scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: var(--gray-light); }
         ::-webkit-scrollbar-thumb {
@@ -463,7 +457,6 @@
         ::-webkit-scrollbar-thumb:hover { background: var(--primary-dark); }
 
 
-        /* Overlay for mobile */
         .sidebar-overlay {
             display: none;
             position: fixed;

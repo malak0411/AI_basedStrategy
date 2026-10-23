@@ -632,6 +632,8 @@ class AuditLog(Base):
     ip_address = Column(String(45))
     user_agent = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
+    employee = relationship("Employee", foreign_keys=[employee_id])
+
 
 class SystemConfig(Base):
     __tablename__ = "system_config"

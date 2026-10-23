@@ -198,7 +198,7 @@
                 <i class="fas fa-user-shield"></i>
                 دورك: 
                 @if($userRole === 'minister') <strong>وزير</strong>
-                @elseif($userRole === 'manager') <strong>مدير</strong>
+                @elseif($userRole === 'manager'||$userRole === 'deputy'||$userRole === 'general_manager') <strong>مدير</strong>
                 @else <strong>{{ $userRole }}</strong>
                 @endif
             </span>
@@ -215,7 +215,7 @@
                 كوزير: يمكنك نقل المبادرات إلى <strong>"معتمد"</strong> و <strong>"ملغي"</strong>.
             </small>
         </div>
-    @elseif($userRole === 'manager')
+    @elseif($userRole === 'manager'||$userRole === 'deputy'||$userRole === 'general_manager')
         <div class="alert alert-info py-2 mb-3">
             <small><i class="fas fa-info-circle ml-1"></i>
                 كمدير: يمكنك نقل المبادرات إلى <strong>"قيد التنفيذ"</strong> و <strong>"مكتمل"</strong> (بعد الاعتماد).

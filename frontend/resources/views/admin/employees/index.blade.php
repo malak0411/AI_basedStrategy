@@ -6,6 +6,7 @@
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3><i class="fas fa-users ml-2"></i>إدارة الموظفين</h3>
+        <a href="{{ route('admin.employees.create') }}" class="btn-gold"><i class="fas fa-plus"></i> موظف جديد</a>
     </div>
 
     @if(session('success'))

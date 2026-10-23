@@ -8,29 +8,27 @@ use App\Services\ApiClient;
 
 class RoleMiddleware
 {
-    /**
-     * التحقق من صلاحيات المستخدم
-     */
+    
     public function handle(Request $request, Closure $next, ...$roles)
     {
         try {
             $token = session('jwt_token');
             $userRole = session('user_role');
             
-            // التحقق من وجود الجلسة
+
             if (!$token || !$userRole) {
                 return redirect()->route('login')
                     ->with('error', 'يجب تسجيل الدخول أولاً');
             }
             
-            // التحقق من الصلاحية
+
             if (!in_array($userRole, $roles)) {
                 $redirectPath = $this->getDefaultRoute($userRole);
                 return redirect($redirectPath)
                     ->with('error', 'ليس لديك صلاحية للوصول إلى هذه الصفحة');
             }
             
-            // مشاركة البيانات المشتركة
+
             $this->shareCommonData($token);
             
             return $next($request);
@@ -42,9 +40,7 @@ class RoleMiddleware
         }
     }
     
-    /**
-     * تحديد المسار الافتراضي حسب الصلاحية
-     */
+    
     private function getDefaultRoute($role)
     {
         return match($role) {
@@ -55,21 +51,19 @@ class RoleMiddleware
         };
     }
     
-    /**
-     * مشاركة البيانات المشتركة بين جميع الواجهات
-     */
+    
     private function shareCommonData($token)
     {
         try {
             $apiClient = new ApiClient();
             
-            // معلومات المستخدم الحالي
+
             $userResponse = $apiClient->get('/api/auth/me', $token);
             if (isset($userResponse['data'])) {
                 view()->share('currentUser', $userResponse['data']);
             }
             
-            // عدد الإشعارات غير المقروءة
+
             try {
                 $notifResponse = $apiClient->get('/api/notifications/unread-count', $token);
                 view()->share('unreadNotifications', $notifResponse['data']['count'] ?? 0);

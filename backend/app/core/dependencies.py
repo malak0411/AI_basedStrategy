@@ -9,7 +9,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 def get_current_employee(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """استخراج employee_id من JWT Token"""
+
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -26,7 +26,7 @@ def get_current_employee(credentials: HTTPAuthorizationCredentials = Depends(sec
             detail=f"Invalid token: {str(e)}"
         )
 
-# اسم بديل للتوافق مع الملفات القديمة
+
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """استخراج employee_id من JWT Token - اسم بديل"""
+
     return get_current_employee(credentials)

@@ -32,7 +32,7 @@
         </div>
     </div>
 
-    <!-- ملخص الأعداد التشغيلية -->
+
     <div class="row g-3 mb-5">
         @php
             $counts = [
@@ -56,7 +56,7 @@
         @endforeach
     </div>
 
-    <!-- مكتبة التقارير -->
+
     <h4 class="fw-bold mb-3 border-bottom pb-2">مكتبة التقارير التفصيلية</h4>
     <div class="row g-4">
         <div class="col-md-4">

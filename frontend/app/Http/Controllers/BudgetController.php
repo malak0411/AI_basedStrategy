@@ -237,7 +237,7 @@ class BudgetController extends Controller
     }
 
 
-    // الدالة المضافة حديثاً
+
     public function showTransaction($transactionId)
     {
         try {

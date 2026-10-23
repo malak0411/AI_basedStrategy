@@ -19,8 +19,8 @@
 
 @section('content')
 <div class="container-fluid px-4 py-3" dir="rtl">
-    <!-- Header & Filter -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h3 class="fw-bold text-navy"><i class="fas fa-landmark ml-2"></i> الخريطة المالية والاستراتيجية</h3>
             <p class="text-muted mb-0">متابعة التخصيصات المالية للمشاريع والبرامج الحكومية</p>
@@ -36,7 +36,7 @@
     </div>
 
 
-    <!-- Summary Cards -->
+
     <div class="row g-3 mb-4">
         <div class="col-md-3">
             <div class="card shadow-sm kpi-card border-primary">
@@ -76,7 +76,7 @@
     </div>
 
 
-    <!-- Hierarchical Tree -->
+
     <div class="accordion shadow-sm" id="programTree">
         @foreach($tree as $program)
         <div class="accordion-item mb-2 border rounded">
@@ -100,8 +100,8 @@
             </h2>
             <div id="prog{{ $program['id'] }}" class="accordion-collapse collapse">
                 <div class="accordion-body bg-light p-2">
-                    <!-- Initiatives -->
-                    @foreach($program['initiatives'] as $init)
+
+                @foreach($program['initiatives'] as $init)
                     <div class="accordion tree-node mb-2" id="initTree{{ $init['id'] }}">
                         <div class="accordion-item border-0 shadow-sm">
                             <h2 class="accordion-header">

@@ -15,9 +15,7 @@ class EmployeeController extends Controller
         $this->apiClient = new ApiClient();
     }
 
-    /**
-     * عرض قائمة الموظفين
-     */
+    
     public function index()
     {
         $token = session('jwt_token');
@@ -31,9 +29,7 @@ class EmployeeController extends Controller
         return view('admin.employees.index', compact('employees'));
     }
 
-    /**
-     * عرض تفاصيل موظف
-     */
+    
     public function show($id)
     {
         $token = session('jwt_token');
@@ -48,7 +44,7 @@ class EmployeeController extends Controller
             return redirect()->route('admin.employees.index')->with('error', 'الموظف غير موجود');
         }
 
-        // جلب الأدوار المرتبطة
+
         $rolesResponse = $this->apiClient->get('/api/employee-roles', $token);
         $allRoles = $rolesResponse['data'] ?? [];
         $employeeRoles = array_filter($allRoles, function($r) use ($id) {
@@ -58,9 +54,8 @@ class EmployeeController extends Controller
         return view('admin.employees.show', compact('employee', 'employeeRoles'));
     }
 
-    /**
-     * عرض صفحة تعديل موظف
-     */
+    
+
     public function edit($id)
     {
         $token = session('jwt_token');
@@ -71,7 +66,7 @@ class EmployeeController extends Controller
         $response = $this->apiClient->get("/api/employees/{$id}", $token);
         $employee = $response['data'] ?? [];
 
-        // جلب الإدارات للاختيار
+
         $deptResponse = $this->apiClient->get('/api/departments', $token);
         $departments = $deptResponse['data'] ?? [];
 
@@ -82,9 +77,7 @@ class EmployeeController extends Controller
         return view('admin.employees.edit', compact('employee', 'departments'));
     }
 
-    /**
-     * تحديث بيانات موظف
-     */
+    
     public function update(Request $request, $id)
     {
         $token = session('jwt_token');
@@ -107,4 +100,63 @@ class EmployeeController extends Controller
         }
         return back()->with('error', $response['detail'] ?? 'فشل تحديث الموظف');
     }
+
+    public function create()
+{
+    $token = session('jwt_token');
+    if (session('user_role') !== 'super_admin') {
+        return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+    }
+
+    $deptResponse = $this->apiClient->get('/api/departments', $token);
+    $departments = $deptResponse['data'] ?? [];
+
+    return view('admin.employees.create', compact('departments'));
+}
+
+public function store(Request $request)
+{
+    $token = session('jwt_token');
+    if (session('user_role') !== 'super_admin') {
+        return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
+    }
+
+    $request->validate([
+        'full_name'             => 'required|string|max:255',
+        'email'                 => 'required|email|max:191',
+        'password'              => 'required|string|min:6|confirmed',
+        'department_id'         => 'required|integer',
+        'employee_number'       => 'nullable|string|max:50',
+        'phone_number'          => 'nullable|string|max:30',
+        'job_title'             => 'nullable|string|max:150',
+        'hire_date'             => 'nullable|date',
+    ], [
+        'password.confirmed'    => 'تأكيد كلمة المرور غير مطابق',
+        'email.email'           => 'صيغة البريد الإلكتروني غير صحيحة',
+    ]);
+
+    $data = [
+        'full_name'             => $request->full_name,
+        'email'                 => $request->email,
+        'password'              => $request->password,
+        'department_id'         => (int) $request->department_id,
+        'employee_number'       => $request->employee_number ?: null,
+        'phone_number'          => $request->phone_number ?: null,
+        'job_title'             => $request->job_title ?: null,
+        'hire_date'             => $request->hire_date ?: null,
+        'gps_enabled'           => $request->has('gps_enabled'),
+        'is_active'             => $request->has('is_active'),
+    ];
+
+    $response = $this->apiClient->post('/api/employees/', $data, $token);
+
+    if ($response['success'] ?? false) {
+        return redirect()->route('admin.employees.index')
+            ->with('success', 'تم إضافة الموظف بنجاح');
+    }
+
+    return back()->withInput()
+        ->with('error', $response['detail'] ?? $response['message'] ?? 'فشل إضافة الموظف');
+}
+
 }

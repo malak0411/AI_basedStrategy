@@ -22,7 +22,7 @@ STATUS_INITIATIVE_ACTIVE = 2
 STATUS_OPTASK_ACTIVE = 6
 
 
-# --- مسارات ثابتة (يجب أن تسبق /{budget_id}) ---
+
 
 
 @router.get("/options")
@@ -179,7 +179,7 @@ async def get_budget_hierarchy(
     return {"success": True, "data": tree}
 
 
-# --- المسارات الديناميكية ---
+
 
 
 @router.get("/{budget_id}")
@@ -231,7 +231,7 @@ async def get_budget_detail(
             hierarchy = "برنامج استراتيجي"
 
 
-    # التحقق من صحة الميزانية الأب (Reconciliation)
+
     parent_warning = None
     if bl.parent_budget_id:
         parent = db.query(BudgetLine).filter(BudgetLine.budget_id == bl.parent_budget_id).first()
@@ -289,7 +289,7 @@ async def create_budget_line(
             raise HTTPException(status_code=403, detail="لا يمكن إضافة ميزانية إلا للمهام التشغيلية قيد التنفيذ (6)")
 
 
-    # التحقق من وجود ميزانية سابقة لنفس البند ونفس السنة
+
     existing = db.query(BudgetLine).filter(
         BudgetLine.budgetable_type == budgetable_type,
         BudgetLine.budgetable_id == budgetable_id,
@@ -324,7 +324,7 @@ async def update_budget_line(
         raise HTTPException(status_code=404, detail="الميزانية غير موجودة")
 
 
-    # التحقق من الحالة
+
     if bl.budgetable_type == "program":
         item = db.query(Program).filter(Program.program_id == bl.budgetable_id).first()
         if not item or item.status_id != STATUS_PROGRAM_ACTIVE:
@@ -397,7 +397,7 @@ async def create_transaction(
         raise HTTPException(status_code=404, detail="الميزانية غير موجودة")
 
 
-    # التحقق من الحالة
+
     if bl.budgetable_type == "program":
         item = db.query(Program).filter(Program.program_id == bl.budgetable_id).first()
         if not item or item.status_id != STATUS_PROGRAM_ACTIVE:
@@ -423,12 +423,12 @@ async def create_transaction(
         raise HTTPException(status_code=400, detail="نوع العملية غير صحيح")
 
 
-    # تطبيق قواعد المحاسبة
-    if type_id == 1: # تخصيص
+
+    if type_id == 1: 
         bl.allocated_amount = float(bl.allocated_amount) + amount
-    elif type_id == 2: # صرف
+    elif type_id == 2: 
         bl.spent_amount = float(bl.spent_amount) + amount
-    elif type_id == 3: # استرداد
+    elif type_id == 3: 
         bl.spent_amount = float(bl.spent_amount) - amount
     
     new_trans = BudgetTransaction(

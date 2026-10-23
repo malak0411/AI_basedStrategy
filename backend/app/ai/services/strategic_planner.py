@@ -53,9 +53,7 @@ class StrategicPlanner:
         return None
 
 
-    # ===========================================================
-    # 1) Context (full strategic chain)
-    # ===========================================================
+
     def get_initiative_context(self, initiative_id: int) -> dict:
         initiative = self.db.query(Initiative).filter(
             Initiative.initiative_id == initiative_id,
@@ -190,9 +188,7 @@ class StrategicPlanner:
         return " | ".join(parts)
 
 
-    # ===========================================================
-    # 2) Prompt (generation)
-    # ===========================================================
+
     def build_prompt(self, ctx: dict, user_instructions: str = "") -> str:
         ini = ctx["initiative"]
         num_tasks_hint = self._estimate_task_count(ctx)
@@ -281,9 +277,7 @@ class StrategicPlanner:
         return json.dumps(base, ensure_ascii=False)
 
 
-    # ===========================================================
-    # 3) Parsing
-    # ===========================================================
+
     def parse_response(self, text: str) -> list:
         if not text or not isinstance(text, str):
             return []
@@ -316,9 +310,7 @@ class StrategicPlanner:
         return []
 
 
-    # ===========================================================
-    # 4) Normalization & department assignment
-    # ===========================================================
+
     def normalize_tasks(self, raw_tasks: list, ctx: dict) -> list:
         departments = ctx.get("departments", [])
         normalized = []
@@ -517,9 +509,7 @@ class StrategicPlanner:
         return [d for _, d in support[:2]]
 
 
-    # ===========================================================
-    # 5) Save (approval)
-    # ===========================================================
+
     def save_major_tasks(self, initiative_id: int, tasks_data: list, created_by: int = None):
         initiative = self.db.query(Initiative).filter(
             Initiative.initiative_id == initiative_id,
@@ -618,9 +608,7 @@ class StrategicPlanner:
             raise
 
 
-    # ===========================================================
-    # 6) Job helpers
-    # ===========================================================
+
     def create_job(self, initiative_id: int, created_by: int = None) -> int:
         job = AiJob(
             job_type="strategic_task_generation",

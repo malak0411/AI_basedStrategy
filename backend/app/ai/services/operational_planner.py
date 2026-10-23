@@ -29,9 +29,7 @@ class OperationalPlanner:
             self.db.close()
 
 
-    # ------------------------------------------------------------------
-    # helpers
-    # ------------------------------------------------------------------
+
     def _safe_iso(self, value):
         try:
             return value.isoformat() if value else None
@@ -79,9 +77,7 @@ class OperationalPlanner:
         return today, duration, effective_start, effective_end
 
 
-    # ------------------------------------------------------------------
-    # 1) context
-    # ------------------------------------------------------------------
+
     def get_major_task_context(self, major_task_id: int) -> dict:
         task = (
             self.db.query(MajorTask)

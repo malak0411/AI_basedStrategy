@@ -20,7 +20,7 @@ class EmployeeRoleController extends Controller
         $token = session('jwt_token');
         if (session('user_role') !== 'super_admin') return redirect()->route('dashboard.employee')->with('error', 'غير مصرح');
 
-        // جلب الموظفين والأدوار
+
         $employees = $this->apiClient->safeGet('/api/employees', $token, []);
         $roles = $this->apiClient->safeGet('/api/roles', $token, []);
         $employeeRoles = $this->apiClient->safeGet('/api/employee-roles', $token, []);

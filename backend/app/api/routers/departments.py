@@ -7,9 +7,6 @@ from typing import Optional
 
 router = APIRouter(prefix="/api/departments", tags=["Departments"])
 
-# ============================================================
-# Schemas
-# ============================================================
 class DepartmentCreate(BaseModel):
     name: str
     code: Optional[str] = None
@@ -27,11 +24,9 @@ class DepartmentUpdate(BaseModel):
     level: Optional[int] = None
     is_active: Optional[bool] = None
 
-# ============================================================
-# دالة مساعدة
-# ============================================================
+
 def format_department(d):
-    """تنسيق بيانات الإدارة بشكل آمن"""
+
     manager_name = None
     try:
         if d.manager:
@@ -59,12 +54,10 @@ def format_department(d):
         "parent_name": parent_name
     }
 
-# ============================================================
-# GET - جميع الإدارات
-# ============================================================
+
 @router.get("")
 async def get_departments(db: Session = Depends(get_db)):
-    """جميع الإدارات"""
+
     try:
         depts = db.query(Department).all()
         result = [format_department(d) for d in depts]
@@ -72,12 +65,10 @@ async def get_departments(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-# ============================================================
-# GET - تفاصيل إدارة
-# ============================================================
+
 @router.get("/{department_id}")
 async def get_department(department_id: int, db: Session = Depends(get_db)):
-    """تفاصيل إدارة مع موظفيها"""
+
     try:
         d = db.query(Department).filter(Department.department_id == department_id).first()
         if not d:
@@ -99,12 +90,10 @@ async def get_department(department_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-# ============================================================
-# POST - إنشاء إدارة
-# ============================================================
+
 @router.post("")
 async def create_department(data: DepartmentCreate, db: Session = Depends(get_db)):
-    """إنشاء إدارة جديدة"""
+
     try:
         dept = Department(
             name=data.name,
@@ -130,12 +119,10 @@ async def create_department(data: DepartmentCreate, db: Session = Depends(get_db
         db.rollback()
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-# ============================================================
-# PUT - تحديث إدارة
-# ============================================================
+
 @router.put("/{department_id}")
 async def update_department(department_id: int, data: DepartmentUpdate, db: Session = Depends(get_db)):
-    """تحديث إدارة"""
+
     try:
         d = db.query(Department).filter(Department.department_id == department_id).first()
         if not d:
@@ -164,18 +151,16 @@ async def update_department(department_id: int, data: DepartmentUpdate, db: Sess
         db.rollback()
         raise HTTPException(status_code=500, detail=f"خطأ: {str(e)}")
 
-# ============================================================
-# DELETE - حذف إدارة
-# ============================================================
+
 @router.delete("/{department_id}")
 async def delete_department(department_id: int, db: Session = Depends(get_db)):
-    """حذف إدارة"""
+
     try:
         d = db.query(Department).filter(Department.department_id == department_id).first()
         if not d:
             raise HTTPException(status_code=404, detail="الإدارة غير موجودة")
 
-        # التحقق من عدم وجود موظفين
+
         emp_count = db.query(Employee).filter(Employee.department_id == department_id).count()
         if emp_count > 0:
             raise HTTPException(

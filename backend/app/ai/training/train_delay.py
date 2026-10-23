@@ -8,9 +8,9 @@ from app.ai.models.delay_predictor import DelayPredictor
 
 def main():
 
-    print("\n" + "🏛️" * 30)
+
     print("   نظام إدارة الاستراتيجية - تدريب نموذج التنبؤ بالتأخير")
-    print("🏛️" * 30)
+
     
     try:
 

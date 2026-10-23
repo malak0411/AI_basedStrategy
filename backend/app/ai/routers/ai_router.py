@@ -576,9 +576,7 @@ async def get_operational_strategic_map(
 
 
 
-# ===========================================================================
-# Strategic generation (background workers)
-# ===========================================================================
+
 def strategic_generation_in_background(job_id: int, initiative_id: int, instructions: str = ""):
     planner = StrategicPlanner()
     try:
@@ -682,9 +680,7 @@ def strategic_edit_in_background(job_id: int, instruction: str):
 
 
 
-# ===========================================================================
-# Strategic generation (endpoints)
-# ===========================================================================
+
 @router.post("/strategic/generate-major-tasks/{initiative_id}")
 async def generate_major_tasks(
     initiative_id: int,
@@ -936,9 +932,7 @@ async def approve_strategic_tasks(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-# ===========================================================================
-# Predictions & dashboard (unchanged)
-# ===========================================================================
+
 @router.get("/predict-delay/{task_id}")
 async def predict_task_delay(task_id: int):
     try:
@@ -1045,9 +1039,7 @@ async def get_recommendations(task_id: int, save: bool = False):
 
 
 
-# ===========================================================================
-# Risk endpoints (current_user fix applied)
-# ===========================================================================
+
 @router.post("/risk/{risk_id}/recommendations")
 async def generate_risk_recommendations(
     risk_id: int,
@@ -1174,9 +1166,6 @@ async def get_risk_ai_recommendations(risk_id: int, db: Session = Depends(get_db
 
 
 
-# ===========================================================================
-# Job status & scheduler (unchanged)
-# ===========================================================================
 @router.get("/jobs/{job_id}")
 async def get_job_status(job_id: int, db: Session = Depends(get_db)):
     job = db.query(AiJob).filter(AiJob.job_id == job_id).first()

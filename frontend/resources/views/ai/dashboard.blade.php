@@ -86,7 +86,7 @@
                 <table class="table table-sm mt-2 mb-0">
                     <tr><td>الخوارزمية</td><td><strong>XGBoost</strong></td></tr>
                     <tr><td>الإصدار</td><td>{{ $dashboard['model_version'] ?? '1.0.0' }}</td></tr>
-                    <tr><td>الحالة</td><td>{{ ($dashboard['is_model_trained'] ?? false) ? '✅ مدرب' : '❌ غير مدرب' }}</td></tr>
+                    <tr><td>الحالة</td><td>{{ ($dashboard['is_model_trained'] ?? false) ? ' مدرب' : ' غير مدرب' }}</td></tr>
                 </table>
             </div>
         </div>
@@ -95,7 +95,7 @@
                 <h6><i class="fas fa-robot ml-2"></i>نموذج التوصيات</h6>
                 <table class="table table-sm mt-2 mb-0">
                     <tr><td>النوع</td><td><strong>قواعد منطقية (Rule-Based)</strong></td></tr>
-                    <tr><td>الحالة</td><td>{{ ($models['recommender']['trained'] ?? false) ? '✅ نشط' : '✅ نشط' }}</td></tr>
+                    <tr><td>الحالة</td><td>{{ ($models['recommender']['trained'] ?? false) ? ' نشط' : ' نشط' }}</td></tr>
                     <tr><td>الإصدار</td><td>{{ $models['recommender']['version'] ?? '1.0.0' }}</td></tr>
                 </table>
             </div>
@@ -167,7 +167,7 @@
             <div class="text-center py-4">
                 <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
                 <h5>لا توجد مهام عالية الخطورة</h5>
-                <p class="text-muted">جميع المهام تسير بشكل طبيعي 🎉</p>
+                <p class="text-muted">جميع المهام تسير بشكل طبيعي </p>
             </div>
         @endif
     </div>

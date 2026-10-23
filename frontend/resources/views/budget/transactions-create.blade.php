@@ -79,8 +79,7 @@
         const amount = parseFloat(document.getElementById('transAmount').value) || 0;
         const warning = document.getElementById('overspendWarning');
         
-        // التحذير فقط في حالة الصرف (2) إذا كان يتجاوز المتبقي
-        if (type == '2' && amount > remaining) {
+         if (type == '2' && amount > remaining) {
             warning.classList.remove('d-none');
         } else {
             warning.classList.add('d-none');

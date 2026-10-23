@@ -6,6 +6,8 @@ from app.api.routers import auth, strategic, tasks, dashboard, employees, budget
 from app.api.routers import system_config, admin, location, departments as dept_routes
 from app.ai.routers.ai_router import router as ai_router
 from app.api.routers import dict_router 
+from app.api.routers import audit_log as audit_log_router
+
 
 
 app = FastAPI(
@@ -54,6 +56,8 @@ app.include_router(dict_router.router)
 app.include_router(ai_router)
 
 app.include_router(reports.router)
+app.include_router(audit_log_router.router)
+
 
 @app.get("/")
 async def root():
@@ -72,4 +76,4 @@ async def health_check():
 async def startup_event():
     from app.ai.services.scheduler import ai_scheduler
     ai_scheduler.start()
-    print("🚀 تم بدء جدولة AI التلقائية")
+    print(" تم بدء جدولة AI التلقائية")

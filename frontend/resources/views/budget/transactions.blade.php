@@ -85,7 +85,7 @@
                 </tbody>
             </table>
             
-            <!-- Pagination -->
+
             @if(isset($pagination['total_pages']) && $pagination['total_pages'] > 1)
             <nav>
                 <ul class="pagination justify-content-center">

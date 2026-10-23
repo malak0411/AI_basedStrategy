@@ -4,9 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 
-# ================================================================
-# Enums
-# ================================================================
+
 
 class TaskStatusEnum(str, Enum):
     PENDING = "pending"
@@ -36,9 +34,7 @@ class AcceptanceStatusEnum(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
 
-# ================================================================
-# Auth Schemas
-# ================================================================
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -65,9 +61,7 @@ class UserInfoResponse(BaseModel):
     roles: List[str] = []
     permissions: List[str] = []
 
-# ================================================================
-# Password Management Schemas (NEW)
-# ================================================================
+
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
@@ -85,9 +79,8 @@ class ChangePasswordRequest(BaseModel):
 class ChangePasswordResponse(BaseModel):
     message: str
 
-# ================================================================
-# Strategic Pillars Schemas
-# ================================================================
+
+
 
 class StrategicPillarCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -110,9 +103,9 @@ class StrategicPillarResponse(BaseModel):
     updated_at: Optional[datetime] = None
     goals_count: Optional[int] = 0
 
-# ================================================================
-# Strategic Goals Schemas
-# ================================================================
+
+
+
 
 class StrategicGoalCreate(BaseModel):
     pillar_id: int
@@ -157,9 +150,7 @@ class StrategicGoalResponse(BaseModel):
     programs_count: Optional[int] = 0
     achievement_percentage: Optional[float] = 0
 
-# ================================================================
-# Programs Schemas
-# ================================================================
+
 
 class ProgramCreate(BaseModel):
     goal_id: int
@@ -203,9 +194,7 @@ class ProgramResponse(BaseModel):
     updated_at: Optional[datetime] = None
     initiatives_count: Optional[int] = 0
 
-# ================================================================
-# Initiatives Schemas
-# ================================================================
+
 
 class InitiativeCreate(BaseModel):
     program_id: int
@@ -253,9 +242,7 @@ class InitiativeResponse(BaseModel):
     updated_at: Optional[datetime] = None
     major_tasks_count: Optional[int] = 0
 
-# ================================================================
-# Major Tasks Schemas
-# ================================================================
+
 
 class MajorTaskCreate(BaseModel):
     initiative_id: int
@@ -289,9 +276,7 @@ class MajorTaskResponse(BaseModel):
     updated_at: Optional[datetime] = None
     operational_tasks_count: Optional[int] = 0
 
-# ================================================================
-# Operational Tasks Schemas
-# ================================================================
+
 
 class OperationalTaskCreate(BaseModel):
     major_task_id: int
@@ -343,9 +328,7 @@ class OperationalTaskResponse(BaseModel):
     is_delayed: Optional[bool] = False
     remaining_days: Optional[int] = None
 
-# ================================================================
-# Task Assignments Schemas
-# ================================================================
+
 
 class TaskAssignmentCreate(BaseModel):
     employee_id: int
@@ -376,9 +359,7 @@ class TaskAssignmentResponse(BaseModel):
     assigned_at: datetime
     is_active: bool
 
-# ================================================================
-# Task Progress Schemas
-# ================================================================
+
 
 class TaskProgressUpdate(BaseModel):
     progress_percent: int = Field(..., ge=0, le=100)
@@ -397,9 +378,7 @@ class TaskProgressLogResponse(BaseModel):
     notes: Optional[str] = None
     log_time: datetime
 
-# ================================================================
-# Department Schemas
-# ================================================================
+
 
 class DepartmentCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -433,9 +412,7 @@ class DepartmentResponse(BaseModel):
     updated_at: Optional[datetime] = None
     employees_count: Optional[int] = 0
 
-# ================================================================
-# Employee Schemas
-# ================================================================
+
 
 class EmployeeCreate(BaseModel):
     department_id: int
@@ -480,9 +457,7 @@ class EmployeeResponse(BaseModel):
     updated_at: Optional[datetime] = None
     roles: List[str] = []
 
-# ================================================================
-# Dashboard Schemas
-# ================================================================
+
 
 class DepartmentPerformance(BaseModel):
     department_id: int
@@ -510,12 +485,10 @@ class EmployeeDashboardResponse(BaseModel):
     tasks_summary: dict
     recent_activities: List[dict]
 
-# ================================================================
-# Budget Schemas
-# ================================================================
+
 
 class BudgetLineCreate(BaseModel):
-    budgetable_type: str  # program, initiative, major_task, operational_task
+    budgetable_type: str  
     budgetable_id: int
     department_id: Optional[int] = None
     allocated_amount: Decimal = Decimal(0)
@@ -562,9 +535,7 @@ class BudgetTransactionResponse(BaseModel):
     approved_by_name: Optional[str] = None
     approved_at: Optional[datetime] = None
 
-# ================================================================
-# Risk Schemas
-# ================================================================
+
 
 class RiskCreate(BaseModel):
     task_id: Optional[int] = None
@@ -605,9 +576,7 @@ class RiskResponse(BaseModel):
     status_name: Optional[str] = None
     updated_at: datetime
 
-# ================================================================
-# KPI Schemas
-# ================================================================
+
 
 class KPICreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -660,18 +629,16 @@ class KPIMeasurementResponse(BaseModel):
     recorded_by_name: Optional[str] = None
     notes: Optional[str] = None
 
-# ================================================================
-# AI Schemas
-# ================================================================
+
 
 class DelayPredictionRequest(BaseModel):
     task_id: int
     current_progress: int = Field(..., ge=0, le=100)
     remaining_days: int = Field(..., ge=0)
-    history: dict  # date -> progress
+    history: dict  
 
 class DelayPredictionResponse(BaseModel):
-    prediction: str  # "on_track", "likely_delayed", "critical"
+    prediction: str  
     probability_delay: float
     confidence: float
     suggestion: str
