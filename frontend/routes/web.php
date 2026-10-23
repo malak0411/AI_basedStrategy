@@ -460,6 +460,7 @@ Route::middleware(['check.jwt'])->prefix('reports')->name('reports.')->group(fun
     Route::get('/kpis', [ReportController::class, 'kpis'])->name('kpis');
     Route::get('/departments', [ReportController::class, 'departments'])->name('departments');
     Route::get('/employees', [ReportController::class, 'employees'])->name('employees');
+    Route::get('/tasks', [ReportController::class, 'tasks'])->name('tasks');
     Route::get('/export/{type}', [ReportController::class, 'export'])->name('export');
 });
 
