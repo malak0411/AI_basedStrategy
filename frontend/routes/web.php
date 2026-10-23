@@ -109,6 +109,8 @@ Route::middleware('check.jwt')->group(function () {
 
     Route::middleware(['web', 'check.jwt'])->group(function () {
 
+    Route::get('/operational', [OperationalTaskController::class, 'index'])
+        ->name('operational.index');
     Route::get('/operational/major-tasks', [OperationalTaskController::class, 'majorTasks'])
         ->name('operational.major-tasks');
 

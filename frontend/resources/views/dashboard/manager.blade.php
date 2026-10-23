@@ -304,24 +304,7 @@
 
 
     <div class="quick-links">
-        <a href="{{ route('operational.major-tasks') }}" class="quick-link">
-            <div class="icon-box blue"><i class="fas fa-layer-group"></i></div>
-            <div>
-                <div class="label">المهام الرئيسية</div>
-                <div class="sub">عرض وإدارة المهام الرئيسية</div>
-            </div>
-        </a>
-
-
-        <a href="{{ route('operational.kanban') }}" class="quick-link">
-            <div class="icon-box green"><i class="fas fa-columns"></i></div>
-            <div>
-                <div class="label">لوحة المهام التشغيلية</div>
-                <div class="sub">عرض حسب الحالة</div>
-            </div>
-        </a>
-
-
+        
         <a href="{{ route('risks.index') }}" class="quick-link">
             <div class="icon-box red"><i class="fas fa-exclamation-triangle"></i></div>
             <div>

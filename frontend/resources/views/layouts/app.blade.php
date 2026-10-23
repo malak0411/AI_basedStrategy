@@ -492,8 +492,8 @@
         <nav class="nav flex-column">
             @php
                 $userRole = session('user_role', 'employee');
-                $isMinister = in_array($userRole, ['minister', 'deputy', 'general_manager']);
-                $isManager = ($userRole === 'manager');
+                $isMinister = in_array($userRole, ['minister', 'deputy']);
+                $isManager = in_array($userRole, ['manager', 'general_manager']);
                 $isSuperAdmin = ($userRole === 'super_admin');
             @endphp
 
@@ -503,23 +503,16 @@
             <a class="nav-link {{ request()->routeIs('dashboard.employee') ? 'active' : '' }}" href="{{ route('dashboard.employee') }}">
                 <i class="fas fa-user"></i><span class="nav-text">لوحة الموظف</span>
             </a>
-            @if($isManager || $isMinister || $isSuperAdmin)
+            @if($isManager)
             <a class="nav-link {{ request()->routeIs('dashboard.manager') ? 'active' : '' }}" href="{{ route('dashboard.manager') }}">
                 <i class="fas fa-user-tie"></i><span class="nav-text">لوحة المدير</span>
             </a>
             @endif
-            @if($isMinister || $isSuperAdmin)
+            @if($isMinister)
             <a class="nav-link {{ request()->routeIs('dashboard.minister') ? 'active' : '' }}" href="{{ route('dashboard.minister') }}">
                 <i class="fas fa-crown"></i><span class="nav-text">لوحة الوزير</span>
             </a>
             @endif
-
-
-            {{-- العمليات --}}
-            <div class="nav-section">العمليات</div>
-            <a class="nav-link {{ request()->routeIs('tasks.*') ? 'active' : '' }}" href="{{ route('tasks.index') }}">
-                <i class="fas fa-tasks"></i><span class="nav-text">المهام</span>
-            </a>
 
 
             {{-- الاستراتيجية --}}
@@ -561,31 +554,8 @@
             <a class="nav-link {{ request()->routeIs('risks.*') ? 'active' : '' }}" href="{{ route('risks.index') }}">
                 <i class="fas fa-exclamation-triangle"></i><span class="nav-text">المخاطر</span>
             </a>
-            <a class="nav-link" href="{{ route('operational.kanban') }}">
-                <i class="fas fa-columns"></i><span class="nav-text">لوحة المهام</span>
-            </a>
             @endif
 
-
-            {{-- الذكاء الاصطناعي --}}
-            @if($isMinister || $isManager || $isSuperAdmin)
-            <div class="nav-section">ذكاء اصطناعي</div>
-            <a class="nav-link {{ request()->routeIs('ai.dashboard') ? 'active' : '' }}" href="{{ route('ai.dashboard') }}">
-                <i class="fas fa-brain"></i><span class="nav-text">لوحة AI</span>
-            </a>
-            <a class="nav-link {{ request()->routeIs('ai.strategic.*') ? 'active' : '' }}" href="{{ route('ai.strategic.index') }}">
-                <i class="fas fa-robot"></i><span class="nav-text">توليد المهام الرئيسية</span>
-            </a>
-            <a class="nav-link {{ request()->routeIs('ai.models.*') ? 'active' : '' }}" href="{{ route('ai.models') }}">
-                <i class="fas fa-microchip"></i><span class="nav-text">النماذج</span>
-            </a>
-            <a class="nav-link {{ request()->routeIs('ai.recommendations.*') ? 'active' : '' }}" href="{{ route('ai.recommendations') }}">
-                <i class="fas fa-lightbulb"></i><span class="nav-text">التوصيات</span>
-            </a>
-            <a class="nav-link" href="{{ route('operational.major-tasks') }}">
-                <i class="fas fa-tasks"></i><span class="nav-text">المهام التشغيلية</span>
-            </a>
-            @endif
 
 
             {{-- التقارير --}}
@@ -641,26 +611,7 @@
             <a class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}" href="{{ route('admin.settings.index') }}">
                 <i class="fas fa-cogs"></i><span class="nav-text">تهيئة النظام</span>
             </a>
-
-
-            <div class="nav-section">القواميس</div>
-            <a class="nav-link" href="{{ route('admin.dictionaries.statuses') }}">
-                <i class="fas fa-tag"></i><span class="nav-text">الحالات</span>
-            </a>
-            <a class="nav-link" href="{{ route('admin.dictionaries.priorities') }}">
-                <i class="fas fa-sort-amount-up"></i><span class="nav-text">الأولويات</span>
-            </a>
-            <a class="nav-link" href="{{ route('admin.dictionaries.risk-levels') }}">
-                <i class="fas fa-exclamation-circle"></i><span class="nav-text">مستويات المخاطر</span>
-            </a>
-            <a class="nav-link" href="{{ route('admin.dictionaries.role-types') }}">
-                <i class="fas fa-user-tag"></i><span class="nav-text">أنواع الأدوار</span>
-            </a>
-            <a class="nav-link" href="{{ route('admin.dictionaries.transaction-types') }}">
-                <i class="fas fa-exchange-alt"></i><span class="nav-text">أنواع المعاملات</span>
-            </a>
             @endif
-
 
             {{-- تسجيل الخروج --}}
             <form method="POST" action="{{ route('logout') }}">
